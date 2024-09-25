@@ -12,7 +12,7 @@ Please see TAGGING.md for details on object comments.
 
 | Solution | Description |
 | --- | --- |
-| [Supply Chain Network Optimization](./sfguide-supply-chain-network-optimization/) | Using optimization programming to make least cost fulfillment decisions. |
-| [Solution Installation Wizard](./sfguide-solution-installation-wizard/) | A Native App that helps facilitate consumers deploy code from the provider. |
-| [Alert Hub](./sfguide-alert-hub/) | A Streamlit for managing and templatizing Alerts. |
-| [Application Control Framework](./sfguide-application-control-framework/) | A framework that allows for rule-based access and consumer experiences within Native Apps. |
+| [Supply Chain Network Optimization](https://github.com/Snowflake-Labs/sfguide-supply-chain-network-optimization/) | Using optimization programming to make least cost fulfillment decisions. |
+| [Solution Installation Wizard](https://github.com/Snowflake-Labs/sfguide-solution-installation-wizard/) | A Native App that helps facilitate consumers deploy code from the provider. |
+| [Alert Hub](https://github.com/Snowflake-Labs/sfguide-alert-hub/) | A Streamlit for managing and templatizing Alerts. |
+| [Application Control Framework](https://github.com/Snowflake-Labs/sfguide-application-control-framework/) | A framework that allows for rule-based access and consumer experiences within Native Apps. |
