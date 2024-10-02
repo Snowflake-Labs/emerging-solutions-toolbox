@@ -1,0 +1,9 @@
+# This dependabot.yml file will updates git submodules
+version: 2
+updates:
+
+  # Maintain dependencies git submodules
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "daily"

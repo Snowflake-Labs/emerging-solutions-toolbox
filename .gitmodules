@@ -1,0 +1,12 @@
+[submodule "sfguide-supply-chain-network-optimization"]
+	path = sfguide-supply-chain-network-optimization
+	url = https://github.com/Snowflake-Labs/sfguide-supply-chain-network-optimization
+[submodule "sfguide-solution-installation-wizard"]
+	path = sfguide-solution-installation-wizard
+	url = https://github.com/Snowflake-Labs/sfguide-solution-installation-wizard
+[submodule "sfguide-alert-hub"]
+	path = sfguide-alert-hub
+	url = https://github.com/Snowflake-Labs/sfguide-alert-hub
+[submodule "sfguide-application-control-framework"]
+	path = sfguide-application-control-framework
+	url = https://github.com/Snowflake-Labs/sfguide-application-control-framework
