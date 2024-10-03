@@ -10,3 +10,18 @@
 [submodule "sfguide-application-control-framework"]
 	path = sfguide-application-control-framework
 	url = https://github.com/Snowflake-Labs/sfguide-application-control-framework
+[submodule "sfguide-data-crawler"]
+	path = sfguide-data-crawler
+	url = https://github.com/Snowflake-Labs/sfguide-data-crawler
+[submodule "sfguide-cohort-builder"]
+	path = sfguide-cohort-builder
+	url = https://github.com/Snowflake-Labs/sfguide-cohort-builder
+[submodule "sfguide-getting-started-with-api-enrichment-framework"]
+	path = sfguide-getting-started-with-api-enrichment-framework
+	url = https://github.com/Snowflake-Labs/sfguide-getting-started-with-api-enrichment-framework
+[submodule "sfguide-getting-started-with-data-quality-manager"]
+	path = sfguide-getting-started-with-data-quality-manager
+	url = https://github.com/Snowflake-Labs/sfguide-getting-started-with-data-quality-manager
+[submodule "sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks"]
+	path = sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
+	url = https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
