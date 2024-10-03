@@ -19,3 +19,8 @@ Please see TAGGING.md for details on object comments.
 | [Solution Installation Wizard](https://github.com/Snowflake-Labs/sfguide-solution-installation-wizard/) | A Native App that helps facilitate consumers deploy code from the provider. |
 | [Alert Hub](https://github.com/Snowflake-Labs/sfguide-alert-hub/) | A Streamlit for managing and templatizing Alerts. |
 | [Application Control Framework](https://github.com/Snowflake-Labs/sfguide-application-control-framework/) | A framework that allows for rule-based access and consumer experiences within Native Apps. |
+| [Data Crawler](https://github.com/Snowflake-Labs/sfguide-data-crawler/) | A solution prompting a Cortex Large Language Model (LLM) to generate a natural language description of each table within a database and/or schema. |
+| [Cohort Builder](https://github.com/Snowflake-Labs/sfguide-cohort-builder/) | The Cohort Builder Model leverages Snowflake and Snowpark to create, manage, and schedule cohorts effectively. |
+| [API Enrichment Framework](https://github.com/Snowflake-Labs/sfguide-getting-started-with-api-enrichment-framework/) | A Native App designed to quick start API-driven data enrichment. |
+| [Data Quality Manager](https://github.com/Snowflake-Labs/sfguide-getting-started-with-data-quality-manager/) | A application designed to implement data quality checks, using both Snowflake data metric functions (DMFs) and custom checks. |
+| [ML (Machine Learning) Sidekick](https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks/) | A no-code app built using Streamlit in Snowflake, designed for building and deploying machine learning models in Snowflake. |
