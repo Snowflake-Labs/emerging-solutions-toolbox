@@ -1,3 +1,5 @@
+![Emerging Solutions Toolbox Banner](banner_emerging_solutions_toolbox.png)
+
 # Emerging Solutions Toolbox
 #### Brought to you by Snowflake's Solution Innovation Team (SIT)
 The Emerging Solutions Toolbox is a collection of solutions created by Snowflake's Solution Innovation Team (SIT).  Each folder represents a separate solution, and solutions can range anywhere between helpful administrative notebooks to fully-fledged frameworks and native applications.  Each solution contains its own licensing agreement, telemetry tagging information, and details on the solution.  Check back frequently, as we'll continually be adding new solutions.
@@ -33,3 +35,9 @@ A solution can represent one of three types:
 | [API Enrichment Framework](https://github.com/Snowflake-Labs/sfguide-getting-started-with-api-enrichment-framework/) | FRAMEWORK | A Native App designed to quick start API-driven data enrichment. |
 | [Data Quality Manager](https://github.com/Snowflake-Labs/sfguide-getting-started-with-data-quality-manager/) | FRAMEWORK | An application designed to implement data quality checks, using both Snowflake data metric functions (DMFs) and custom checks. |
 | [ML (Machine Learning) Sidekick](https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks/) | FRAMEWORK | A no-code app built using Streamlit in Snowflake, designed for building and deploying machine learning models in Snowflake. |
+| [DSPy](https://github.com/stanfordnlp/dspy/) | FRAMEWORK | Added Snowflake Cortex support for DSPy, and framework for optimizing lanugage model prompts and weights. |
+| [Semantic Model Generator](https://github.com/Snowflake-Labs/semantic-model-generator/) | FRAMEWORK | A semantic model generator for use with Snowflake's Cortex Analyst, including support for migrating other semantic models including dbt and Looker. |
+| [Data Model Mapper](https://github.com/Snowflake-Labs/sfguide-data-model-mapper/) | FRAMEWORK | A native app solution with no-code UI that helps consumers model, map, and share provider-standardized data to providers. |
+| [Migrate Tasks to Dynamic Tables Notebook](https://snow.gitlab-dedicated.com/snowflakecorp/SE/sit/sln.emerging-solutions-toolbox/-/tree/master/helper-tasks-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible Tasks that can be migrated to Dynamic Tables (DTs), with the option to examine the DT DDL and/or migrate. |
+| [Migrate Non-Tasks to Dynamic Tables Notebook](https://snow.gitlab-dedicated.com/snowflakecorp/SE/sit/sln.emerging-solutions-toolbox/-/tree/master/helper-non_tasks-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible repetitive commands, that are executed not using tasks, that can be migrated to Dynamic Tables (DTs), with the option to examine the DT DDL and/or migrate. |
+| [Migrate Secure Views to Dynamic Tables Notebook](https://snow.gitlab-dedicated.com/snowflakecorp/SE/sit/sln.emerging-solutions-toolbox/-/tree/master/helper-secure-views-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible secure views to migrate to Dynamic Tables (DT). |
