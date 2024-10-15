@@ -1,0 +1,28 @@
+version:
+ name: v1.0
+ label: "Share IceBerger Helper v1.0"
+ comment: "sit_share_iceberger_helper"
+
+artifacts:
+ setup_script: setup_hello.sql
+ extension_code: true
+
+references:
+  - consumer_table:
+      label: "Consumer Table"
+      description: "Select the table you wish to Create an Iceberg Table From"
+      privileges: "SELECT,INSERT,UPDATE"
+      object_type: Table
+      multi_valued: true
+      register_callback: src.update_reference
+
+configuration:
+ log_level: DEBUG
+ trace_level: ON_EVENT
+ default_streamlit: src.streamlit
+
+privileges: # optional (default: empty list)
+# description is a required subfield
+ - EXECUTE TASK: "To run ingestion tasks for replicating Redshift data"
+ - EXECUTE MANAGED TASK: "To run serverless ingestion tasks for replicating Redshift data"
+ - CREATE DATABASE: "To create sink databases for replicating Redshift data"
