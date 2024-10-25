@@ -1,0 +1,152 @@
+{
+  "process_name" : "target_incremental_merge_inventory_by_transaction_1",
+  "process_type_id" : 2,
+  "distinct": false,
+  "top": 1000,
+  "columns" : [
+    "HASH(OBJ_1.ITEMID,OBJ_1.LOCATIONID,MAX(OBJ_1.PROJECT),MAX(OBJ_1.AVAILABLEFORSUPPLYDATE),RIGHT(OBJ_1.BATCH, 4),SUM(OBJ_1.QUANTITY),MAX(OBJ_1.STORE),MAX(OBJ_2.STARTDATE),MAX(OBJ_2.TRANSACTIONCODE)) RECORD_ID" ,
+    "OBJ_1.ITEMID",
+    "OBJ_1.LOCATIONID",
+    "MAX(OBJ_1.PROJECT) PROJECT",
+    "MAX(OBJ_1.TYPE) TYPE",
+    "MAX(OBJ_1.AVAILABLEFORSUPPLYDATE) AVAILABLEFORSUPPLYDATE",
+    "RIGHT(OBJ_1.BATCH, 4) BATCH",
+    "SUM(OBJ_1.QUANTITY) QUANTITY_SUM",
+    "MAX(OBJ_1.STORE) STORE",
+    "MAX(OBJ_2.STARTDATE) STARTDATE",
+    "MAX(OBJ_2.TRANSACTIONCODE) TRANSACTIONCODE"
+  ],
+  "group_by" : [
+    "OBJ_1.ITEMID",
+    "OBJ_1.LOCATIONID",
+    "RIGHT(OBJ_1.BATCH, 4)"
+  ],
+  "join" : [
+    {
+      "collection_id" : 1,
+      "alias" : "OBJ_2",
+      "key" : "ITEMID",
+      "object" : "ZAMBONI_DB.ZAMBONI_SRC.INVENTORY_TRANSACTIONS"
+    }
+  ],
+  "order_by_pos" : [1,2,3,7,6],
+  "settings" : {
+    "target_interval" : "minute",
+    "target_lag" : 1440,
+    "warehouse" : "xs_wh",
+    "when_matched" : [],
+    "when_not_matched" : []
+  },
+  "source" : {
+    "collection_id" : 1,
+    "alias" : "OBJ_1",
+    "key" : "ITEMID",
+    "object" : "ZAMBONI_DB.ZAMBONI_SRC.INVENTORY_ON_HANDS"
+  },
+  "target" : {
+    "collection_id" : 2,
+    "alias" : "TGT_1",
+    "key" : null,
+    "object" : "ZAMBONI_DB.ZAMBONI_TGT.INVENTORY_BY_TRANSACTION_INCREMENTAL"
+  },
+  "where" : [
+    {
+      "attr_1" : "OBJ_1.LOCATIONID",
+      "operator" : "IN",
+      "attr_2" : "('LDC2', 'LDC3')",
+      "condition" : "AND"
+    },
+    {
+      "attr_1" : "OBJ_1.ITEMID",
+      "operator" : "!=",
+      "attr_2" : "'CFGB09'",
+      "condition" : "AND"
+    },
+    {
+      "attr_1" : "OBJ_1.AVAILABLEFORSUPPLYDATE ",
+      "operator" : "!=",
+      "attr_2" : "'2023-10-30'",
+      "condition" : ""
+    }
+  ],
+  "mapping" : [
+    {
+      "source_attr" : "RECORD_ID",
+      "target_attr" : "RECORD_ID",
+      "merge_on" : "Y",
+      "update" : "N",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "ITEMID",
+      "target_attr" : "ITEM_ID",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "LOCATIONID",
+      "target_attr" : "LOCATION_ID",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "PROJECT",
+      "target_attr" : "PROJECT_NAME",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "TYPE",
+      "target_attr" : "TYPE",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "AVAILABLEFORSUPPLYDATE",
+      "target_attr" : "SUPPLY_DATE",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "BATCH",
+      "target_attr" : "BATCH_ID",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "QUANTITY_SUM",
+      "target_attr" : "QUANTITY_SUM",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "STORE",
+      "target_attr" : "STORE_NAME",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "STARTDATE",
+      "target_attr" : "START_DATE",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    },
+    {
+      "source_attr" : "TRANSACTIONCODE",
+      "target_attr" : "TRANSACTION_CODE",
+      "merge_on" : "N",
+      "update" : "Y",
+      "insert" : "Y"
+    }
+  ],
+  "labels" : ["label1", "label2"]
+}

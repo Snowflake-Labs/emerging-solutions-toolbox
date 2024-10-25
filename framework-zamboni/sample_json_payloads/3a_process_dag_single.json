@@ -1,0 +1,9 @@
+{
+  "child_processes" : [
+    {
+      "process_id" : 1,
+      "process_name" : "target_dt_inventory_by_transaction",
+      "process_order" : 1
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "child_processes" : [
+    {
+      "process_id" : 2,
+      "process_name" : "target_incremental_merge_inventory_by_transaction_2",
+      "process_order" : 2
+    },
+    {
+      "process_id" : 2,
+      "process_name" : "target_incremental_merge_inventory_by_transaction_1",
+      "process_order" : 1
+    }
+  ]
+}
