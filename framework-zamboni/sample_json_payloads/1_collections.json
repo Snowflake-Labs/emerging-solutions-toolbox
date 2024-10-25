@@ -1,0 +1,38 @@
+{
+    "objects": [
+      {
+        "alias": "OBJ_1",
+        "columns": [
+          "ITEMID",
+          "LOCATIONID",
+          "PROJECT",
+          "TYPE",
+          "AVAILABLEFORSUPPLYDATE",
+          "BATCH",
+          "UOM",
+          "QUANTITY",
+          "PROCESSTYPE",
+          "EXPIRATIONDATE",
+          "SITEOWNER",
+          "ITEMOWNER",
+          "ONHANDPOSTDATETIME",
+          "MEASURE",
+          "NODETYPE",
+          "LOB",
+          "LOTNUMBER",
+          "STORE",
+          "CTOITEMID",
+          "CTOBOMID"
+        ],
+        "object_id": 1
+      },
+      {
+        "alias": "OBJ_2",
+        "columns": [
+          "STARTDATE",
+          "TRANSACTIONCODE"
+        ],
+        "object_id": 2
+      }
+    ]
+  }

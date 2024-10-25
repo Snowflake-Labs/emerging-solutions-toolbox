@@ -1,0 +1,84 @@
+{
+  "process_name" : "target_dt_inventory_by_transaction",
+  "process_type_id" : 1,
+  "distinct": true,
+  "top": null,
+  "columns" : [
+    "OBJ_1.ITEMID",
+    "OBJ_1.LOCATIONID",
+    "MAX(OBJ_1.PROJECT) PROJECT",
+    "MAX(OBJ_1.TYPE) TYPE",
+    "MAX(OBJ_1.AVAILABLEFORSUPPLYDATE) AVAILABLEFORSUPPLYDATE",
+    "RIGHT(OBJ_1.BATCH, 4) BATCH",
+    "SUM(OBJ_1.QUANTITY) QUANTITY_SUM",
+    "MAX(OBJ_1.STORE) STORE",
+    "MAX(OBJ_2.STARTDATE) STARTDATE",
+    "MAX(OBJ_2.TRANSACTIONCODE) TRANSACTIONCODE"
+  ],
+  "group_by" : [
+    "OBJ_1.ITEMID",
+    "OBJ_1.LOCATIONID",
+    "RIGHT(OBJ_1.BATCH, 4)"
+  ],
+  "join" : [
+    {
+      "collection_id" : 1,
+      "alias" : "OBJ_2",
+      "object" : "ZAMBONI_DB.ZAMBONI_SRC.INVENTORY_TRANSACTIONS",
+      "keys" : [
+        {
+          "attr_1" : "OBJ_1.ITEMID",
+          "operator" : "=",
+          "attr_2" : "OBJ_2.ITEMID",
+          "condition" : ""
+        }
+      ]
+    }
+  ],
+  "order_by_cols" : [
+    "ITEMID",
+    "LOCATIONID",
+    "BATCH",
+    "AVAILABLEFORSUPPLYDATE"
+  ],
+  "settings" : {
+    "downstream" : true,
+    "target_interval" : "hours",
+    "target_lag" : 24,
+    "warehouse" : "xs_wh"
+  },
+  "source" : {
+    "collection_id" : 1,
+    "alias" : "OBJ_1",
+    "key" : "ITEMID",
+    "object" : "ZAMBONI_DB.ZAMBONI_SRC.INVENTORY_ON_HANDS"
+  },
+  "target" : {
+    "collection_id" : 2,
+    "alias" : "OBJ3",
+    "key" : null,
+    "object" : "ZAMBONI_DB.ZAMBONI_TGT.INVENTORY_BY_TRANSACTION_DYNAMIC"
+  },
+  "where" : [
+    {
+      "attr_1" : "OBJ_1.LOCATIONID",
+      "operator" : "IN",
+      "attr_2" : "('LDC2', 'LDC3')",
+      "condition" : "AND"
+    },
+    {
+      "attr_1" : "OBJ_1.ITEMID",
+      "operator" : "!=",
+      "attr_2" : "'CFGB09'",
+      "condition" : "AND"
+    },
+    {
+      "attr_1" : "OBJ_1.AVAILABLEFORSUPPLYDATE ",
+      "operator" : "!=",
+      "attr_2" : "'2023-10-30'",
+      "condition" : ""
+    }
+  ],
+  "mapping" : [],
+  "labels" : ["label1", "label2"]
+}

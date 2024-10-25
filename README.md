@@ -42,3 +42,6 @@ A solution can represent one of three types:
 | [Migrate Non-Tasks to Dynamic Tables Notebook](/helper-non_tasks-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible repetitive commands, that are executed not using tasks, that can be migrated to Dynamic Tables (DTs), with the option to examine the DT DDL and/or migrate. |
 | [Migrate Secure Views to Dynamic Tables Notebook](/helper-secure-views-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible secure views to migrate to Dynamic Tables (DT). |
 | [Share (Ice)Berger Helper](/helper-share-iceberger-helper) | HELPER | A Native app that helps Consumers turn Provider data into iceberg tables for external use
+| [Zamboni](/framework-zamboni) | FRAMEWORK | Zamboni allows a customer to create a pipeline of Source-to-Target transformations with little to no ELT engineering required.|
+| [Enable Query Acceleration Service (QAS) for Eligible Warehouses](/helper-enable-qas-eligible-warehouses) | HELPER | A notebook that helps users identify warehouses eligible to enable the query acceleration service (QAS). |
+| [Evalanche](/framework-evalanche) | FRAMEWORK | A Streamlit in Snowflake app to orchestrate any Generative AI use case evaluations. |
