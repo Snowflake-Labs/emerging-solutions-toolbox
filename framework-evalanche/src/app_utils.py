@@ -22,6 +22,55 @@ css_yaml_editor = """
     }
     """
 
+models = [
+    'llama3.2-1b',
+    'llama3.2-3b',
+    'llama3.1-8b',
+    'llama3.1-70b',
+    'llama3.1-405b',
+    'snowflake-arctic',
+    'reka-core',
+    'reka-flash',
+    'mistral-large2',
+    'mixtral-8x7b',
+    'mistral-7b',
+    'jamba-instruct',
+    'jamba-1.5-mini',
+    'jamba-1.5-large',
+    'gemma-7b',
+]
+
+def select_model(
+        keyname: str,
+        default: Optional[str] = None,
+                 ) -> List[str]:
+    """Renders selectbox for model selection.
+
+    Args:
+        default (string): Default model to select.
+
+    Returns:
+        string: Selected model.
+    """
+
+    return st.selectbox("Select model",
+                        models,
+                        index=models.index(default) if default in models else None,
+                        key=f"{keyname}_model_selector",)
+
+
+def test_complete(session, model, prompt = "Repeat the word hello once and only once. Do not say anything else.") -> bool:
+    from snowflake.cortex import Complete
+    from snowflake.snowpark.exceptions import SnowparkSQLException
+
+    """Returns True if selected model is supported in region and returns False otherwise."""
+    try:
+        response = Complete(model, prompt, session = session)
+        return True
+    except SnowparkSQLException as e:
+        if 'unknown model' in str(e):
+            return False
+
 
 def fetch_metrics() -> List[Metric]:
     """Combines metrics and custom metrics, if any, and returns list of metrics."""
@@ -287,7 +336,7 @@ def try_parse_json(value: str) -> Any:
 
 def fetch_evals(
     table_name: str,
-    json_cols=["METRIC_NAMES", "PARAM_ASSIGNMENTS", "ASSOCIATED_OBJECTS"],
+    json_cols=["METRIC_NAMES", "PARAM_ASSIGNMENTS", "MODELS", "ASSOCIATED_OBJECTS"],
 ) -> List[Optional[Dict[str, Optional[str]]]]:
     """
     Returns evaluation metadata from tables.

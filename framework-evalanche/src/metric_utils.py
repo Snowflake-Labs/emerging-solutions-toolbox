@@ -15,6 +15,7 @@ AUTO_EVAL_TABLE = "CORTEX_ANALYST_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
 def run_metric(
     metrics: List[Metric],  # List of metrics
     metric_result_data: DataFrame,
+    models: Dict[str, str],  # Dictionary of metric model names
     params: Dict[str, Dict[str, str]],  # Nested dictionary {metric_name: {key: value}}
     session: Session,
 ) -> DataFrame:
@@ -31,10 +32,15 @@ def run_metric(
             input_name: column_name
         }
     )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
+    )
 
     Args:
         metrics (list[Metric]): Metric child classes
         metric_result_data (Dataframe): Snowpark dataframe with data to evaluate.
+        models (dict[str, str]): Dictionary of metric model names.
         params (dict[str, dict[str, str]]): Nested dictionary of metric parameter-column associations.
         session (Session): Snowpark session.
 
@@ -60,7 +66,8 @@ def run_metric(
                             *[
                                 row[params[metric.name][key]]
                                 for key in params[metric.name]
-                            ]
+                            ],
+                            model=models[metric.name]  # Pass the correct model for each metric
                         )  # Pass the correct params for each metric
                         for metric in metrics
                     },
@@ -76,6 +83,7 @@ def run_metric(
 def apply_metric(
     metrics: List[Metric],
     metric_result_data: DataFrame,
+    models: Dict[str, str],
     params: Dict[str, Dict[str, str]],
     session: Session,
 ):
@@ -91,10 +99,15 @@ def apply_metric(
             input_name: column_name
         }
     )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
+    )
 
     Args:
         metrics (list[Metric]): Metric child classes
         metric_result_data (Dataframe): Snowpark dataframe with data to evaluate.
+        models (dict[str, str]): Dictionary of metric model names.
         params (dict[str, dict[str, str]]): Nested dictionary of metric parameter-column associations.
         session (Session): Snowpark session.
 
@@ -102,7 +115,7 @@ def apply_metric(
         Dataframe: Snowpark dataframe of selected data with metric results.
 
     """
-    metric_df = run_metric(metrics, metric_result_data, params, session)
+    metric_df = run_metric(metrics, metric_result_data, models, params, session)
 
     return metric_result_data.join(metric_df, on="ROW_ID", how="left")
 
@@ -110,6 +123,7 @@ def apply_metric(
 def metric_runner(
     session: Session,
     metrics: List[Metric],
+    models: Dict[str, str],
     param_assignments: Dict[str, Dict[str, str]],
     source_sql: Optional[str] = None,
     source_df: Optional[DataFrame] = None,
@@ -120,16 +134,21 @@ def metric_runner(
     Results are returned as a Snowpark dataframe.
     Either source_sql or source_df must be provided.
 
-    params is a nested dictionary with the following structure:
+    param_assignments is a nested dictionary with the following structure:
     {
         metric_name: {
             input_name: column_name
         }
     )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
+    )
 
     Args:
         session (Session): Snowpark session.
         metrics (list[Metric]): Metric child classes
+        models (dict[str, str]): Dictionary of metric model names.
         param_assignments (Dataframe): Snowpark dataframe with data to evaluate.
         source_sql (str, Optional): SQL to derive source data.
         source_df (Dataframe, Optional): Snowpark dataframe with source data.
@@ -158,6 +177,7 @@ def metric_runner(
     df = apply_metric(
         metrics=metrics,
         metric_result_data=df,
+        models=models,
         params=param_assignments,
         session=session,
     ).drop("ROW_ID")
@@ -196,6 +216,7 @@ def register_saved_eval_sproc(
     eval_name: str,
     metrics: List[Metric],
     source_sql: str,
+    models: Dict[str, str],
     param_assignments: Dict[str, Dict[str, str]],
 ) -> Dict[str, str]:
     """
@@ -207,6 +228,10 @@ def register_saved_eval_sproc(
         metric_name: {
             input_name: column_name
         }
+    )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
     )
 
     Returned ASSOCIATED_OBJECTS will contain the name of the stored procedure:
@@ -224,6 +249,7 @@ def register_saved_eval_sproc(
                          Characters must follow Snowflake object naming rules.
         metrics (list[Metric]): Metric child classes
         source_sql (str, Optional): SQL to derive source data.
+        models (dict[str, str]): Dictionary of metric model names.
         param_assignments (Dataframe): Snowpark dataframe with data to evaluate.
 
 
@@ -269,6 +295,7 @@ def register_saved_eval_sproc(
         df = metric_runner(
             session=session,
             metrics=metrics,
+            models=models,
             source_sql=source_sql,
             source_df=None,
             param_assignments=param_assignments,
@@ -287,6 +314,7 @@ def register_auto_eval_sproc(
     output_table_name: str,
     metrics: List[Metric],
     source_sql: str,
+    models: Dict[str, str],
     param_assignments: Dict[str, Dict[str, str]],
 ) -> None:
     """
@@ -302,6 +330,11 @@ def register_auto_eval_sproc(
             input_name: column_name
         }
     )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
+    )
+
 
     Args:
         session (Session): Snowpark session.
@@ -310,6 +343,7 @@ def register_auto_eval_sproc(
         output_table_name (str): Fully-qualified Snowflake stored table name.
         metrics (list[Metric]): Metric child classes
         source_sql (str, Optional): SQL to derive source data.
+        models (dict[str, str]): Dictionary of metric model names.
         param_assignments (Dataframe): Snowpark dataframe with data to evaluate.
 
 
@@ -349,6 +383,7 @@ def register_auto_eval_sproc(
         df = metric_runner(
             session=session,
             metrics=metrics,
+            models=models,
             source_sql=source_sql,
             source_df=None,
             param_assignments=param_assignments,
@@ -455,13 +490,14 @@ def create_eval_task(
 
 def automate_eval_objects(
     session: Session,
-    stage: str,  # Fully-qualified?
+    stage: str,
     warehouse: str,
     database: str,
     schema: str,
     eval_name: str,  # Just the name
     source_sql: str,
     metrics: List[Metric],
+    models: Dict[str, str],
     param_assignments: Dict[str, Dict[str, str]],
 ) -> Dict[str, str]:
     """
@@ -472,6 +508,10 @@ def automate_eval_objects(
         metric_name: {
             input_name: column_name
         }
+    )
+    models is a dictionary with the following structure:
+    {
+        metric_name: model_name
     )
 
     Returned ASSOCIATED_OBJECTS will contain the following:
@@ -494,6 +534,7 @@ def automate_eval_objects(
                          Characters must follow Snowflake object naming rules.
         source_sql (str, Optional): SQL to derive source data.
         metrics (list[Metric]): Metric child classes
+        models (dict[str, str]): Dictionary of metric model names.
         param_assignments (Dataframe): Snowpark dataframe with data to evaluate.
 
     Returns:
@@ -533,6 +574,7 @@ def automate_eval_objects(
         ASSOCIATED_OBJECTS["TABLE"],
         metrics,
         metric_source_sql,  # This is the SQL that captures Stream INSERTS
+        models,
         param_assignments,
     )
 

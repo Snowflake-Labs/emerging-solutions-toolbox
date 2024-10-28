@@ -15,6 +15,8 @@ from src.app_utils import (
     fetch_columns,
     render_sidebar,
     table_data_selector,
+    select_model,
+    test_complete,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
@@ -51,6 +53,17 @@ CODE_PLACEHOLDER = """SELECT
     DATA
 FROM
 """
+
+
+def check_models(models: List[str]) -> None:
+    """Check if models are available in the Snowflake account region."""
+
+    for model in models:
+        available = test_complete(st.session_state["session"],
+                      model)
+        if not available:
+            st.error(f"Model {model} not available in region. Please select another.")
+            st.stop()
 
 
 def run_sql(sql: str) -> Union[None, DataFrame]:
@@ -286,7 +299,7 @@ def pipeline_runner_dialog() -> None:
 def configure_metrics() -> None:
     """Dialog to configure metric parameters/inputs to data source columns."""
 
-    st.write("Select a column for each required parameter.")
+    st.write("Select a model and a column for each required parameter.")
     limit = 5
     if st.session_state.get("single_source_data", None) is None:
         validate_data_inputs()
@@ -306,9 +319,12 @@ def configure_metrics() -> None:
         except Exception as e:
             st.error(f"Error in pulling data: {e}")
     param_selection = {}  # Track parameter-column assignments for each metric
+    model_selection = {} # Track model selection for each metric
     for metric in st.session_state["selected_metrics"]:
         st.divider()
         st.write(f"**{metric.name}**: {metric.description}")
+        model = select_model(default = metric.model,
+                             keyname = metric.name)
         metric_params = (
             OrderedDict()
         )  # Track each parameter assignment for a single metric
@@ -322,8 +338,11 @@ def configure_metrics() -> None:
                 help=desc,
             )
         param_selection[metric.name] = metric_params
+        model_selection[metric.name] = model
     st.session_state["param_selection"] = param_selection
+    st.session_state["model_selection"] = model_selection
     if st.button("Run"):
+        check_models(st.session_state["model_selection"].values())
         run_eval()
 
 
@@ -356,6 +375,7 @@ def run_eval() -> None:
             st.session_state["metric_result_data"] = metric_runner(
                 session=st.session_state["session"],
                 metrics=st.session_state["selected_metrics"],
+                models=st.session_state["model_selection"],
                 param_assignments=st.session_state["param_selection"],
                 source_df=st.session_state["metric_result_data"],
                 source_sql=None,
