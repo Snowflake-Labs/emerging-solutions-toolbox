@@ -158,6 +158,7 @@ def save_eval() -> None:
             "METRIC_NAMES": [metric.name for metric in metrics],
             "DESCRIPTION": eval_description,  # Not passed to object creation but just inserted into table
             "SOURCE_SQL": st.session_state["source_sql"],
+            "MODELS": st.session_state["model_selection"],
             "PARAM_ASSIGNMENTS": st.session_state["param_selection"],
         }
 
@@ -171,6 +172,7 @@ def save_eval() -> None:
                     eval_name=eval_metadata["EVAL_NAME"],
                     metrics=metrics,
                     source_sql=eval_metadata["SOURCE_SQL"],
+                    models=eval_metadata["MODELS"],
                     param_assignments=eval_metadata["PARAM_ASSIGNMENTS"],
                 )
                 st.success(
@@ -235,6 +237,7 @@ def automate_eval() -> None:
             "METRIC_NAMES": [metric.name for metric in metrics],
             "DESCRIPTION": eval_description,  # Not passed to object creation but just inserted into table
             "SOURCE_SQL": st.session_state["source_sql"],
+            "MODELS": st.session_state["model_selection"],
             "PARAM_ASSIGNMENTS": st.session_state["param_selection"],
         }
         try:
@@ -247,6 +250,7 @@ def automate_eval() -> None:
                     warehouse=warehouse,
                     eval_name=eval_metadata["EVAL_NAME"],
                     metrics=metrics,
+                    models=eval_metadata["MODELS"],
                     source_sql=eval_metadata["SOURCE_SQL"],
                     param_assignments=eval_metadata["PARAM_ASSIGNMENTS"],
                 )

@@ -110,9 +110,11 @@ def show_eval_details(
                 label_visibility="collapsed",
                 height=200,
             )
-    for metric_name, assignments in evaluation["PARAM_ASSIGNMENTS"].items():
-        with st.expander(f"Parameter Assignments for **{metric_name}**"):
-            st.write(assignments)
+    st.write("**Metrics**:")
+    for metric_name in evaluation["METRIC_NAMES"]:
+        with st.expander(f"{metric_name}"):
+            st.write(f"Model: {evaluation['MODELS'][metric_name]}")
+            st.write(evaluation["PARAM_ASSIGNMENTS"][metric_name])
     button_container = row(5, vertical_align="center")
     if button_container.button("Run", use_container_width=True):
         click_func(evaluation)
@@ -149,6 +151,7 @@ def run_saved_eval(evaluation: Dict[str, Any]) -> None:
         # wants to automate an already saved evaluation
         st.session_state["source_sql"] = evaluation["SOURCE_SQL"]
         st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
+        st.session_state["model_selection"] = evaluation["MODELS"]
         st.switch_page("pages/results.py")
 
 
@@ -171,6 +174,7 @@ def run_auto_eval(evaluation: Dict[str, Any]) -> None:
             metric for metric in metrics if metric.name in evaluation["METRIC_NAMES"]
         ]
         st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
+        st.session_state["model_selection"] = evaluation["MODELS"]
         st.session_state["eval_funnel"] = "automated"
         try:
             result = st.session_state["session"].table(
