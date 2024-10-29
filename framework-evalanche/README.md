@@ -86,8 +86,8 @@ To run a reference dataset through your desired LLM pipelines on the data page, 
 will be passed to the stored procedure as:
 ```python
 {
-    "QUESTION": "What is the capital of France?",
-    "QUESTION_TYPE": "Geography"
+    "TASK": "Tell a joke",
+    "PERSONA": "Pirate"
 }
 ```
 A appropriately crafted stored procedure could look like the below.

@@ -147,7 +147,8 @@ def preview_merge_data() -> None:
             st.error(f"Error: {e}")
     if data is not None:
         st.write(f"Limited to {limit} rows.")
-        st.dataframe(data, hide_index=True, use_container_width=True)
+        st.dataframe(data, hide_index=True, use_container_width=False)
+
 
 
 def data_spec(key_name: str, instructions: str, height=200, join_key=True) -> None:

@@ -1,5 +1,5 @@
 # Python 3.8 type hints
-from typing import Union
+from typing import Union, Optional
 
 from src.metrics import Metric
 from src.prompts import *
@@ -19,28 +19,30 @@ After updating this file, you will need to re-compress the src directory and re-
 """
 
 # Custom Metrics
-# class CustomRelevancy(Metric):
+# class CustomAnswerRelevancy(Metric):
 #     def __init__(
 #         self,
+#         model: str = "llama3.1-8b"
 #     ):
 #         super().__init__(
 #             name="CustomRelevancy",
-#             description="Evaluates the correctness, relevance, and helpfulness of a response compared to a reference answer.",
-#             prompt=Relevance_prompt,
+#             description="""
+# Evaluates the relevance of a response to a user question on a scale of 1-5.
+# 5 indicates the scorer strongly agrees that the response is relevant and 1 indicates strong disagreement.""",
+#             prompt=AnswerRelevancy_prompt,
 #             required={
 #                 "question": "User question",
-#                 "answer_ref": "Expected answer to the question",
 #                 "ai_response": "LLM-generated response to the question",
 #             },
 #         )
+#         self.model = model
 
 #     def get_prompt(
-#         self, question: str, answer_ref: str, ai_response: str
+#         self, question: str, ai_response: str
 #     ) -> Union[str, None]:
 #         if self.prompt is not None:
 #             fstrings = {
 #                 "question": question,
-#                 "answer_ref": answer_ref,
 #                 "ai_response": ai_response,
 #             }
 #             return self.prompt.format(**fstrings)
@@ -50,15 +52,16 @@ After updating this file, you will need to re-compress the src directory and re-
 #     def evaluate(
 #         self,
 #         question: str,
-#         answer_ref: str,
 #         ai_response: str,
-#         model: str = "llama3.1-8b",
+#         model: Optional[str] = None,
 #     ):
 #         import re
 
-#         prompt = self.get_prompt(question, answer_ref, ai_response)
+#         model_to_use = model if model else self.model  
 
-#         response = run_async_sql_complete(self.session, model, prompt)
+#         prompt = self.get_prompt(question, ai_response)
+
+#         response = run_async_sql_complete(self.session, model_to_use, prompt)
 #         values = [str(i) for i in range(1, 11)]
 #         pattern = f"[{''.join(values)}]"
 #         match = re.search(pattern, response)
@@ -66,5 +69,5 @@ After updating this file, you will need to re-compress the src directory and re-
 #         return int(match.group(0)) if match else None
 
 custom_metrics = [
-    # CustomRelevancy()
+    # CustomAnswerRelevancy()
 ]
