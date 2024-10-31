@@ -8,8 +8,8 @@ from snowflake.snowpark.session import Session
 from src.app_utils import QUERY_TAG, format_query_tag
 from src.metrics import Metric
 
-SAVED_EVAL_TABLE = "CORTEX_ANALYST_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
-AUTO_EVAL_TABLE = "CORTEX_ANALYST_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
+SAVED_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
+AUTO_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
 
 
 def run_metric(
@@ -164,7 +164,7 @@ def metric_runner(
     for idx in range(len(metrics)):
         metrics[idx].session = session
     if source_sql:
-        df = session.sql(source_sql)
+        df = session.sql(source_sql.replace(";", ""))
     elif source_df:
         df = source_df
     else:

@@ -196,7 +196,7 @@ def save_eval_to_table(snpk_df: DataFrame, table_name: str) -> str:
         snpk_df = snpk_df.drop("ROW_ID")
     if "METRIC_DATETIME" not in columns:
         snpk_df = snpk_df.with_column("METRIC_DATETIME", current_timestamp())
-    snpk_df.write.save_as_table(table_name, mode="append")
+    snpk_df.write.save_as_table(table_name, mode="append", column_order = "name")
     return f"Metric evaluation results saved to {table_name}."
 
 

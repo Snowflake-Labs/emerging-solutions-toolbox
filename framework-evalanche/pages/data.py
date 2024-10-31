@@ -2,7 +2,7 @@ import time
 from collections import OrderedDict
 
 # Python 3.8 type hints
-from typing import List, Union
+from typing import List, Union, Dict, Tuple, Any
 
 import streamlit as st
 from snowflake.snowpark import DataFrame
@@ -73,7 +73,7 @@ def run_sql(sql: str) -> Union[None, DataFrame]:
         st.warning("Please enter a SQL query.")
     else:
         try:
-            return st.session_state["session"].sql(sql)
+            return st.session_state["session"].sql(sql.replace(';', ''))
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -201,11 +201,18 @@ def data_spec(key_name: str, instructions: str, height=200, join_key=True) -> No
         )
 
 
+def sproc_runner(session: Session, sproc_name: str, inputs: Dict[str, Any]) -> Tuple[Union[int, float], Any]:
+    start_time = time.time()
+    record_result = session.sql(f"""CALL {sproc_name}({inputs})""").collect_nowait().result()[0][0]
+    elapsed_time = time.time() - start_time
+    return (elapsed_time, record_result)
+
 def pipeline_runner(
     session: Session,
     sproc: str,
     input_tablename: str,
     output_tablename: str,
+    columns: List[str],
 ) -> None:
     """Runs stored procedures asynchronously over input from Snowflake table.
 
@@ -213,12 +220,15 @@ def pipeline_runner(
     Stored procedures must have one input that is a string and return a single value.
     Results are written to a table in Snowflake.
     Write mode is set to append so that multiple evaluations can be saved to the same table.
+    Note that all columns in table will be kept but only those passed in columns will be 
+    passed to stored procedure to mitigate errors from other columns.
 
     Args:
         session (Session): Snowpark session
         sproc (string): Fully-qualified name of stored procedure.
         input_tablename (string): Fully-qualified name of table with input values.
         output_tablename (string): Fully-qualified name of table to write results to.
+        columns (list): List of columns to pass to stored procedure.
 
     """
 
@@ -229,15 +239,16 @@ def pipeline_runner(
     from src.snowflake_utils import add_row_id, save_eval_to_table
 
     df = add_row_id(session.table(input_tablename))
+    columns = columns + ["ROW_ID"]
 
-    for pandas_df in df.to_pandas_batches():
+    for pandas_df in df.select(*columns).to_pandas_batches():
+    # for pandas_df in df.to_pandas_batches():
         results = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
             delayed(
                 lambda row: {
                     "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
-                    "RESPONSE": session.sql(f"""CALL {sproc}({row.to_dict()})""")
-                    .collect_nowait()
-                    .result()[0][0],
+                    "RESPONSE": (response := sproc_runner(session, sproc, row.to_dict()))[0],
+                    "ELAPSED_TIME": response[1],
                 }
             )(row)
             for _, row in pandas_df.iterrows()
@@ -259,6 +270,7 @@ def pipeline_runner_dialog() -> None:
 
              Before you start, your LLM pipeline must be encapsulated in a stored procedure that takes a VARIANT input and returns a single value.
              Every row of the reference table will be passed through the stored procedure as a dictionary.
+             Every column in the reference table will be passed to the stored procedure but only those columns selected will be passed to the stored procedure.
              Please see [Snowflake Stored Procedure documentation](https://docs.snowflake.com/en/developer-guide/stored-procedure/stored-procedures-overview)
              for details on stored procedures and these [specific instructions](https://github.com/sfc-gh-jsummer/evalanche#crafting-a-llm-pipeline-stored-procedure) on crafting these stored procedures.""")
 
@@ -278,9 +290,15 @@ def pipeline_runner_dialog() -> None:
     st.divider()
 
     st.write("Select the reference data.")
-    table_spec = table_data_selector("runner_output", new_table=False)
+    name = "runner_output"
+    table_spec = table_data_selector(name, new_table=False)
     data_table = (
         f'{table_spec["database"]}.{table_spec["schema"]}.{table_spec["table"]}'
+    )
+    available_columns = fetch_columns(table_spec["database"],table_spec["schema"],table_spec["table"])
+    selected_columns = st.multiselect(
+        "Select Columns", available_columns, default=None, key=f"columns_{name}",
+        help = "Select the columns to explicitly passed to the stored procedure."
     )
 
     if st.button("Run"):
@@ -290,10 +308,11 @@ def pipeline_runner_dialog() -> None:
                 sproc_name.split("(")[0],
                 data_table,
                 new_tablename,
+                selected_columns
             )
             st.success(f"Results written to {new_tablename}.")
-            time.sleep(1.5)
-            st.rerun()
+        time.sleep(2)
+        st.rerun()
 
 
 @st.experimental_dialog("Configure Metrics", width="large")

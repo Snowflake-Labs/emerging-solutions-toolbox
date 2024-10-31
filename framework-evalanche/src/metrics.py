@@ -33,13 +33,13 @@ class Metric(ABC):
 
 
 # Cortex Analyst Metrics
-class SQLAccuracy(Metric):
+class SQLResultsAccuracy(Metric):
     def __init__(
         self,
         model: str = "reka-flash"
     ):
         super().__init__(
-            name="SQL Accuracy",
+            name="SQL Results Accuracy",
             description="""
 Evaluates if 2 SQL queries return the same data given a user question.
 Results are True or False.
@@ -396,7 +396,7 @@ cortex_analyst_metrics = {
     "section_name": "Cortex Analyst Metrics",
     "caption": """Suggested metrics to evaluate the performance of Cortex Analyst SQL generation.""",
     "metrics": [
-        SQLAccuracy(),
+        SQLResultsAccuracy(),
     ],
 }
 knowledge_base_retrieval_metrics = {
@@ -420,7 +420,7 @@ non_knowledge_base_retrieval_metrics = {
 
 # All metrics
 metrics = [
-    SQLAccuracy(),
+    SQLResultsAccuracy(),
     Correctness(),
     Comprehensiveness(),
     Hallucination(),
