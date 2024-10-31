@@ -47,20 +47,23 @@ Once you've selected Metric(s) and configured your Data Source for the Metric(s)
 # Setup
 Evalanche is deployed to Streamlit in Snowflake and can be done so using multiple methods. First obtain the source code for Evalanche by either downloading this repo or cloning the repository locally. We list a few options below for deployment. Use the one based on your desired tool.
 
+## Snowsight Worksheet
+Copy and paste the contents of `setup/git_setup.sql` into a Snowsight SQL Worksheet. Ensure your context role is appropriate as this will be the owning role of the Streamlit app. Execute the entire SQL Worksheet.
+
 ## Snowflake CLI
 See [Snowflake CLI installation documentation](https://docs.snowflake.com/developer-guide/snowflake-cli/index) for instructions. Once installed, configure your connection parameters OR pass them via command flags. Run the below command in terminal from the project root to deploy the application.
 ```bash
-snow sql -f setup.sql
+snow sql -f setup/cli_setup.sql
 ```
 
 ## VSCode with Snowflake Extension
-See [Snowflake Extension for Visual Studio Code installation documentation](https://docs.snowflake.com/en/user-guide/vscode-ext) for instructions. Once installed, sign into Snowflake in the extension. Execute all of `setup.sql` from VSCode.
+See [Snowflake Extension for Visual Studio Code installation documentation](https://docs.snowflake.com/en/user-guide/vscode-ext) for instructions. Once installed, sign into Snowflake in the extension. Execute all of `setup/git_setup.sql` from VSCode.
 
 # Running
 Once Evalanche is deployed to Streamlit in Snowflake, the app is ready for use. Login into Snowsight and open the app named Evalanche: GenAI Evaluation Application. If desired, this can be done directly from terminal with Snowflake CLI command
 
 ```bash
-snow streamlit get-url EVALUATION_APP --open --database CORTEX_ANALYST_UTILITIES --schema EVALUATION
+snow streamlit get-url EVALUATION_APP --open --database GENAI_UTILITIES --schema EVALUATION
 ```
 
 # Advanced

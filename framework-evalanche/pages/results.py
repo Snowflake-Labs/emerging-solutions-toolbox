@@ -9,7 +9,7 @@ import streamlit as st
 from snowflake.snowpark import DataFrame
 from streamlit_extras.row import row
 
-from src.app_utils import render_sidebar, select_schema_context
+from src.app_utils import render_sidebar, select_model
 from src.metric_utils import AUTO_EVAL_TABLE, SAVED_EVAL_TABLE
 from src.snowflake_utils import save_eval_to_table
 
@@ -19,11 +19,12 @@ def get_result_title() -> str:
 
     The title includes the evaluation name if it is available in session state.
     """
-
-    if st.session_state.get("eval_name", None) is not None:
-        return f"Evaluation Results: {st.session_state.get('eval_name', '')}"
-    else:
+    
+    if st.session_state.get("eval_funnel", "") == "new":
         return "Evaluation Results"
+    else:
+        if st.session_state.get("eval_name", None) is not None:
+            return f"Evaluation Results: {st.session_state.get('eval_name', '')}"
 
 
 TITLE = get_result_title()
@@ -139,15 +140,9 @@ def save_eval() -> None:
 
     st.write("""Source data and metric configuration will be captured as a Snowflake Stored Procedure.
              Select the evaluation from Homepage's **Saved Evaluations** section to run.""")
-    name = "save_eval"
-    schema_context = select_schema_context(name, on_change=get_stages, args=(name,))
-    if f"{name}_stages" not in st.session_state:
-        st.session_state[f"{name}_stages"] = []
-    stage_name = st.selectbox(
-        "Select Stage",
-        st.session_state[f"{name}_stages"],
-        index=None,
-    )
+    # App logic and saved evaluations must resides in same location so we hard-code these values.
+    schema_context = {"database": "GENAI_UTILITIES", "schema": "EVALUATION"}
+    stage_name = "STREAMLIT_STAGE"
     eval_name, eval_description = get_eval_name_desc()
 
     if st.button("Save"):
@@ -178,9 +173,8 @@ def save_eval() -> None:
                 st.success(
                     "Evaluation registered complete. See On Demand Evaluations to run."
                 )
-        except Exception as e:
-            st.error(f"Error: {e}")
-        try:
+            # Inserting metadata into table does not have its own try/except block as we 
+            # only want to add to the table if everything above is successful
             with st.spinner("Adding to On Demand Evaluations."):
                 msg = insert_to_eval_table(
                     session=st.session_state["session"],
@@ -212,21 +206,16 @@ def automate_eval() -> None:
     st.write("""Source data will be tracked and metric(s) calculated for new records.
             Results will be captured in a table.
             Select the evaluation from Homepage's **Automated Evaluations** section to view results.""")
-    name = "auto_eval"
-    schema_context = select_schema_context(name, on_change=get_stages, args=(name,))
-    if f"{name}_stages" not in st.session_state:
-        st.session_state[f"{name}_stages"] = []
-    stage_name = st.selectbox(
-        "Select Stage",
-        st.session_state[f"{name}_stages"],
-        index=None,
-    )
+    # App logic and saved evaluations must resides in same location so we hard-code these values.
+    schema_context = {"database": "GENAI_UTILITIES", "schema": "EVALUATION"}
+    stage_name = "STREAMLIT_STAGE"
+
     warehouse = st.selectbox(
         "Select Warehouse",
         st.session_state["warehouses"],  # Set prior to launching dialog box
         index=None,
+        help="Select the warehouse to power the automation task.",
     )
-    warehouse = "WH_XS"
     eval_name, eval_description = get_eval_name_desc()
 
     if st.button("Save"):
@@ -258,9 +247,8 @@ def automate_eval() -> None:
                     """Evaluation automation complete. Results from current records may be delayed.
                     Select Automated Evaluations from the Homepage to view."""
                 )
-        except Exception as e:
-            st.error(f"Error: {e}")
-        try:
+            # Inserting metadata into table does not have its own try/except block as we 
+            # only want to add to the table if everything above is successful
             with st.spinner("Adding to Automated Evaluations."):
                 msg = insert_to_eval_table(
                     session=st.session_state["session"],
@@ -283,6 +271,17 @@ def give_recommendation_instruction() -> None:
     st.write(
         "Select a row using the far left checkboxes to generate a recommendation based on the selected metric."
     )
+
+
+def get_metric_cols(current_df: DataFrame) -> list:
+    """Returns list of columns in dataframe that contain metric values.
+    
+    Some metric names have spaces and Snowpark keeps them in lower case with double quotes.
+    Metric names without spaces are capitalized when added to a Snowflake table/dataframe."""
+
+    metric_names = [metric.name for metric in st.session_state["selected_metrics"]]
+    df_columns = current_df.columns
+    return [c_name for c_name in df_columns if c_name.upper() in (m_name.upper() for m_name in metric_names)]
 
 
 def show_metric() -> None:
@@ -362,20 +361,20 @@ def show_recommendation(selection: Union[int, None], pandas_df: pd.DataFrame) ->
             session = st.session_state["session"]
 
         selected_row = pandas_df.iloc[selection].to_dict()
-        metric_cols = [
-            metric.name.upper() for metric in st.session_state["selected_metrics"]
-        ]
+        metric_cols = get_metric_cols(pandas_df)
 
         selected_metric_name = st.selectbox(
             "Select Metric", metric_cols, index=None, key="metric_selector"
         )
         if selected_metric_name is not None:
-            # Get metric object that matches metric name
+            score = selected_row[selected_metric_name]
+  
+            # Get the actual metric object
             matching_metric = next(
                 (
                     metric
                     for metric in metrics
-                    if metric.name.upper() == selected_metric_name
+                    if metric.name.upper() == selected_metric_name.upper()
                 ),
                 None,
             )
@@ -390,11 +389,14 @@ def show_recommendation(selection: Union[int, None], pandas_df: pd.DataFrame) ->
             }
             original_prompt = matching_metric.get_prompt(**original_prompt_fstrings)
             recommender_prompt = Recommendation_prompt.format(
-                prompt=original_prompt, score=selected_row[selected_metric_name]
+                prompt=original_prompt, score=score
             )
 
-            with st.spinner("Thinking..."):
-                response = run_complete(session, "llama3.1-8b", recommender_prompt)
+        rec_model = select_model('rec_model',
+                                    default = "llama3.2-3b")
+        if st.button("Analyze", disabled = selected_metric_name is None):
+            with st.spinner("Crunching the numbers..."):
+                response = run_complete(session, rec_model, recommender_prompt)
                 if response is not None:
                     st.write(response)
 
@@ -411,9 +413,7 @@ def trend_avg_metrics() -> None:
         st.session_state.get("metric_result_data", None) is not None
         and st.session_state.get("selected_metrics", None) is not None
     ):
-        metric_cols = [
-            metric.name.upper() for metric in st.session_state["selected_metrics"]
-        ]
+        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
         # We cast to variant in case the metric is a boolean
         # METRIC_DATETIME is batched for every run so there should be many rows per metric calculation set
@@ -439,9 +439,7 @@ def trend_count_metrics() -> None:
         st.session_state.get("metric_result_data", None) is not None
         and st.session_state.get("selected_metrics", None) is not None
     ):
-        metric_cols = [
-            metric.name.upper() for metric in st.session_state["selected_metrics"]
-        ]
+        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
         df = st.session_state["metric_result_data"]
         st.bar_chart(
@@ -456,14 +454,13 @@ def bar_chart_metrics() -> None:
 
     This is the default chart if no trendable column is found.
     """
-
+    # TO DO - Add preview metric vs. selected metric so user can see 
+    # results for previously selected metrics until they select new one.
     if (
         st.session_state.get("metric_result_data", None) is not None
-        and st.session_state.get("selected_metrics", None) is not None
+        and len(st.session_state.get("selected_metrics", []))>0
     ):
-        metric_cols = [
-            metric.name.upper() for metric in st.session_state["selected_metrics"]
-        ]
+        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
         df = st.session_state["metric_result_data"]
         chart_df = (
