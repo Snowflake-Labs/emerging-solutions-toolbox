@@ -5,11 +5,17 @@ import pandas as pd
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
 
-from src.app_utils import QUERY_TAG, format_query_tag
-from src.metrics import Metric
+from src.app_utils import format_query_tag
+from src.metrics import Metric, AnswerRelevancy
+from src.snowflake_utils import QUERY_TAG
 
-SAVED_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
-AUTO_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
+
+DEFAULT_CUSTOM_METRIC_NAME = "MyRelevancy"
+DEFAULT_CUSTOM_METRIC_DESC = AnswerRelevancy().description
+DEFAULT_CUSTOM_METRIC_PROMPT = AnswerRelevancy().prompt.strip()\
+                                        .replace("\n", " ")\
+                                        .replace("[", "\n[")\
+                                        .replace("]", "]\n")
 
 
 def run_metric(
@@ -52,6 +58,7 @@ def run_metric(
     import multiprocessing
 
     from joblib import Parallel, delayed
+    import streamlit as st
 
     # Iterating over the data in pandas batches
     for pandas_df in metric_result_data.to_pandas_batches():
@@ -62,13 +69,13 @@ def run_metric(
                     "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
                     # Loop over each metric in the metrics list
                     **{
-                        metric.name: metric.evaluate(
-                            *[
-                                row[params[metric.name][key]]
+                        metric.get_column(): metric.evaluate(
+                            models[metric.name],  # Pass the model for each metric
+                            **{
+                                key: row[params[metric.name][key]]
                                 for key in params[metric.name]
-                            ],
-                            model=models[metric.name]  # Pass the correct model for each metric
-                        )  # Pass the correct params for each metric
+                            }
+                        )  # Pass params as **kwargs for each metric
                         for metric in metrics
                     },
                 }
@@ -587,3 +594,45 @@ def automate_eval_objects(
     )
 
     return ASSOCIATED_OBJECTS
+
+
+def create_custom_metric(metric_name: str,
+                         description: str,
+                         prompt: str,
+                         required_args: Dict[str, str],
+                         default_model: str = "llama3.1-8b",
+                         ):
+    """
+    Creates a custom metric class that inherits from the Metric class.
+
+    required_args is a dictionary with the following structure: {input_name: description}
+    f-string, e.g. {question} in the prompt should match the keys of require_args.
+
+    Args:
+        metric_name (str): Metric name.
+        description (str): Metric description.
+        prompt (str): LLM-as-a-Judge prompt with f-strings that match required_args keys.
+        required_args (dict[str, str]): Input arguments required for the metric with a description of each as the value.
+        default_model (str): Snowflake Cortex LLM model name.
+
+    Returns:
+        CustomClass: Custom metric class
+
+    """
+
+    class_name = ''.join(t.title().replace(" ","") for t in metric_name.split())
+        
+    CustomClass = type(
+        class_name,
+        (Metric,),
+        {
+            "__init__": lambda self, model=default_model: Metric.__init__(
+                self,
+                name=metric_name,
+                description=description,
+                prompt=prompt,
+                required=required_args,
+            ) or setattr(self, 'model', model)
+        }
+    )
+    return CustomClass()

@@ -5,6 +5,35 @@ import streamlit as st
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
 
+SAVED_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
+AUTO_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
+STAGE_NAME = "GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE"
+CUSTOM_METRIC_TABLE = "GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS"
+
+QUERY_TAG = {
+    "origin": "sf_sit",
+    "name": "evalanche",
+    "version": {"major": 1, "minor": 0},
+}
+
+models = [
+    'llama3.2-1b',
+    'llama3.2-3b',
+    'llama3.1-8b',
+    'llama3.1-70b',
+    'llama3.1-405b',
+    'snowflake-arctic',
+    'reka-core',
+    'reka-flash',
+    'mistral-large2',
+    'mixtral-8x7b',
+    'mistral-7b',
+    'jamba-instruct',
+    'jamba-1.5-mini',
+    'jamba-1.5-large',
+    'gemma-7b',
+]
+
 
 @st.cache_resource()
 def get_connection() -> Session:

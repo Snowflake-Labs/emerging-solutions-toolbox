@@ -1,5 +1,6 @@
 # Python 3.8 type hints
 from typing import Any, Dict, List
+import time
 
 import streamlit as st
 from streamlit_extras.grid import grid
@@ -14,7 +15,12 @@ from src.app_utils import (
     get_metric_preview,
     render_sidebar,
 )
-from src.metric_utils import AUTO_EVAL_TABLE, SAVED_EVAL_TABLE
+from src.snowflake_utils import (
+    AUTO_EVAL_TABLE,
+    SAVED_EVAL_TABLE,
+    STAGE_NAME,
+    CUSTOM_METRIC_TABLE,
+)
 from src.snowflake_utils import (
     call_sproc,
     get_connection,
@@ -46,10 +52,98 @@ st.write(INSTRUCTIONS)
 render_sidebar()
 
 
-@st.experimental_dialog("Create New Metric")
+@st.experimental_dialog("Create New Metric",
+                        width="large")
 def add_new_metric():
-    st.write("TO DO - Add new metric wizard")
+    from src.app_utils import (
+        select_model,
+        vars_entry,
+        upload_staged_pickle,
+        add_metric_to_table,
+    )
+    from src.metric_utils import (
+        create_custom_metric,
+        DEFAULT_CUSTOM_METRIC_DESC,
+        DEFAULT_CUSTOM_METRIC_NAME,
+        DEFAULT_CUSTOM_METRIC_PROMPT,
+    )
+    from src.metrics import provided_metrics
+    
+    st.write("""Want to create your own LLM-as-a-Judge metric? Let's get started!
+             Please provide the below required information and we'll do the heavy lifting for you.
+             We've added some example prompts to get you started.""")
+    
+    metric_name = st.text_input("Metric Name", value=DEFAULT_CUSTOM_METRIC_NAME)
+    metric_description = st.text_area("Metric Description",
+                                      value=DEFAULT_CUSTOM_METRIC_DESC.strip())
+    model = select_model('custom_metric_model',
+                         default = "llama3.1-8b")
+    st.caption("""Variables should be enclosed in brackets { } like f-strings. 
+               For example, '{question}'. These variables will be filled with column values.
+               We suggest prompts that return an integer score, such as 1 - 5.
+               True/False results should be returned as 1 or 0.""")
+    metric_prompt = st.text_area("LLM-as-a-Judge Prompt",
+                                 value= DEFAULT_CUSTOM_METRIC_PROMPT,
+                                 height = 200)
+    
+    if metric_prompt:
+        metric_required = vars_entry(metric_prompt)
+    else:
+        st.write("No variables found.")
+    
+    if st.button("Create Metric"):
+        new_metric = create_custom_metric(metric_name, metric_description, metric_prompt, metric_required, model)
+        if new_metric.name in [metric.name for metric in provided_metrics]:
+            st.error("Metric name cannot match provided metrics.")
+            st.stop()
+        # Pickled file name should match the class name for convenience
+        file_name = type(new_metric).__name__ + ".pkl"
+        upload_staged_pickle(st.session_state["session"], new_metric, file_name, STAGE_NAME)
+        
+        add_metric_to_table(st.session_state["session"],
+                            new_metric.name,
+                            f"@{STAGE_NAME}/{file_name}", # We want to track back to full file path
+                            CUSTOM_METRIC_TABLE)
+        st.success("New metric created successfully!")
+        time.sleep(1.5)
+        st.rerun()
 
+
+@st.experimental_dialog("Manage Metrics", width="large")
+def manage_metric_dialog():
+    
+    # Going straight from snowpark df into data_editor causes issues with rendering home in st. dialog
+    # Instead we go directly to pandas and then back to table
+    schema = st.session_state['session'].table(CUSTOM_METRIC_TABLE).schema
+    current_table = st.session_state['session'].table(CUSTOM_METRIC_TABLE).to_pandas()
+    if current_table.shape[0] == 0:
+        st.write("No custom metrics available.")
+    else:
+        st.write("Below are the custom metrics currently available. Uncheck to hide a custom metric on the account.")
+        new_table = st.data_editor(current_table,
+                       key = "custom_metrics_table",
+                       use_container_width=True,
+                       hide_index=True,
+                       column_order= ["SHOW_METRIC"] + [col for col in current_table.columns if col != "SHOW_METRIC"],
+                       column_config= {"SHOW_METRIC": st.column_config.CheckboxColumn(
+                                        "SHOW",
+                                        help="Checked metrics will be displayed as available to users.",
+                                    )},
+                       disabled = [col for col in current_table.columns if col != "SHOW_METRIC"],
+                       )
+        if st.button("Save"):
+            with st.spinner("Saving changes..."):
+                time.sleep(3)
+                new_df = st.session_state['session'].create_dataframe(new_table,
+                                                                  schema = schema)
+                _ = new_df.write.save_as_table(table_name = CUSTOM_METRIC_TABLE.split("."),
+                                            mode = "overwrite",
+                                            column_order = "name",)
+                st.success("Changes saved successfully.")
+            # A fetch_metrics will be called in the next rerun so we don't need to add it here
+            st.rerun()
+                
+            
 
 def delete_evaluation(evaluation: Dict[str, Any], eval_tablename: str) -> None:
     """
@@ -136,23 +230,30 @@ def run_saved_eval(evaluation: Dict[str, Any]) -> None:
         None
 
     """
-    with st.spinner("Running evaluation..."):
-        result = call_sproc(
-            st.session_state["session"],
-            evaluation["ASSOCIATED_OBJECTS"]["PROCEDURE"],
-        )
-        st.session_state["selected_metrics"] = [
-            metric for metric in metrics if metric.name in evaluation["METRIC_NAMES"]
+    st.session_state["selected_metrics"] = [
+            metric for metric in st.session_state['all_metrics'] if metric.name in evaluation["METRIC_NAMES"]
         ]
-        st.session_state["metric_result_data"] = result
-        st.session_state["eval_name"] = evaluation["EVAL_NAME"]
-        st.session_state["eval_funnel"] = "existing"
-        # We also extract source_sql and param_assignments here in case user
-        # wants to automate an already saved evaluation
-        st.session_state["source_sql"] = evaluation["SOURCE_SQL"]
-        st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
-        st.session_state["model_selection"] = evaluation["MODELS"]
-        st.switch_page("pages/results.py")
+    # Evaluations may correspond to previously hidden/removed metrics
+    # If they are selected, we want to stop the user the ability to run them
+    # If the metrics exist but hidden, they can select to show them before running
+    if len(st.session_state["selected_metrics"]) != len(evaluation["METRIC_NAMES"]):
+        st.error("Metric(s) used in evaluations have been hidden and/or deleted. Please ensure they exist and are set to show via Manage Metrics.")
+        st.stop()
+    else:
+        with st.spinner("Running evaluation..."):
+            result = call_sproc(
+                st.session_state["session"],
+                evaluation["ASSOCIATED_OBJECTS"]["PROCEDURE"],
+            )
+            st.session_state["metric_result_data"] = result
+            st.session_state["eval_name"] = evaluation["EVAL_NAME"]
+            st.session_state["eval_funnel"] = "existing"
+            # We also extract source_sql and param_assignments here in case user
+            # wants to automate an already saved evaluation
+            st.session_state["source_sql"] = evaluation["SOURCE_SQL"]
+            st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
+            st.session_state["model_selection"] = evaluation["MODELS"]
+            st.switch_page("pages/results.py")
 
 
 def run_auto_eval(evaluation: Dict[str, Any]) -> None:
@@ -169,27 +270,36 @@ def run_auto_eval(evaluation: Dict[str, Any]) -> None:
         None
 
     """
-    with st.spinner("Running evaluation..."):
-        st.session_state["selected_metrics"] = [
-            metric for metric in metrics if metric.name in evaluation["METRIC_NAMES"]
+    st.session_state["selected_metrics"] = [
+            metric for metric in st.session_state['all_metrics'] if metric.name in evaluation["METRIC_NAMES"]
         ]
-        st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
-        st.session_state["model_selection"] = evaluation["MODELS"]
-        st.session_state["eval_funnel"] = "automated"
-        try:
-            result = st.session_state["session"].table(
-                evaluation["ASSOCIATED_OBJECTS"]["TABLE"]
-            )
-            # If automation process is not complete, table may not exist throwing error
-            # in which case we also don't want to switch pages to results as they won't exist
-            st.session_state["metric_result_data"] = result
-            st.session_state["eval_name"] = evaluation["EVAL_NAME"]
-            st.switch_page("pages/results.py")
-        except Exception as e:
-            st.session_state["metric_result_data"] = None
-            st.warning(
-                f"Table {evaluation['ASSOCIATED_OBJECTS']['TABLE']} does not have results yet."
-            )
+    # Evaluations may correspond to previously hidden/removed metrics
+    # If they are selected, we want to stop the user the ability to run them
+    # If the metrics exist but hidden, they can select to show them before running
+    if len(st.session_state["selected_metrics"]) != len(evaluation["METRIC_NAMES"]):
+        st.error("Metric(s) used in evaluations have been hidden and/or deleted. Please ensure they exist and are set to show via Manage Metrics.")
+        st.stop()
+    else:
+        with st.spinner("Running evaluation..."):
+            st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
+            st.session_state["model_selection"] = evaluation["MODELS"]
+            st.session_state["eval_funnel"] = "automated"
+            try:
+                result = st.session_state["session"].table(
+                    evaluation["ASSOCIATED_OBJECTS"]["TABLE"]
+                )
+                # If automation process is not complete, table may not exist throwing error
+                # in which case we also don't want to switch pages to results as they won't exist
+                # We force an immediate action on dataframe to check if it exists. Otherwise lazy evaluation will hide it.
+                result.count()
+                st.session_state["metric_result_data"] = result
+                st.session_state["eval_name"] = evaluation["EVAL_NAME"]
+                st.switch_page("pages/results.py")
+            except Exception as e:
+                st.session_state["metric_result_data"] = None
+                st.warning(
+                    f"Table {evaluation['ASSOCIATED_OBJECTS']['TABLE']} does not have results yet. Please try again shortly."
+                )
 
 
 def eval_button_grid(evaluations: List[Any]) -> Any:
@@ -231,23 +341,15 @@ def add_to_selected_metrics(metric_name: str) -> None:
         None
     """
 
-    # Initialize metric_name and metric trackers
-    if "selected_metric_names" not in st.session_state:
-        st.session_state["selected_metric_names"] = []
-    if "selected_metrics" not in st.session_state:
-        st.session_state["selected_metrics"] = []
-
-    # Get metric object that matches metric name
     matching_metric = next(
-        (metric for metric in metrics if metric.name == metric_name),
+        (metric for metric in st.session_state['all_metrics'] if metric.name == metric_name),
         None,
     )
 
-    # Add or remove metric from selected metrics
     if st.session_state.get(f"{metric_name}_checkbox", False) is True:
         if metric_name not in st.session_state["selected_metric_names"]:
             st.session_state["selected_metric_names"].append(metric_name)
-        if matching_metric not in st.session_state["selected_metrics"]:
+        if metric_name not in [metric.name for metric in st.session_state["selected_metrics"]]:
             st.session_state["selected_metrics"].append(matching_metric)
     else:
         st.session_state["selected_metric_names"] = [
@@ -258,17 +360,16 @@ def add_to_selected_metrics(metric_name: str) -> None:
         st.session_state["selected_metrics"] = [
             j
             for i, j in enumerate(st.session_state["selected_metrics"])
-            if j != matching_metric
+            if j.name != metric_name
         ]
 
-    # If no metrics are selected such as user returned to Home, reset selected_metrics
-    if len(st.session_state["selected_metric_names"]) == 0:
-        st.session_state["selected_metrics"] = []
+    st.session_state["selected_metric_names"] = list(set(st.session_state["selected_metric_names"]))
+    st.session_state["selected_metrics"] = list(set(st.session_state["selected_metrics"]))
 
 
 def new_eval_section() -> None:
     """Renders the New Evaluations section of the home page."""
-
+    import uuid
     metric_display = fetch_metric_display()
 
     with st.container(border=True):
@@ -295,12 +396,12 @@ def new_eval_section() -> None:
             with st.container(border=True):
                 preview_metric = st.selectbox(
                     "Metric Preview",
-                    options=[metric.name for metric in metrics],
+                    options=[metric.name for metric in st.session_state['all_metrics']],
                     index=None,
                 )
                 if preview_metric is not None:
                     display_metric = next(
-                        (metric for metric in metrics if metric.name == preview_metric),
+                        (metric for metric in st.session_state['all_metrics'] if metric.name == preview_metric),
                         None,
                     )
                     st.code(
@@ -308,15 +409,30 @@ def new_eval_section() -> None:
                         language="yaml",
                     )
 
-        button_container = row(9, vertical_align="center")
+        button_container = row(6, vertical_align="center")
+        for _ in range(1,4):
+            button_container.empty()
+        new_metric_button = button_container.button(
+            "➕ Add Metrics",
+            use_container_width=True,
+        )
+        del_metric_button = button_container.button(
+            "🎛️ Manage Metrics",
+            use_container_width=True,
+        )
         continue_button = button_container.button(
-            "Continue",
+            "▶️ Continue",
             use_container_width=True,
             disabled=bool(st.session_state["selected_metrics"] is None),
+            type = "primary",
         )
         if continue_button:
             st.session_state["eval_funnel"] = "new"
             st.switch_page("pages/data.py")
+        if new_metric_button:
+            add_new_metric()
+        if del_metric_button:
+            manage_metric_dialog()
 
 
 def saved_eval_section() -> None:
@@ -363,11 +479,20 @@ def automated_eval_section() -> None:
         else:
             st.write("No automated evaluations available.")
 
+def set_metric_states():
+    """Sets necessary metric trackers for the home page."""
+    if "selected_metric_names" not in st.session_state:
+        st.session_state["selected_metric_names"] = []
+    if "selected_metrics" not in st.session_state:
+        st.session_state["selected_metrics"] = []
 
-metrics = fetch_metrics()
-# Initialize selected metric trackers and reset if returning to page
-for metric in metrics:
-    add_to_selected_metrics(metric.name)
+    st.session_state['all_metrics'] = fetch_metrics(st.session_state["session"], STAGE_NAME)
+    # User may return from results where selected metrics already set
+    # If user selects a new metric, we want to refresh selected_metrics to match
+    for metric in st.session_state['all_metrics']:
+        add_to_selected_metrics(metric.name)
+
+set_metric_states()
 new_eval_section()
 saved_eval_section()
 automated_eval_section()

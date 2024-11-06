@@ -21,15 +21,37 @@ class Metric(ABC):
         self.session = None
         self.prompt = prompt
 
-    @abstractmethod
-    def get_prompt(self, *args):
-        """Used to run any necessary data prep and impute prompt before LLM."""
-        pass
+    def get_prompt(
+        self, **kwargs,
+    ) -> Union[str, None]:
+        if self.prompt is not None:
+            try:    
+                return self.prompt.format(**kwargs)
+            except ValueError as e:
+                return f"Keyword argument missing in prompt: {e}"
+        else:
+            return None
+            
+    def evaluate(
+        self,
+        model: Optional[str] = None,
+        **kwargs,
+    ):
+        import re
 
-    @abstractmethod
-    def evaluate(self, *args):
-        """Conducts the final LLM-as-a-judge prompt."""
-        pass
+        model_to_use = model if model else self.model 
+        
+        prompt = self.get_prompt(**kwargs)
+
+        response = run_async_sql_complete(self.session, model_to_use, prompt)
+        rating = re.search(r'\d+', response)
+        if rating:
+            return int(rating.group())
+        else:
+            return None
+        
+    def get_column(self):
+        return self.name.replace(" ", "_").upper()
 
 
 # Cortex Analyst Metrics
@@ -54,13 +76,23 @@ Questions are best designed when expected results have less than 100 rows.""",
         self.model = model
 
     def get_prompt(
-        self, question: str, inference_sql: str, expected_sql: str
+        self, **kwargs,
     ) -> Union[str, None]:
         if self.prompt is not None:
             from src.snowflake_utils import return_sql_result
 
-            inference_data = return_sql_result(self.session, inference_sql)
-            expected_data = return_sql_result(self.session, expected_sql)
+            if "inference_sql" in kwargs:
+                inference_data = return_sql_result(self.session, kwargs["inference_sql"])
+            else:
+                inference_data = "No data returned"
+            if "inference_sql" in kwargs:
+                expected_data = return_sql_result(self.session, kwargs["expected_sql"])
+            else:
+                expected_data = "No data returned"
+            if "question" in kwargs:
+                question = kwargs["question"]
+            else:
+                question = "No question provided"
 
             fstrings = {
                 "question": question,
@@ -73,15 +105,13 @@ Questions are best designed when expected results have less than 100 rows.""",
 
     def evaluate(
         self,
-        question: str,
-        inference_sql: str,
-        expected_sql: str,
         model: Optional[str] = None,
+        **kwargs,
     ):
         
         model_to_use = model if model else self.model  
 
-        prompt = self.get_prompt(question, inference_sql, expected_sql)
+        prompt = self.get_prompt(**kwargs)
 
         response = run_async_sql_complete(self.session, model_to_use, prompt)
         if "true" in response.lower():
@@ -107,42 +137,9 @@ Evaluates the correctness of a response compared to a reference answer on a scal
                 "answer_ref": "Expected answer to the question",
                 "ai_response": "LLM-generated response to the question",
             },
-            
         )
-        self.model = model
-
-    def get_prompt(
-        self, question: str, answer_ref: str, ai_response: str
-    ) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "question": question,
-                "answer_ref": answer_ref,
-                "ai_response": ai_response,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self,
-        question: str,
-        answer_ref: str,
-        ai_response: str,
-        model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model  
         
-        prompt = self.get_prompt(question, answer_ref, ai_response)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
+        self.model = model
 
 
 class Comprehensiveness(Metric):
@@ -164,39 +161,6 @@ Evaluates the thoroughness and comprehensiveness of a response compared to a ref
         )
         self.model = model
 
-    def get_prompt(
-        self, question: str, answer_ref: str, ai_response: str
-    ) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "question": question,
-                "answer_ref": answer_ref,
-                "ai_response": ai_response,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self,
-        question: str,
-        answer_ref: str,
-        ai_response: str,
-        model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model 
-
-        prompt = self.get_prompt(question, answer_ref, ai_response)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
-
 
 class Hallucination(Metric):
     def __init__(
@@ -217,35 +181,6 @@ Evaluates the prevalance of hallucination in a response based on reference conte
         )
         self.model = model
 
-    def get_prompt(
-        self, question: str, context: str, ai_response: str
-    ) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "question": question,
-                "context": context,
-                "ai_response": ai_response,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self, question: str, context: str, ai_response: str, model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model  
-
-        prompt = self.get_prompt(question, context, ai_response)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
-
 
 # Non-Reference Prompt Metrics
 class ConversationCohesiveness(Metric):
@@ -264,34 +199,8 @@ Evaluates the cohesivenss and adherence to topics of AI responses in conversatio
             },
         )
         self.model = model
-
-    def get_prompt(self, exchange: str) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "exchange": exchange,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self,
-        exchange: str,
-        model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model 
-
-        prompt = self.get_prompt(exchange)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
     
+
 class AnswerRelevancy(Metric):
     def __init__(
         self,
@@ -310,36 +219,6 @@ Evaluates the relevance of a response to a user question on a scale of 1-5.
         )
         self.model = model
 
-    def get_prompt(
-        self, question: str, ai_response: str
-    ) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "question": question,
-                "ai_response": ai_response,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self,
-        question: str,
-        ai_response: str,
-        model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model 
-
-        prompt = self.get_prompt(question, ai_response)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
     
 class ContextualRelevancy(Metric):
     def __init__(
@@ -358,37 +237,6 @@ Evaluates the contextual relevance of retrieved content in response to a user qu
             },
         )
         self.model = model
-
-    def get_prompt(
-        self, question: str, retrieved_content: str
-    ) -> Union[str, None]:
-        if self.prompt is not None:
-            fstrings = {
-                "question": question,
-                "retrieved_content": retrieved_content,
-            }
-            return self.prompt.format(**fstrings)
-        else:
-            return None
-
-    def evaluate(
-        self,
-        question: str,
-        retrieved_content: str,
-        model: Optional[str] = None,
-    ):
-        import re
-
-        model_to_use = model if model else self.model  
-
-        prompt = self.get_prompt(question, retrieved_content)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        values = [str(i) for i in range(1, 11)]
-        pattern = f"[{''.join(values)}]"
-        match = re.search(pattern, response)
-
-        return int(match.group(0)) if match else None
 
 
 # Metric categorization for display
@@ -419,7 +267,7 @@ non_knowledge_base_retrieval_metrics = {
 }
 
 # All metrics
-metrics = [
+provided_metrics = [
     SQLResultsAccuracy(),
     Correctness(),
     Comprehensiveness(),
