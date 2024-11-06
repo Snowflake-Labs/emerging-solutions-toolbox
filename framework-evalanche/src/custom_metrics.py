@@ -62,7 +62,7 @@ After updating this file, you will need to re-compress the src directory and re-
 #         prompt = self.get_prompt(question, ai_response)
 
 #         response = run_async_sql_complete(self.session, model_to_use, prompt)
-#         values = [str(i) for i in range(1, 11)]
+#         values = [str(i) for i in range(1, 6)]
 #         pattern = f"[{''.join(values)}]"
 #         match = re.search(pattern, response)
 

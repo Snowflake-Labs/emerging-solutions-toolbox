@@ -19,7 +19,7 @@ Please see TAGGING.md for details on object comments.
     + [Snowflake CLI](#snowflake-cli)
     + [VSCode with Snowflake Extension](#vscode-with-snowflake-extension)
 * [Running](#release)
-* [Advanced](#advanced)
+* [Extras](#extras)
     + [Custom Metrics](#custom-metrics)
     + [Crafting a LLM Pipeline Stored Procedure](#crafting-a-llm-pipeline-stored-procedure)
 
@@ -66,18 +66,32 @@ Once Evalanche is deployed to Streamlit in Snowflake, the app is ready for use. 
 snow streamlit get-url EVALUATION_APP --open --database GENAI_UTILITIES --schema EVALUATION
 ```
 
-# Advanced
+# Extras
 ## Custom Metrics
-While we continue to add Metrics, you may have a use case that warrants a unique one. Module `src/custom_metrics.py` has been added for this purpose. The module has an example custom Metric with additional instructions.
+While we continue to add Metrics, you may very well have a use case that warrants a unique one. This is expected. New simple prompt-based metrics can be added from the homepage's Add Metric button. 
 
-Every Metric must be a child class of class `Metric` with `name`, `description`, `required` attributes. It must also have an `evaluate` method that calculates the actual metric result per record. Please feel free to use the sample one as a template and create your own with new prompts added to `src/prompts.py`.
+To craft a new metric, give it a name, description and prompt. Examples are shown in the app. When crafting a prompt, variables should be enclosed with curly brackets (`{}`). Ideal metrics prompt the LLM to return a result of an integer-based scale, such as 1-5 corresponding to a [Likert scale](https://en.wikipedia.org/wiki/Likert_scale). True/False responses should be crafted as 1/0 responses, respectively. These variables will be populated by the values in the user-selected data sources. Here's an example of a basic prompt:
 
-Please note that you must take two actions before custom metrics are available:
-1) Add the class name to custom_metrics at the bottom of `src/custom_metrics.py`.
-2) Re-compress `src/` as `src.zip` and upload to Snowflake stage STREAMLIT_STAGE as noted in `setup.sql`.
+```text
+Please act as an impartial judge and evaluate the quality of the response provided by the AI Assistant to the user question displayed below.
+Your evaluation should consider RELEVANCY. You will be given a user question and the AI Assistant's answer.
+Your job is to rate the assistant's response from 1 to 5, where 5 indicates you strongly agree that the response is
+RELEVANT
+and 1 indicates you strongly disagree.
+Avoid any position biases and ensure that the order in which the content presented does not affect your evaluation.
+Be as objective as possible. Output your rating with just the number rating value.
+[User Question]
+{question}
 
-> **Note:** The terminal zip command does not create the required file for step #2 above. Instead, please compress via Mac Finder or Windows Explore user interface.
-Alternatively, for Mac only, you may use the following command in the project root: ```ditto -c -k --sequesterRsrc --keepParent src src.zip```. For Windows machine, you may use the following command in the project root: ```Compress-Archive -Path .\src\* -DestinationPath .\src.zip -Update```.
+[The Start of the AI Assistant's Answer]
+{ai_response}
+[The End of the AI Assistant's Answer]
+```
+
+To remove a metric as selectable in the app, deselect it in the Manage Metrics menu. To completely delete a metric, we've added a helper store procedure. As an example, the below can be run from any Snowflake SQL interface to delete a custom metric named, `Rudeness`.
+```
+CALL GENAI_UTILITIES.EVALUATION.DELETE_METRIC('Rudeness');
+```
 
 ## Crafting a LLM Pipeline Stored Procedure
 To run a reference dataset through your desired LLM pipelines on the data page, we must first encapsulated the pipeline logic in a Stored Procedure. To take advantage of this feature, the stored procedure must have a single VARIANT input type and return a single value. When we execute the stored procedure, a single row from the reference dataset will be passed in the form of a Python dictionary. In other words, a row in the reference dataset that looks like:

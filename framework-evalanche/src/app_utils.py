@@ -1,16 +1,16 @@
 # Python 3.8 type hints
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
+from snowflake.snowpark import Session
 
 from src.metrics import Metric
-from src.snowflake_utils import get_connection
+from src.snowflake_utils import (
+    get_connection,
+    CUSTOM_METRIC_TABLE,
+    models,
+)
 
-QUERY_TAG = {
-    "origin": "sf_sit",
-    "name": "evalanche",
-    "version": {"major": 1, "minor": 0},
-}
 
 # Style text_area to mirror st.code
 css_yaml_editor = """
@@ -21,24 +21,6 @@ css_yaml_editor = """
         background-color: #fbfbfb;
     }
     """
-
-models = [
-    'llama3.2-1b',
-    'llama3.2-3b',
-    'llama3.1-8b',
-    'llama3.1-70b',
-    'llama3.1-405b',
-    'snowflake-arctic',
-    'reka-core',
-    'reka-flash',
-    'mistral-large2',
-    'mixtral-8x7b',
-    'mistral-7b',
-    'jamba-instruct',
-    'jamba-1.5-mini',
-    'jamba-1.5-large',
-    'gemma-7b',
-]
 
 def select_model(
         keyname: str,
@@ -70,23 +52,139 @@ def test_complete(session, model, prompt = "Repeat the word hello once and only 
     except SnowparkSQLException as e:
         if 'unknown model' in str(e):
             return False
+        
+def upload_staged_pickle(session: Session, instance: Any, file_name: str, stage_name: str) -> None:
+    """Pickles object and uploads to Snowflake stage."""
+    import cloudpickle as pickle
+    import os
 
+    # Pickle the instance
+    with open(file_name, "wb") as f:
+        pickle.dump(instance, f)
+    # Upload the pickled instance to the stage
+    session.file.put(file_name, f"@{stage_name}", auto_compress=False, overwrite=True)
+    os.remove(file_name)
+        
+def load_staged_pickle(session: Session, staged_file_path: str) -> Any:
+    """Loads pickled object from Snowflake stage.
+    
+    LS @stage results do not include database and schema so we have to create the full path to the file manually.
+    """
+    import cloudpickle as pickle
+    # staged_file_name = '@' + database + '.' + schema + '.' + staged_file_name
+    session.file.get(f"{staged_file_path}","/tmp")
+    # Load the pickled instance from the file
+    local_file = '/tmp/' + staged_file_path.split("/")[-1]
+    with open(local_file, "rb") as f:
+       loaded_instance = pickle.load(f)
+       return loaded_instance
+    
+def delete_metric(session: Session, metric: Metric, stage_name: str):
+    """Deletes metric pickle file from Snowflake stage."""
+    file_name = type(metric).__name__ + ".pkl"
 
-def fetch_metrics() -> List[Metric]:
-    """Combines metrics and custom metrics, if any, and returns list of metrics."""
-    from src.custom_metrics import custom_metrics
-    from src.metrics import metrics
+    query = f"rm @{stage_name}/{file_name}"
+    session.sql(query).collect()
 
-    if len(custom_metrics) > 0:
-        return metrics + custom_metrics
+    # Remove metric from all_metrics list
+    # We want to avoid re-querying stage for latency
+    st.session_state['all_metrics'] = [
+                metric if metric.name != metric.name else metric
+                for metric in st.session_state['all_metrics']
+            ]
+    
+
+def add_metric_to_table(session: Session,
+                        metric_name: str,
+                        stage_file_path: str,
+                        table_name: str = CUSTOM_METRIC_TABLE,
+                        ):
+    """Adds metric to CUSTOM_METRICS table in Snowflake."""
+    import datetime
+    from snowflake.snowpark.functions import current_timestamp, when_matched, when_not_matched
+    
+    metric_table = session.table(table_name)
+    metric_columns = metric_table.columns
+    key_col = 'METRIC_NAME'
+    other_cols = [col for col in metric_columns if col != key_col]
+    
+    if session.get_current_user() is None:
+        username = st.experimental_user.user_name
     else:
-        return metrics
+        username = session.get_current_user()
+
+    new_record_df = session.create_dataframe([[metric_name,
+                                               stage_file_path,
+                                               datetime.datetime.now(),
+                                               True,
+                                               username.replace('"', '')]]).to_df(*metric_columns)
+    
+    update_dict = {col: new_record_df[col] for col in other_cols}
+    insert_dict = {col: new_record_df[col] for col in metric_columns}
+
+    _ = metric_table.merge(new_record_df, metric_table[key_col] == new_record_df[key_col],
+            [when_matched().update(update_dict),
+            when_not_matched().insert(insert_dict)])
+
+
+    
+
+def get_custom_metrics_table_results(session: Session,
+                                     table_name: str = CUSTOM_METRIC_TABLE
+                                     ) -> List[Dict[str, Any]]:
+    """Retrieves list of staged file names from CUSTOM_METRICS table in Snowflake where show is True."""
+    df = session.table(table_name)
+    if "STAGE_FILE_PATH" not in df.columns or "SHOW_METRIC" not in df.columns:
+        return []
+    else:
+        return [i.as_dict()['STAGE_FILE_PATH'] for i in df.collect() if i.as_dict()['SHOW_METRIC'] is True]
+
+
+def fetch_custom_metrics_from_stage(session: Session,
+                                    stage_name: str,
+                                    metrics_table: str = CUSTOM_METRIC_TABLE,
+                                    ) -> List[Union[str, Metric, None]]:
+    """Returns list of custom metrics from Snowflake stage."""
+
+    # Get metric list from table
+    metrics_to_show = get_custom_metrics_table_results(session, metrics_table)
+    
+    query = f"ls @{stage_name} pattern='.*\\pkl'"
+    result = session.sql(query)
+    files = [file[0] for file in result.collect()]
+    if len(files) > 0:
+        custom_metrics = []
+        for f in files:
+            stage_file_path = f"@{stage_name}/{f.split('/')[-1]}" # Non-qualified stage name in LS from @stage results
+            if stage_file_path in metrics_to_show:
+                custom_metrics.append(load_staged_pickle(session, stage_file_path))
+        return custom_metrics
+    else:
+        return []
+
+def fetch_metrics(session: Session,
+                  custom_metrics_stage_name: str,
+                  metrics_table: str = CUSTOM_METRIC_TABLE,
+                  ) -> List[Metric]:
+    """Combines metrics and custom metrics, if any, and returns list of metrics."""
+    from src.metrics import provided_metrics
+
+    custom_metrics = fetch_custom_metrics_from_stage(session, custom_metrics_stage_name, metrics_table)
+    if len(custom_metrics) > 0:
+        return provided_metrics + custom_metrics
+    else:
+        return provided_metrics
 
 
 def fetch_metric_display() -> List[Dict[str, Any]]:
     """Combines metrics and custom metrics displays, if any, and returns list of displays."""
-    from src.custom_metrics import custom_metrics
+
     from src.metrics import metric_display
+    from src.metrics import provided_metrics
+
+
+    custom_metrics = [metric for metric in st.session_state['all_metrics'] 
+                      if metric.name not in [provided_metric.name for provided_metric in provided_metrics]]
 
     if len(custom_metrics) > 0:
         custom_metrics_section = {
@@ -379,14 +477,25 @@ def render_sidebar():
                 st.write(get_metric_preview(metric))
 
 
-def print_session_state():
-    """Troubleshooting helper function to print session state keys and values.
+def count_words_in_braces(prompt: str):
+    import re
+    # Create a regex pattern that matches any word between the braces
+    pattern = re.compile(r'\{([^{}]+)\}')
+    # Find all non-overlapping matches of the pattern
+    matches = pattern.findall(prompt)
+    # Return the number of matches
+    return set(matches)
 
-    Note: This function is not intended for production use.
-    """
 
-    for key, value in st.session_state.items():
-        print(f"{key}: {value}\n")
+def vars_entry(prompt):
+    variables = count_words_in_braces(prompt)
+    required_params = {}
+    if len(variables) > 0:
+        st.caption("Enter description for variable(s).")
+        for i, var in enumerate(variables):
+            required_params[var] = st.text_input(label=var,
+                                key = var,)
+        return required_params
 
 
 def format_query_tag(query_tag: Dict[str, Any]) -> str:

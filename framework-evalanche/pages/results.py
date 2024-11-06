@@ -10,8 +10,12 @@ from snowflake.snowpark import DataFrame
 from streamlit_extras.row import row
 
 from src.app_utils import render_sidebar, select_model
-from src.metric_utils import AUTO_EVAL_TABLE, SAVED_EVAL_TABLE
-from src.snowflake_utils import save_eval_to_table
+from src.snowflake_utils import (
+    save_eval_to_table,
+    AUTO_EVAL_TABLE, 
+    SAVED_EVAL_TABLE, 
+    STAGE_NAME,
+)
 
 
 def get_result_title() -> str:
@@ -71,7 +75,7 @@ def replace_bool_col_with_str() -> DataFrame:
     from snowflake.snowpark import functions as F
     from snowflake.snowpark.types import StringType
 
-    metric_names = [metric.name for metric in st.session_state["selected_metrics"]]
+    metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
 
     df = st.session_state["metric_result_data"]
     for name in metric_names:
@@ -141,8 +145,8 @@ def save_eval() -> None:
     st.write("""Source data and metric configuration will be captured as a Snowflake Stored Procedure.
              Select the evaluation from Homepage's **Saved Evaluations** section to run.""")
     # App logic and saved evaluations must resides in same location so we hard-code these values.
-    schema_context = {"database": "GENAI_UTILITIES", "schema": "EVALUATION"}
-    stage_name = "STREAMLIT_STAGE"
+    schema_context = {"database": STAGE_NAME.split(".")[0], "schema": STAGE_NAME.split(".")[1]}
+    stage_name = STAGE_NAME.split(".")[-1]
     eval_name, eval_description = get_eval_name_desc()
 
     if st.button("Save"):
@@ -207,8 +211,8 @@ def automate_eval() -> None:
             Results will be captured in a table.
             Select the evaluation from Homepage's **Automated Evaluations** section to view results.""")
     # App logic and saved evaluations must resides in same location so we hard-code these values.
-    schema_context = {"database": "GENAI_UTILITIES", "schema": "EVALUATION"}
-    stage_name = "STREAMLIT_STAGE"
+    schema_context = {"database": STAGE_NAME.split(".")[0], "schema": STAGE_NAME.split(".")[1]}
+    stage_name = STAGE_NAME.split(".")[-1]
 
     warehouse = st.selectbox(
         "Select Warehouse",
@@ -269,7 +273,7 @@ def give_recommendation_instruction() -> None:
     The dataframe selection checkboxes are not obvious so we provide these explicit instructions.
     """
     st.write(
-        "Select a row using the far left checkboxes to generate a recommendation based on the selected metric."
+        "Select a row using the far left checkboxes to analyze score results and get recommendations."
     )
 
 
@@ -279,7 +283,7 @@ def get_metric_cols(current_df: DataFrame) -> list:
     Some metric names have spaces and Snowpark keeps them in lower case with double quotes.
     Metric names without spaces are capitalized when added to a Snowflake table/dataframe."""
 
-    metric_names = [metric.name for metric in st.session_state["selected_metrics"]]
+    metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
     df_columns = current_df.columns
     return [c_name for c_name in df_columns if c_name.upper() in (m_name.upper() for m_name in metric_names)]
 
@@ -291,7 +295,7 @@ def show_metric() -> None:
 
     if st.session_state.get("metric_result_data", None) is not None:
         df = st.session_state["metric_result_data"]
-        metric_names = [metric.name for metric in st.session_state["selected_metrics"]]
+        metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
         kpi_row = row(6, vertical_align="top")
         for metric_name in metric_names:
             metric_value = df.select(F.avg(F.to_variant(F.col(metric_name)))).collect()[
@@ -348,7 +352,7 @@ def show_recommendation(selection: Union[int, None], pandas_df: pd.DataFrame) ->
     from src.prompts import Recommendation_prompt
     from src.snowflake_utils import get_connection, run_complete
 
-    metrics = fetch_metrics()
+    metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
 
     if (
         selection is not None
@@ -422,6 +426,7 @@ def trend_avg_metrics() -> None:
             .group_by("METRIC_DATETIME")
             .agg(*[avg(to_variant(col)).alias(col) for col in metric_cols])
         )
+        st.write("Average Metric Scores over Time")
         st.line_chart(
             df,
             x="METRIC_DATETIME",
@@ -442,6 +447,7 @@ def trend_count_metrics() -> None:
         metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
         df = st.session_state["metric_result_data"]
+        st.write("Metric Scores over Time")
         st.bar_chart(
             df,
             x="METRIC_DATETIME",
@@ -469,7 +475,7 @@ def bar_chart_metrics() -> None:
             .group_by("METRIC", "SCORE")
             .count()
         )
-
+        st.write("Score Counts by Metric")
         st.bar_chart(chart_df, x="SCORE", y="COUNT", color="METRIC")
 
 
@@ -496,10 +502,12 @@ def chart_expander() -> None:
     with st.expander("Chart Metrics", expanded=False):
         trendable_col = get_trendable_column()
         if trendable_col is not None:
-            line, bar = st.columns(2)
-            with line:
+            bar_counts, line_trend, bar_trend = st.columns(3)
+            with bar_counts:
+                bar_chart_metrics()
+            with line_trend:
                 trend_avg_metrics()
-            with bar:
+            with bar_trend:
                 trend_count_metrics()
         else:
             bar_chart_metrics()
@@ -522,8 +530,17 @@ def show_results():
     show_metric()
     if st.session_state["eval_funnel"] is not None:
         top_row = row(5, vertical_align="top")
+        recommend_inst = top_row.button(
+            "🤖 Get AI Recommendations",
+            disabled=True
+            if st.session_state.get("metric_result_data", None) is None
+            else False,
+            use_container_width=True,
+            help="Select a row to generate a recommendation.",
+            on_click=execute_cb,
+        )
         record_button = top_row.button(
-            "Record Results",
+            "📁 Record Results",
             disabled=True
             if st.session_state.get("metric_result_data", None) is None
             else False,
@@ -532,26 +549,17 @@ def show_results():
             on_click=execute_cb,  # Reset dataframe key to unselect rows.
         )
         save_eval_button = top_row.button(
-            "Save Evaluation",
+            "💾 Save Evaluation",
             disabled=st.session_state["eval_funnel"] == ("saved" or "automated"),
             use_container_width=True,
             help="Add the evaluation to your On Demand metrics.",
             on_click=execute_cb,
         )
         automate_button = top_row.button(
-            "Automate Evaluation",
+            "⌛ Automate Evaluation",
             disabled=False,
             use_container_width=True,
             help="Automate and record the evaluation for any new records.",
-            on_click=execute_cb,
-        )
-        recommend_inst = top_row.button(
-            "Get AI Recommendations",
-            disabled=True
-            if st.session_state.get("metric_result_data", None) is None
-            else False,
-            use_container_width=True,
-            help="Select a row to generate a recommendation.",
             on_click=execute_cb,
         )
         row_selection, results_pandas = show_dataframe_results()

@@ -205,7 +205,7 @@ def sproc_runner(session: Session, sproc_name: str, inputs: Dict[str, Any]) -> T
     start_time = time.time()
     record_result = session.sql(f"""CALL {sproc_name}({inputs})""").collect_nowait().result()[0][0]
     elapsed_time = time.time() - start_time
-    return (elapsed_time, record_result)
+    return (record_result, elapsed_time)
 
 def pipeline_runner(
     session: Session,
@@ -457,9 +457,10 @@ def pick_data() -> None:
                     key_name="inference", instructions="Select your actual results."
                 )
         button_container = row(10, vertical_align="center")
-        preview_button = button_container.button("Preview", use_container_width=True)
+        preview_button = button_container.button(":mag_right: Preview", use_container_width=True)
         configure_button = button_container.button(
-            "Configure", use_container_width=True
+            "▶️ Configure", use_container_width=True,
+            type="primary",
         )
 
         if preview_button:
