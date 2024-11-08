@@ -277,5 +277,5 @@ def call_sproc(session: Session, name: str) -> Any:
     return session.call(name)
 
 
-def call_async_sproc(session: Session, sproc: str, input_value: dict[str, Any]) -> Any:
+def call_async_sproc(session: Session, sproc: str, input_value: Dict[str, Any]) -> Any:
     return session.sql(f"CALL {sproc}({input_value})").collect_nowait().result()[0][0]

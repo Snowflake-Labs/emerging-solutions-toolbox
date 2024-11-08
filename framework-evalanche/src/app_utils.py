@@ -76,8 +76,9 @@ def load_staged_pickle(session: Session, staged_file_path: str) -> Any:
     # Load the pickled instance from the file
     local_file = '/tmp/' + staged_file_path.split("/")[-1]
     with open(local_file, "rb") as f:
-       loaded_instance = pickle.load(f)
-       return loaded_instance
+        loaded_instance = pickle.load(f)
+        return loaded_instance
+        
     
 def delete_metric(session: Session, metric: Metric, stage_name: str):
     """Deletes metric pickle file from Snowflake stage."""
@@ -157,7 +158,11 @@ def fetch_custom_metrics_from_stage(session: Session,
         for f in files:
             stage_file_path = f"@{stage_name}/{f.split('/')[-1]}" # Non-qualified stage name in LS from @stage results
             if stage_file_path in metrics_to_show:
-                custom_metrics.append(load_staged_pickle(session, stage_file_path))
+                try:
+                    custom_metrics.append(load_staged_pickle(session, stage_file_path))
+                except TypeError:
+                    st.warning(f"Error loading metric {stage_file_path}. This can occur if the metric was created with a different python version than what is being used.")
+                    continue
         return custom_metrics
     else:
         return []

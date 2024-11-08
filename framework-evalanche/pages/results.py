@@ -378,7 +378,7 @@ def show_recommendation(selection: Union[int, None], pandas_df: pd.DataFrame) ->
                 (
                     metric
                     for metric in metrics
-                    if metric.name.upper() == selected_metric_name.upper()
+                    if metric.get_column() == selected_metric_name.upper()
                 ),
                 None,
             )
