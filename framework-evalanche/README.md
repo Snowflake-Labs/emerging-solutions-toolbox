@@ -93,6 +93,8 @@ To remove a metric as selectable in the app, deselect it in the Manage Metrics m
 CALL GENAI_UTILITIES.EVALUATION.DELETE_METRIC('Rudeness');
 ```
 
+Lastly, please be aware that Streamlit in Snowflake now supports multiple python versions. Custom metrics may only be available with consistent Python versions. For example, if you create a custom metric while running the app with Python version 3.11, the custom metric will only be available in subsequent sessions when running Python 3.11. 
+
 ## Crafting a LLM Pipeline Stored Procedure
 To run a reference dataset through your desired LLM pipelines on the data page, we must first encapsulated the pipeline logic in a Stored Procedure. To take advantage of this feature, the stored procedure must have a single VARIANT input type and return a single value. When we execute the stored procedure, a single row from the reference dataset will be passed in the form of a Python dictionary. In other words, a row in the reference dataset that looks like:
 ```markdown
