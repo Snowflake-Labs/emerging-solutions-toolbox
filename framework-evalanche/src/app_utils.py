@@ -71,7 +71,7 @@ def load_staged_pickle(session: Session, staged_file_path: str) -> Any:
     LS @stage results do not include database and schema so we have to create the full path to the file manually.
     """
     import cloudpickle as pickle
-    # staged_file_name = '@' + database + '.' + schema + '.' + staged_file_name
+
     session.file.get(f"{staged_file_path}","/tmp")
     # Load the pickled instance from the file
     local_file = '/tmp/' + staged_file_path.split("/")[-1]
@@ -516,3 +516,9 @@ def format_query_tag(query_tag: Dict[str, Any]) -> str:
     import json
 
     return json.dumps(query_tag)
+
+
+def set_session_var_to_none(variable: str):
+    """Sets session state to None for all session state variables."""
+    if variable in st.session_state:
+        st.session_state[variable] = None

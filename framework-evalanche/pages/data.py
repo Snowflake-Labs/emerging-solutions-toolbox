@@ -17,6 +17,7 @@ from src.app_utils import (
     table_data_selector,
     select_model,
     test_complete,
+    set_session_var_to_none,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
@@ -204,6 +205,7 @@ def data_spec(key_name: str, instructions: str, height=200, join_key=True) -> No
 def sproc_runner(session: Session, sproc_name: str, inputs: Dict[str, Any]) -> Tuple[Union[int, float], Any]:
     start_time = time.time()
     record_result = session.sql(f"""CALL {sproc_name}({inputs})""").collect_nowait().result()[0][0]
+    # record_result = session.call(sproc_name, inputs) # Once Snowpark supports thread-safe calls without parameter change
     elapsed_time = time.time() - start_time
     return (record_result, elapsed_time)
 
@@ -310,6 +312,9 @@ def pipeline_runner_dialog() -> None:
                 new_tablename,
                 selected_columns
             )
+            # Set result_data to None so first rendering on results
+            # page will create it as pandas dataframe from Snowpark result dataframe
+            set_session_var_to_none('result_data')
             st.success(f"Results written to {new_tablename}.")
         time.sleep(2)
         st.rerun()

@@ -1,5 +1,5 @@
 # Python 3.8 type hints
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import time
 
 import streamlit as st
@@ -14,6 +14,7 @@ from src.app_utils import (
     fetch_metrics,
     get_metric_preview,
     render_sidebar,
+    set_session_var_to_none,
 )
 from src.snowflake_utils import (
     AUTO_EVAL_TABLE,
@@ -211,6 +212,9 @@ def show_eval_details(
             st.write(evaluation["PARAM_ASSIGNMENTS"][metric_name])
     button_container = row(5, vertical_align="center")
     if button_container.button("Run", use_container_width=True):
+        # Set result_data to None so first rendering on results
+        # page will create it as pandas dataframe from Snowpark result dataframe
+        set_session_var_to_none('result_data')
         click_func(evaluation)
     if button_container.button("Delete", use_container_width=True):
         delete_evaluation(evaluation, eval_tablename)
@@ -302,8 +306,12 @@ def run_auto_eval(evaluation: Dict[str, Any]) -> None:
                 )
 
 
-def eval_button_grid(evaluations: List[Any]) -> Any:
+def eval_button_grid(evaluations: List[Any], suffix = Optional[str]) -> Any:
     """Creates a grid of evaluations buttons given list of evaluation metadata.
+
+    Args:
+        evaluations (list[]): List of evaluation metadata to be displayed in button grid.
+        suffix (string): Optional suffix to add to button key names to avoid duplicate widget key error in streamlit.
 
     Returns:
        buttons or empty list if no evaluations are available.
@@ -319,7 +327,7 @@ def eval_button_grid(evaluations: List[Any]) -> Any:
                     eval["EVAL_NAME"].split(".")[-1],
                     use_container_width=True,
                     help=eval["DESCRIPTION"],
-                    key=eval["EVAL_NAME"],
+                    key=eval["EVAL_NAME"] + (suffix or ''),
                 )
             )
         return eval_buttons
@@ -443,7 +451,7 @@ def saved_eval_section() -> None:
         st.write("Select a saved evaluation to run.")
         saved_evaluations = fetch_evals(SAVED_EVAL_TABLE)
         if len(saved_evaluations) > 0:
-            eval_buttons = eval_button_grid(saved_evaluations)
+            eval_buttons = eval_button_grid(saved_evaluations, suffix='_saved')
             # Need result of session call so cannot use a callback here
             # Instead, we iterate over the buttons and evaluations and call the SPROC if the button is clicked
             for i, button in enumerate(eval_buttons):
@@ -466,7 +474,7 @@ def automated_eval_section() -> None:
         st.write("Select an automated evaluation to see results.")
         auto_evaluations = fetch_evals(AUTO_EVAL_TABLE)
         if len(auto_evaluations) > 0:
-            eval_buttons = eval_button_grid(auto_evaluations)
+            eval_buttons = eval_button_grid(auto_evaluations, suffix='_auto')
             # Need to extract the table name corresponding to the automated evaluation to show in results
             for i, button in enumerate(eval_buttons):
                 if button is True:
