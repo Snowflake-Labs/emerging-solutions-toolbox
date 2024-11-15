@@ -1,14 +1,18 @@
+SET major = 2;
+SET minor = 0;
+SET COMMENT = concat('{"origin": "sf_sit",
+            "name": "evalanche",
+            "version": {"major": ',$major,', "minor": ',$minor,'}}');
+
 SET (streamlit_warehouse)=(SELECT CURRENT_WAREHOUSE());
 
 CREATE DATABASE IF NOT EXISTS GENAI_UTILITIES
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;
 
 CREATE SCHEMA IF NOT EXISTS GENAI_UTILITIES.EVALUATION
 COMMENT = '{"origin": "sf_sit",
             "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+            "version": {"major": 2, "minor": 0}}';
 
 -- Create API Integration for Git
 CREATE OR REPLACE API INTEGRATION git_api_integration_snowflake_labs_emerging_solutions_toolbox
@@ -31,9 +35,7 @@ SOURCE_SQL VARCHAR,
 PARAM_ASSIGNMENTS VARIANT,
 ASSOCIATED_OBJECTS VARIANT,
 MODELS VARIANT)
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;
 
 CREATE OR ALTER TABLE GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS
 (EVAL_NAME VARCHAR,
@@ -43,9 +45,7 @@ SOURCE_SQL VARCHAR,
 PARAM_ASSIGNMENTS VARIANT,
 ASSOCIATED_OBJECTS VARIANT,
 MODELS VARIANT)
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;
 
 CREATE OR ALTER TABLE GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS
 (METRIC_NAME VARCHAR,
@@ -53,16 +53,12 @@ STAGE_FILE_PATH VARCHAR,
 CREATED_DATETIME TIMESTAMP,
 SHOW_METRIC BOOLEAN,
 CREATION_USER VARCHAR)
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;
 
 -- Create stage for App logic
 CREATE STAGE IF NOT EXISTS GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE
 DIRECTORY = (ENABLE = true)
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;
 
 -- Copy Files from Git Repository into App Stage
 COPY FILES
@@ -92,6 +88,7 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.9'
 PACKAGES = ('snowflake-snowpark-python')
 HANDLER = 'run'
+COMMENT = $COMMENT
 EXECUTE AS CALLER
 AS
 $$
@@ -116,6 +113,4 @@ ROOT_LOCATION = '@GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE'
 MAIN_FILE = 'home.py'
 TITLE = "Evalanche: GenAI Evaluation Application"
 QUERY_WAREHOUSE = $streamlit_warehouse
-COMMENT = '{"origin": "sf_sit",
-            "name": "evalanche",
-            "version": {"major": 1, "minor": 0}}';
+COMMENT = $COMMENT;

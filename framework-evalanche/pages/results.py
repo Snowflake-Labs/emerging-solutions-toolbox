@@ -1,21 +1,23 @@
 import time
-import uuid
 
 # Python 3.8 type hints
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional, Dict
 
 import pandas as pd
 import streamlit as st
 from snowflake.snowpark import DataFrame
 from streamlit_extras.row import row
+import snowflake.snowpark.functions as F
 
-from src.app_utils import render_sidebar, select_model
+from src.app_utils import render_sidebar, select_model, fetch_metrics
 from src.snowflake_utils import (
     save_eval_to_table,
     AUTO_EVAL_TABLE, 
     SAVED_EVAL_TABLE, 
     STAGE_NAME,
+    add_row_id,
 )
+from src.metrics import Metric
 
 
 def get_result_title() -> str:
@@ -33,9 +35,9 @@ def get_result_title() -> str:
 
 TITLE = get_result_title()
 if st.session_state.get("metric_result_data", None) is not None:
-    INSTRUCTIONS = """Metric evaluation results are shown below.
-    You can record these results to a table, save the evaluation for future use, or automate the evaluation.
-    Select the checkbox to the left of a row to generate recommendations."""
+    INSTRUCTIONS = """Evaluation results are shown below.
+    Results can be reviewed and saved to a table.
+    New evaluations can be saved for future use or automated."""
 else:
     INSTRUCTIONS = "Please first select an evaluation from home."
 if "eval_funnel" not in st.session_state:
@@ -52,30 +54,13 @@ st.set_page_config(
 # Resolves temporary web socket error in SiS for text input inside of dialog
 st.config.set_option("global.minCachedMessageSize", 500 * 1e6)
 
-# We will reset dataframe key to by resetting dataframe key whenever a new dialog boxes opens up.
-# Otherwise, we receive error if 2 dialog boxes are opened.
-if "dfk" not in st.session_state:
-    st.session_state.dfk = str(uuid.uuid4())
-
-
-def execute_cb() -> None:
-    """
-    Change the dataframe key.
-
-    This is called when the button with execute label
-    is clicked. The dataframe key is changed to unselect rows on it.
-    """
-    # print(sinfo)
-    st.session_state.dfk = str(uuid.uuid4())
-
 
 def replace_bool_col_with_str() -> DataFrame:
     """Change boolean metric to string so st.dataframe doesn't show checkboxes."""
 
-    from snowflake.snowpark import functions as F
     from snowflake.snowpark.types import StringType
 
-    metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
+    metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
 
     df = st.session_state["metric_result_data"]
     for name in metric_names:
@@ -138,7 +123,6 @@ def record_evaluation() -> None:
 def save_eval() -> None:
     """Render dialog box to save evaluation as stored procedure."""
 
-    from src.app_utils import get_stages
     from src.metric_utils import register_saved_eval_sproc
     from src.snowflake_utils import insert_to_eval_table
 
@@ -150,7 +134,7 @@ def save_eval() -> None:
     eval_name, eval_description = get_eval_name_desc()
 
     if st.button("Save"):
-        metrics = st.session_state["selected_metrics"]
+        metrics = st.session_state["metrics_in_results"]
 
         eval_metadata = {
             "EVAL_NAME": eval_name,
@@ -203,7 +187,6 @@ def automate_eval() -> None:
     Results written to new final table.
     """
 
-    from src.app_utils import get_stages
     from src.metric_utils import automate_eval_objects
     from src.snowflake_utils import insert_to_eval_table
 
@@ -223,7 +206,7 @@ def automate_eval() -> None:
     eval_name, eval_description = get_eval_name_desc()
 
     if st.button("Save"):
-        metrics = st.session_state["selected_metrics"]
+        metrics = st.session_state["metrics_in_results"]
 
         eval_metadata = {
             "EVAL_NAME": eval_name,
@@ -283,7 +266,7 @@ def get_metric_cols(current_df: DataFrame) -> list:
     Some metric names have spaces and Snowpark keeps them in lower case with double quotes.
     Metric names without spaces are capitalized when added to a Snowflake table/dataframe."""
 
-    metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
+    metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
     df_columns = current_df.columns
     return [c_name for c_name in df_columns if c_name.upper() in (m_name.upper() for m_name in metric_names)]
 
@@ -291,118 +274,224 @@ def get_metric_cols(current_df: DataFrame) -> list:
 def show_metric() -> None:
     """Renders metric KPIs based on selected metrics."""
 
-    import snowflake.snowpark.functions as F
+    # User may navigate away from results and return. 
+    # If so, we want to keep the previously viewed metrics and avoid error.
+    # When user returns to home page, selected_metric set to empty list by default.
+    if (len(st.session_state.get('selected_metrics', [])) > 0 and 
+        st.session_state.get('metrics_in_results', []) != st.session_state.get('selected_metrics', [])):
+        st.session_state['metrics_in_results'] = st.session_state['selected_metrics']
+    
+    # Stop page from rendering if user selects new metrics from homepage after viewing previous results
+    if (len(st.session_state.get('selected_metrics', [])) > 0 and
+        len(st.session_state.get('metrics_in_results', [])) > 0 and
+        st.session_state.get('selected_metrics', []) != st.session_state.get('metrics_in_results', [])):
+        st.error("""Oops! Looks like you have may have selected new metrics from the homepage. 
+                 Please create a new evaluation or select an existing one from the homepage.""")
+        st.stop()
 
     if st.session_state.get("metric_result_data", None) is not None:
         df = st.session_state["metric_result_data"]
-        metric_names = [metric.get_column() for metric in st.session_state["selected_metrics"]]
+        metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
         kpi_row = row(6, vertical_align="top")
-        for metric_name in metric_names:
-            metric_value = df.select(F.avg(F.to_variant(F.col(metric_name)))).collect()[
-                0
-            ][0]
+        # Placing entire dataframe in memory seems to be more stable than iterating over columns and averaging in snowpark
+        metric_values = df.select(*metric_names).to_pandas()
+
+        for metric_name, metric_value in metric_values.mean().to_dict().items():
             kpi_row.metric(label=metric_name, value=round(metric_value, 2))
 
+def reset_analysis():
+    """Reset the analysis attribute in session state to None.
+    
+    This is necessary so clear out the AI review in the dialog if anything is changed."""
 
-def show_dataframe_results() -> Tuple[Union[int, None], Union[None, pd.DataFrame]]:
-    """
-    Renders dataframe output with metrics calculated for each row.
+    st.session_state['analysis'] = None
 
-    Dataframe has a single-row selection. The selected row is used to generate AI recommendations.
-    If selection is made, the row index and the pandas dataframe are returned.
-    If not selection is made, None and the pandas dataframe are returned.
-    If no dataframe is available, None and None are returned.
+def set_selected_row(selection_df: pd.DataFrame) -> None:
+    """Callback function to capture the rows in selection_df with REVIEW == True.
+    
+    Executed when user selects Review Record."""
+
+    if selection_df is not None:
+        reset_analysis()
+        first_metric = get_metric_cols(st.session_state.get("metric_result_data", None))[0]
+        selected_row = selection_df[selection_df['REVIEW'] == True]
+
+        if selected_row is not None and len(selected_row) >= 1:
+            selection = selected_row.to_dict(orient='records')
+            st.session_state["selected_dict"] = selection
+            st.session_state["selected_score"] = selection[0][first_metric]
+        else:
+            st.session_state["selected_dict"] = None
+            st.session_state["selected_score"] = None
+
+
+def set_score(selected_record: Dict[str, str]) -> None:
+    """Callback function to capture the score in the selected row corresponding to the selected metric."""
+    st.session_state["selected_score"] = selected_record[st.session_state['metric_selector']]
+    reset_analysis()
+
+
+def rerun_metric(prompt_inputs: Dict[str, str], metric: Metric) -> None:
+    """Callback function to rerun the selected metric with revised required inputs."""
+
+    response = metric.evaluate(model = st.session_state['review_model_selector'], **prompt_inputs)
+    if response is not None:
+        st.session_state["selected_score"] = response
+        reset_analysis()
+
+
+def analyze_result(prompt_inputs: Dict[str, str], metric: Metric) -> None:
+    """Callback function to prompt Cortex LLM to review metric's prompt and requried inputs for explanation."""
+
+    from src.prompts import Recommendation_prompt
+    from src.snowflake_utils import run_complete
+
+    original_prompt = metric.get_prompt(**prompt_inputs)
+    recommender_prompt = Recommendation_prompt.format(
+        prompt=original_prompt, score=st.session_state["selected_score"]
+    )
+    response = run_complete(st.session_state["session"], st.session_state['review_model_selector'], recommender_prompt)
+    if response is not None:
+        st.session_state['analysis'] = response
+
+
+def update_record(table_update_inputs: Dict[str, str], selected_metric_name: str, row_id: Union[int,str]) -> None:
+    """Callback function to update result_data (display) in session state.
+    
+    Required input arguments and metric score are editable through this dialog.
+    ROW_ID is used as unique identifier to match the record in the dataframe.
+    We must first create a temp table to update the record in the dataframe.
 
     Args:
-        None
-
-    Returns:
-        int and pandas Dataframe if selection
-        None and pandas Dataframe if no selection
-        None and None otherwise
-
+        table_update_inputs (dict[str,str]): Column name keys with updated values to replace in dataframe.
+        selected_metric_name (str): Name of metric to update in dataframe.
     """
-    if st.session_state.get("metric_result_data", None) is not None:
-        pandas_df = replace_bool_col_with_str().drop("ROW_ID").to_pandas()
-        df_selection = st.dataframe(
-            pandas_df,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            use_container_width=True,
-            key=st.session_state[
-                "dfk"
-            ],  # Will be used to reset dataframe if we mean to de-select row.
-            # Opening multiple dialog boxes will cause an error so we will reset this.
-        )
-        selected_row = df_selection["selection"]["rows"]
-        if selected_row:
-            return selected_row[0], pandas_df
-        else:
-            return None, pandas_df
+    
+    # Proper update path once SiS support temp table creation
+    # table_update_inputs[selected_metric_name] = st.session_state["selected_score"]
+    # st.session_state["result_data"].write.mode("overwrite").save_as_table("tmp_tbl", table_type="temp")
+    # temp_df = st.session_state['session'].table("tmp_tbl")
+    # temp_df.update(table_update_inputs, temp_df["ROW_ID"] == st.session_state["selected_dict"][0]["ROW_ID"])
+    # st.session_state["result_data"] = st.session_state['session'].table("tmp_tbl")
+
+    # Temporary update method using purely pandas
+    table_update_inputs[selected_metric_name] = st.session_state["selected_score"]
+    # Create shallow copy of dataframe to update is necessary to avoid read-only error
+    df = st.session_state["result_data"].copy()
+    df.loc[df['ROW_ID'] == row_id, table_update_inputs.keys()] = table_update_inputs.values()
+    st.session_state["result_data"] = df
+
+
+# metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
+
+@st.experimental_dialog("Review Record", width="large")
+def review_record() -> None:
+    """Render dialog box to review a metric result record."""
+
+
+    if st.session_state["selected_dict"] is None or len(st.session_state["selected_dict"]) == 0:
+        st.write("Please select a record to review.")
+    elif len(st.session_state["selected_dict"]) > 1:
+        st.write("Please select only one record to review at a time.")
     else:
-        return None, None
+        # Only first record is selected for analysis
+        selected_record = st.session_state["selected_dict"][0]
+        # metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
+        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
-
-@st.experimental_dialog("🤖 AI Recommendation", width="large")
-def show_recommendation(selection: Union[int, None], pandas_df: pd.DataFrame) -> None:
-    """Render dialog box to show AI recommendation based on selected row and metric."""
-
-    from src.app_utils import fetch_metrics
-    from src.prompts import Recommendation_prompt
-    from src.snowflake_utils import get_connection, run_complete
-
-    metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
-
-    if (
-        selection is not None
-        and pandas_df is not None
-        and st.session_state["selected_metrics"] is not None
-    ):
-        if "session" not in st.session_state:
-            session = get_connection()
-        else:
-            session = st.session_state["session"]
-
-        selected_row = pandas_df.iloc[selection].to_dict()
-        metric_cols = get_metric_cols(pandas_df)
-
-        selected_metric_name = st.selectbox(
-            "Select Metric", metric_cols, index=None, key="metric_selector"
-        )
-        if selected_metric_name is not None:
-            score = selected_row[selected_metric_name]
-  
-            # Get the actual metric object
+        metric_col, model_col = st.columns(2)
+        with metric_col:
+            selected_metric_name = st.selectbox(
+                    "Select Metric", metric_cols, index=0, 
+                    key="metric_selector", 
+                    on_change=set_score,
+                    args=(selected_record,)
+                )
+        with model_col:
+            select_model('review', default = "llama3.2-3b")
+    
+        if selected_metric_name is not None:     
             matching_metric = next(
                 (
                     metric
-                    for metric in metrics
+                    for metric in st.session_state["metrics"]
                     if metric.get_column() == selected_metric_name.upper()
                 ),
                 None,
             )
             # Re-add session attribute to metric object
-            matching_metric.session = session
-            # Re-construct the original prompt from the selected row and param_selections previously saved to session state
-            original_prompt_fstrings = {
-                key: selected_row[value]
-                for key, value in st.session_state["param_selection"][
+            matching_metric.session = st.session_state["session"]
+            
+            prompt_inputs = {} # Captures value of f-strings for prompt
+            table_update_inputs = {} # Captures table column values for metric evaluation
+            for key, value in st.session_state["param_selection"][
                     matching_metric.name
-                ].items()
-            }
-            original_prompt = matching_metric.get_prompt(**original_prompt_fstrings)
-            recommender_prompt = Recommendation_prompt.format(
-                prompt=original_prompt, score=score
-            )
+                ].items():
+                entered_value = st.text_area(value, selected_record[value])
+                prompt_inputs[key] = entered_value
+                table_update_inputs[value] = entered_value
+            metric_col, comment_col = st.columns((1, 4))
+            with metric_col:
+                st.metric(label=selected_metric_name, value=st.session_state['selected_score'])
+            with comment_col:
+                table_update_inputs['COMMENT'] = st.text_area("Comment", selected_record["COMMENT"])
+        
+        bottom_selection = row(4, vertical_align="top")
+        bottom_selection.button("Analyze", disabled = selected_metric_name is None,
+                                          use_container_width=True,
+                                          on_click = analyze_result, args = (prompt_inputs, matching_metric))
+        bottom_selection.button("Rerun", disabled = selected_metric_name is None,
+                                        on_click = rerun_metric, args = (prompt_inputs, matching_metric),
+                                        use_container_width=True,)
+        save = bottom_selection.button("Save", disabled = selected_metric_name is None,
+                                       use_container_width=True,)
 
-        rec_model = select_model('rec_model',
-                                    default = "llama3.2-3b")
-        if st.button("Analyze", disabled = selected_metric_name is None):
-            with st.spinner("Crunching the numbers..."):
-                response = run_complete(session, rec_model, recommender_prompt)
-                if response is not None:
-                    st.write(response)
+        if st.session_state.get('analysis', None) is not None:
+            st.write(f"**Analysis:** {st.session_state['analysis']}")
+        
+        if save:
+            update_record(table_update_inputs, 
+                            selected_metric_name,
+                            selected_record['ROW_ID'])
+            st.rerun()
+
+def show_dataframe_results() -> Optional[pd.DataFrame]:
+    """
+    Renders dataframe output with metrics calculated for each row.
+
+    Dataframe is rendered in data_editor. Function returns data_editor result as a pandas dataframe.
+    Function adds a ROW_ID column to the dataframe for self-joining of dataframes after running metric evaluations.
+
+    Args:
+        None
+
+    Returns:
+        pandas Dataframe 
+    """
+    
+    if st.session_state.get("metric_result_data", None) is not None:
+        if st.session_state.get('result_data', None) is None:
+            st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
+                                        .withColumn("REVIEW", F.lit(False))\
+                                        .withColumn("COMMENT", F.lit(None)).to_pandas()
+            
+            # Store available metrics in session state
+            st.session_state["metrics"] = fetch_metrics(st.session_state["session"], STAGE_NAME)
+        
+        df_selection = st.data_editor(
+            st.session_state["result_data"],
+            hide_index=True,
+            disabled=[col for col in st.session_state["result_data"].columns if col != "REVIEW"],
+            column_order=['REVIEW'] + [col for col in st.session_state["result_data"].columns if col not in ["REVIEW", 'ROW_ID']],
+            use_container_width=True,
+        )
+        st.caption("Please note that edits made above will not be saved to raw evaluation outputs directly. To save, select Record Results.")
+        
+
+        return df_selection
+    else:
+        st.session_state["result_data"] = None
+        return None
 
 
 def trend_avg_metrics() -> None:
@@ -411,11 +500,9 @@ def trend_avg_metrics() -> None:
     METRIC_DATETIME is added for every saved evaluation run.
     """
 
-    from snowflake.snowpark.functions import avg, to_variant
-
     if (
         st.session_state.get("metric_result_data", None) is not None
-        and st.session_state.get("selected_metrics", None) is not None
+        and st.session_state.get("metrics_in_results", None) is not None
     ):
         metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
@@ -424,7 +511,7 @@ def trend_avg_metrics() -> None:
         df = (
             st.session_state["metric_result_data"]
             .group_by("METRIC_DATETIME")
-            .agg(*[avg(to_variant(col)).alias(col) for col in metric_cols])
+            .agg(*[F.avg(F.to_variant(col)).alias(col) for col in metric_cols])
         )
         st.write("Average Metric Scores over Time")
         st.line_chart(
@@ -442,7 +529,7 @@ def trend_count_metrics() -> None:
 
     if (
         st.session_state.get("metric_result_data", None) is not None
-        and st.session_state.get("selected_metrics", None) is not None
+        and st.session_state.get("metrics_in_results", None) is not None
     ):
         metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
@@ -460,11 +547,10 @@ def bar_chart_metrics() -> None:
 
     This is the default chart if no trendable column is found.
     """
-    # TO DO - Add preview metric vs. selected metric so user can see 
-    # results for previously selected metrics until they select new one.
+
     if (
         st.session_state.get("metric_result_data", None) is not None
-        and len(st.session_state.get("selected_metrics", []))>0
+        and len(st.session_state.get("metrics_in_results", []))>0
     ):
         metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
@@ -487,7 +573,7 @@ def get_trendable_column() -> Union[None, str]:
 
     if (
         st.session_state.get("metric_result_data", None) is not None
-        and st.session_state.get("selected_metrics", None) is not None
+        and st.session_state.get("metrics_in_results", None) is not None
     ):
         df = st.session_state["metric_result_data"]
         for datatype in df.dtypes:
@@ -523,21 +609,19 @@ def show_results():
 
     from src.app_utils import fetch_warehouses
 
-    # Reset metric selector in recommendation if user closes dialog
-    if "metric_selector" in st.session_state:
-        st.session_state["metric_selector"] = None
-
     show_metric()
     if st.session_state["eval_funnel"] is not None:
         top_row = row(5, vertical_align="top")
+        selection_df = show_dataframe_results()
         recommend_inst = top_row.button(
-            "🤖 Get AI Recommendations",
+            "🤖 Review Record",
             disabled=True
             if st.session_state.get("metric_result_data", None) is None
             else False,
             use_container_width=True,
-            help="Select a row to generate a recommendation.",
-            on_click=execute_cb,
+            help="Select a row to review.",
+            on_click=set_selected_row,
+            args=(selection_df,)
         )
         record_button = top_row.button(
             "📁 Record Results",
@@ -546,25 +630,19 @@ def show_results():
             else False,
             use_container_width=True,
             help="Record the results to a table.",
-            on_click=execute_cb,  # Reset dataframe key to unselect rows.
         )
         save_eval_button = top_row.button(
             "💾 Save Evaluation",
             disabled=st.session_state["eval_funnel"] == ("saved" or "automated"),
             use_container_width=True,
             help="Add the evaluation to your On Demand metrics.",
-            on_click=execute_cb,
         )
         automate_button = top_row.button(
             "⌛ Automate Evaluation",
             disabled=False,
             use_container_width=True,
             help="Automate and record the evaluation for any new records.",
-            on_click=execute_cb,
         )
-        row_selection, results_pandas = show_dataframe_results()
-        if row_selection is not None:
-            show_recommendation(row_selection, results_pandas)
         chart_expander()
         if record_button:
             record_evaluation()
@@ -574,7 +652,7 @@ def show_results():
             st.session_state["warehouses"] = fetch_warehouses()
             automate_eval()
         if recommend_inst:
-            give_recommendation_instruction()
+            review_record()
 
 
 show_results()

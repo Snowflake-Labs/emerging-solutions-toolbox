@@ -35,6 +35,7 @@ models = [
 ]
 
 
+
 @st.cache_resource()
 def get_connection() -> Session:
     """Returns a Snowpark session object.
