@@ -11,6 +11,45 @@ from src.snowflake_utils import (
     models,
 )
 
+ABOUT = """
+### Overview
+
+Evalanche is a Streamlit in Snowflake (SiS) app that provides a single location to evaluate and compare LLM use case outputs in a streamlined, on demand, and automated fashion. 
+
+Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. 
+Together, Metrics and Data Sources can be combined to make an Evaluation. 
+In other words, an Evaluation will calculate 1 or more Metrics for every record in a Data Source.
+
+### Metrics
+
+Metrics rely on LLMs to Judge (or Score) results.
+A Metric mostly consists of required input(s) and a prompt asking the LLM to assess a specific quality of these required input(s).
+
+### Data Sources
+
+Data Sources provide the values to Metrics’ required inputs. Data Sources can be a Snowflake table or a SQL SELECT statement. 
+
+### Example
+
+The Answer Relevancy Metric will rate the relevancy of an LLM response to a question. A Data Source for Answer Relevancy could look like the below:
+
+| QUESTION        | LLM_RESPONSE |
+|----------------|----------------|
+| What does SCUBA stand for? | SCUBA stands for Self Contained Underwater Breathing Apparatus  |
+| Do woodchucks chuck wood? | Woodchucks don’t actually chuck wood, they do in fact chuck quite a bit of dirt when digging out a burrow.  |
+
+### Getting Started
+
+To create your own evaluation:
+1) Select from the out of the box Metrics or create your own.
+2) Select or create a Data Source that provides the required inputs of the desired Metric(s).
+"""
+
+MENU_ITEMS = {
+             'Get Help': "https://github.com/Snowflake-Labs/emerging-solutions-toolbox/tree/main/framework-evalanche",
+             'Report a bug': "https://github.com/Snowflake-Labs/emerging-solutions-toolbox/tree/main/framework-evalanche",
+             'About': ABOUT
+         }
 
 # Style text_area to mirror st.code
 css_yaml_editor = """
@@ -475,7 +514,7 @@ def fetch_evals(
 
 def render_sidebar():
     """Renders the sidebar of selected metrics for the application across all pages."""
-
+    
     if st.session_state.get("selected_metrics", None) is not None:
         with st.sidebar:
             for metric in st.session_state["selected_metrics"]:

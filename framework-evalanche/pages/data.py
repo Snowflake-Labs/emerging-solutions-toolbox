@@ -18,6 +18,7 @@ from src.app_utils import (
     select_model,
     test_complete,
     set_session_var_to_none,
+    MENU_ITEMS,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
@@ -42,6 +43,7 @@ st.set_page_config(
     page_icon="⚒️",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items=MENU_ITEMS,
 )
 
 # Resolves temporary web socket error in SiS for text input inside of dialog

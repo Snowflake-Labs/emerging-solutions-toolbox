@@ -15,6 +15,7 @@ from src.app_utils import (
     get_metric_preview,
     render_sidebar,
     set_session_var_to_none,
+    MENU_ITEMS,
 )
 from src.snowflake_utils import (
     AUTO_EVAL_TABLE,
@@ -27,12 +28,14 @@ from src.snowflake_utils import (
     get_connection,
 )
 
-TITLE = "Evalanche: GenAI Evaluation"
+TITLE = "⛰️Evalanche: GenAI Evaluation"
 INSTRUCTIONS = """
 Welcome to the Evalanche dashboard!
 Here you can create, run, and view GenAI evaluations.
 
-To start, select a metric in New Evaluations and follow the prompts to evaluate existing GenAI outputs.
+**Select About in the top right corner for full instructions.**
+
+To get started, select a metric in New Evaluations and follow the prompts to evaluate existing GenAI outputs.
 If you already have saved evaluations, you can run them from Saved Evaluations.
 Lastly, Automated Evaluations shows evaluations that are currently running.
 """
@@ -42,7 +45,8 @@ st.set_page_config(
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded",
-)
+    menu_items=MENU_ITEMS,
+     )
 
 
 if "session" not in st.session_state:

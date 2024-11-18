@@ -9,7 +9,12 @@ from snowflake.snowpark import DataFrame
 from streamlit_extras.row import row
 import snowflake.snowpark.functions as F
 
-from src.app_utils import render_sidebar, select_model, fetch_metrics
+from src.app_utils import (
+    render_sidebar, 
+    select_model, 
+    fetch_metrics,
+    MENU_ITEMS,
+)
 from src.snowflake_utils import (
     save_eval_to_table,
     AUTO_EVAL_TABLE, 
@@ -31,6 +36,8 @@ def get_result_title() -> str:
     else:
         if st.session_state.get("eval_name", None) is not None:
             return f"Evaluation Results: {st.session_state.get('eval_name', '')}"
+        else:
+            return "Evaluation Results"
 
 
 TITLE = get_result_title()
@@ -49,6 +56,7 @@ st.set_page_config(
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items=MENU_ITEMS,
 )
 
 # Resolves temporary web socket error in SiS for text input inside of dialog
