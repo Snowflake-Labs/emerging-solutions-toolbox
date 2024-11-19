@@ -12,8 +12,6 @@ from src.snowflake_utils import (
 )
 
 ABOUT = """
-### Overview
-
 Evalanche is a Streamlit in Snowflake (SiS) app that provides a single location to evaluate and compare LLM use case outputs in a streamlined, on demand, and automated fashion. 
 
 Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. 
