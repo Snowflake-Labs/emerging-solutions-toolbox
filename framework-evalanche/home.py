@@ -16,6 +16,7 @@ from src.app_utils import (
     render_sidebar,
     set_session_var_to_none,
     MENU_ITEMS,
+    ABOUT,
 )
 from src.snowflake_utils import (
     AUTO_EVAL_TABLE,
@@ -33,11 +34,9 @@ INSTRUCTIONS = """
 Welcome to the Evalanche dashboard!
 Here you can create, run, and view GenAI evaluations.
 
-**Select About in the top right corner for full instructions.**
-
 To get started, select a metric in New Evaluations and follow the prompts to evaluate existing GenAI outputs.
-If you already have saved evaluations, you can run them from Saved Evaluations.
-Lastly, Automated Evaluations shows evaluations that are currently running.
+If you already have saved or auomated evaluations, you can run or view them from below.
+Select **Help** to learn more.
 """
 
 st.set_page_config(
@@ -48,6 +47,9 @@ st.set_page_config(
     menu_items=MENU_ITEMS,
      )
 
+@st.experimental_dialog("About", width="large")
+def show_about():
+    st.write(ABOUT)
 
 if "session" not in st.session_state:
     st.session_state["session"] = get_connection()
@@ -422,8 +424,10 @@ def new_eval_section() -> None:
                     )
 
         button_container = row(6, vertical_align="center")
-        for _ in range(1,4):
-            button_container.empty()
+        help_button = button_container.button(
+            "ℹ️ Help",
+            use_container_width=True,
+        )
         new_metric_button = button_container.button(
             "➕ Add Metrics",
             use_container_width=True,
@@ -445,6 +449,8 @@ def new_eval_section() -> None:
             add_new_metric()
         if del_metric_button:
             manage_metric_dialog()
+        if help_button:
+            show_about()
 
 
 def saved_eval_section() -> None:
