@@ -27,16 +27,11 @@ from src.snowflake_utils import (
 )
 
 TITLE = "Data Selection"
-if (
-    st.session_state.get("selected_metrics", None) is not None
-    and st.session_state.get("eval_funnel", None) == "new"
-):
-    INSTRUCTIONS = """
-    Select your evaluation data below.
-    The evaluation data should contain all metric inputs and any additional columns to retain through evaluation.
-    You can specify a single dataset or separate datasets for expected and actual results, if applicable."""
-else:
-    INSTRUCTIONS = "Please first select a metric from home."
+
+INSTRUCTIONS = """
+Select your evaluation data below.
+The evaluation data should contain all metric inputs and any additional columns to retain through evaluation.
+You can specify a single dataset or separate datasets for expected and actual results, if applicable."""
 
 st.set_page_config(
     page_title=TITLE,
@@ -56,6 +51,16 @@ CODE_PLACEHOLDER = """SELECT
     DATA
 FROM
 """
+
+BESPOKE_INSTRUCTIONS = """Before you start, your LLM pipeline must be encapsulated in a stored procedure that takes a VARIANT input and returns a single value.
+            Every row of the reference table will be passed through the stored procedure as a dictionary.
+            Every column in the reference table will be passed to the stored procedure but only those columns selected will be passed to the stored procedure.
+            Please see [Snowflake Stored Procedure documentation](https://docs.snowflake.com/en/developer-guide/stored-procedure/stored-procedures-overview)
+            for details on stored procedures and these [specific instructions](https://github.com/sfc-gh-jsummer/evalanche#crafting-a-llm-pipeline-stored-procedure) on crafting these stored procedures."""
+
+CORTEX_ANALYST_INSTRUCTIONS = """Have reference questions to run through Cortex Analyst? 
+        Select the Semantic Model in stage, table containing the reference questions, and a destination table.
+        We will do the rest. Take note of the table name as it will be used in the next step to evaluate the results."""
 
 
 def check_models(models: List[str]) -> None:
@@ -211,13 +216,22 @@ def sproc_runner(session: Session, sproc_name: str, inputs: Dict[str, Any]) -> T
     elapsed_time = time.time() - start_time
     return (record_result, elapsed_time)
 
+def cortex_analyst_sproc_runner(session: Session, sproc_name: str, question: str, semantic_model_path: str) -> Tuple[Union[int, float], Any]:
+    start_time = time.time()
+    record_result = session.sql(f"""CALL {sproc_name}('{question}', '{semantic_model_path}')""").collect_nowait().result()[0][0]
+    # record_result = session.call(sproc_name, inputs) # Once Snowpark supports thread-safe calls without parameter change
+    elapsed_time = time.time() - start_time
+    return (record_result, elapsed_time)
+
 def pipeline_runner(
     session: Session,
     sproc: str,
     input_tablename: str,
     output_tablename: str,
     columns: List[str],
-) -> None:
+    cortex_analyst: bool = False,
+    semantic_model: str = None,
+) -> str:
     """Runs stored procedures asynchronously over input from Snowflake table.
 
     Stored procedures may not be asynchronous but calling of them is done asynchronously in the app.
@@ -233,93 +247,178 @@ def pipeline_runner(
         input_tablename (string): Fully-qualified name of table with input values.
         output_tablename (string): Fully-qualified name of table to write results to.
         columns (list): List of columns to pass to stored procedure.
+        cortex_analyst (bool): Whether to run Cortex Analyst SQL generation.
+        semantic_model (string): Fully-qualified path to semantic model for Cortex Analyst.
 
+    Returns:
+        string: Fully-qualified name of table where results are written.
     """
 
     import multiprocessing
-
     from joblib import Parallel, delayed
+
+    from snowflake.snowpark.functions import lit
 
     from src.snowflake_utils import add_row_id, save_eval_to_table
 
     df = add_row_id(session.table(input_tablename))
+    first_column = columns[0] # We will use this to pass to Cortex Analyst sproc as the semantic file path
     columns = columns + ["ROW_ID"]
 
-    for pandas_df in df.select(*columns).to_pandas_batches():
-    # for pandas_df in df.to_pandas_batches():
-        results = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
-            delayed(
-                lambda row: {
-                    "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
-                    "RESPONSE": (response := sproc_runner(session, sproc, row.to_dict()))[0],
-                    "ELAPSED_TIME": response[1],
-                }
-            )(row)
-            for _, row in pandas_df.iterrows()
-        )
+    # Add semantic model as additional column for tracking purposes
+    if cortex_analyst:
+        if semantic_model is not None:
+            df = df.withColumn("MODEL", lit(semantic_model))
+            columns = columns + ["MODEL"]
+
+            for pandas_df in df.select(*columns).to_pandas_batches():
+                results = []
+                for _, row in pandas_df.iterrows():
+                    result = {
+                        "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
+                        "CORTEX_ANALYST_SQL": (response := cortex_analyst_sproc_runner(
+                            session, 
+                            sproc, 
+                            row.to_dict()[first_column],
+                            semantic_model))[0],
+                        "ELAPSED_TIME": response[1],
+                    }
+                    results.append(result)
+                    time.sleep(3)  # Add a 3-second delay between processing each record to avoid overloading the system
+
+    else:
+        for pandas_df in df.select(*columns).to_pandas_batches():
+        # for pandas_df in df.to_pandas_batches():
+            results = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
+                delayed(
+                    lambda row: {
+                        "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
+                        "RESPONSE": (response := sproc_runner(session, sproc, row.to_dict()))[0],
+                        "ELAPSED_TIME": response[1],
+                    }
+                )(row)
+                for _, row in pandas_df.iterrows()
+            )
 
     result = session.create_dataframe(results).join(df, on="ROW_ID", how="left")
     save_eval_to_table(result, output_tablename)
+    return output_tablename
 
 
 @st.experimental_dialog("Run your LLM Pipeline", width="large")
 def pipeline_runner_dialog() -> None:
     """Dialog to run reference data through LLM pipeline and record results for evaluation."""
 
-    from src.app_utils import get_sprocs, select_schema_context
+    from src.app_utils import get_sprocs, select_schema_context, get_stages, get_semantic_models
 
-    st.write("""
-             Have reference questions or inputs but still need to run them through your LLM pipeline?
-             Use this dialog to run your reference set through your LLM pipeline and record the results to evaluate here.
 
-             Before you start, your LLM pipeline must be encapsulated in a stored procedure that takes a VARIANT input and returns a single value.
-             Every row of the reference table will be passed through the stored procedure as a dictionary.
-             Every column in the reference table will be passed to the stored procedure but only those columns selected will be passed to the stored procedure.
-             Please see [Snowflake Stored Procedure documentation](https://docs.snowflake.com/en/developer-guide/stored-procedure/stored-procedures-overview)
-             for details on stored procedures and these [specific instructions](https://github.com/sfc-gh-jsummer/evalanche#crafting-a-llm-pipeline-stored-procedure) on crafting these stored procedures.""")
+    st.write("""Have reference questions or inputs but still need to run them through your LLM pipeline?
+             Use this dialog to run a reference set through your LLM pipeline and record the results.""")
 
-    name = "runner"
-    st.write("Select the stored procedure that encapsulates your LLM pipeline.")
-    schema_context = select_schema_context(name, on_change=get_sprocs, args=(name,))
-    if f"{name}_sprocs" not in st.session_state:
-        st.session_state[f"{name}_sprocs"] = []
-    sproc_name = st.selectbox(
-        "Select Stored Procedure",
-        st.session_state[f"{name}_sprocs"],
-        index=None,
-    )
-    sproc_name = f"{schema_context['database']}.{schema_context['schema']}.{sproc_name}"
-    table = st.text_input("Enter Name for Generated Table", key=f"new_table_{name}")
-    new_tablename = f"{schema_context['database']}.{schema_context['schema']}.{table}"
-    st.divider()
+    pipeline_selection = st.selectbox("Do you want to run **Cortex Analyst SQL Generation** or a **custom LLM Pipeline**?",
+                                      options=["Cortex Analyst", "Custom"], index=None)
+    
+    if pipeline_selection is not None:
+        if pipeline_selection == "Custom":
+            st.write(f'**Instructions:** {BESPOKE_INSTRUCTIONS}')
+        else:
+            st.write(f'**Instructions:** {CORTEX_ANALYST_INSTRUCTIONS}')
 
-    st.write("Select the reference data.")
-    name = "runner_output"
-    table_spec = table_data_selector(name, new_table=False)
-    data_table = (
-        f'{table_spec["database"]}.{table_spec["schema"]}.{table_spec["table"]}'
-    )
-    available_columns = fetch_columns(table_spec["database"],table_spec["schema"],table_spec["table"])
-    selected_columns = st.multiselect(
-        "Select Columns", available_columns, default=None, key=f"columns_{name}",
-        help = "Select the columns to explicitly passed to the stored procedure."
-    )
-
-    if st.button("Run"):
-        with st.spinner("Running pipeline..."):
-            pipeline_runner(
-                st.session_state["session"],
-                sproc_name.split("(")[0],
-                data_table,
-                new_tablename,
-                selected_columns
+        name = "runner"
+        if pipeline_selection == "Custom":
+            st.write("Select the stored procedure that encapsulates your LLM pipeline.")
+            schema_context = select_schema_context(name, on_change=get_sprocs, args=(name,))
+            
+            if f"{name}_sprocs" not in st.session_state:
+                st.session_state[f"{name}_sprocs"] = []
+            sproc_name = st.selectbox(
+                "Select Stored Procedure",
+                st.session_state[f"{name}_sprocs"],
+                index=None,
             )
-            # Set result_data to None so first rendering on results
-            # page will create it as pandas dataframe from Snowpark result dataframe
-            set_session_var_to_none('result_data')
-            st.success(f"Results written to {new_tablename}.")
-        time.sleep(2)
-        st.rerun()
+            sproc_name = f"{schema_context['database']}.{schema_context['schema']}.{sproc_name}"
+        
+        else:
+            st.write("Select the stage that contains your semantic model for Cortex Analyst.")
+            schema_context = select_schema_context(name, on_change=get_stages, args=(name,))
+            
+            if f"{name}_stages" not in st.session_state:
+                st.session_state[f"{name}_stages"] = []
+            if f"{name}_models" not in st.session_state:
+                st.session_state[f"{name}_models"] = []
+            stage_name = st.selectbox(
+                "Select Snowflake Stage",
+                st.session_state[f"{name}_stages"],
+                index=None,
+                key=f"{name}_stage",
+                on_change=get_semantic_models, 
+                args=(name,)
+            )
+            semantic_model = st.selectbox(
+                "Select Semantic Model",
+                st.session_state[f"{name}_models"],
+                index=None,
+                key=f"{name}_model",
+            )
+            qualified_semantic_model = f"{schema_context['database']}.{schema_context['schema']}.{stage_name}/{semantic_model}"
+            
+
+        table = st.text_input("Enter Name for Generated Table", key=f"new_table_{name}", help = "Fully qualify if you would like to save in a different database/schema than above.")
+        if '.' not in table:
+            new_tablename = f"{schema_context['database']}.{schema_context['schema']}.{table}"
+        else:
+            new_tablename = table
+        st.divider()
+
+        st.write("Select the reference question set.")
+        name = "runner_output"
+        table_spec = table_data_selector(name, new_table=False)
+        data_table = (
+            f'{table_spec["database"]}.{table_spec["schema"]}.{table_spec["table"]}'
+        )
+        available_columns = fetch_columns(table_spec["database"],table_spec["schema"],table_spec["table"])
+
+        if pipeline_selection == "Custom":
+            selected_columns = st.multiselect(
+                "Select Columns", available_columns, default=None, key=f"columns_{name}",
+                help = "Select the columns to be explicitly passed to the stored procedure."
+            )
+        else:
+            selected_columns = st.selectbox(
+                "Select Column containing Reference Question", available_columns, index = None, key=f"columns_{name}",
+                help = "Select the column that contains the reference questions for Cortex Analyst."
+            )
+        if st.button("Run"):
+            try:
+                if pipeline_selection == "Custom":
+                    with st.spinner("Running pipeline..."):
+                        st.session_state['returned_tablename'] = pipeline_runner(
+                            st.session_state["session"],
+                            sproc_name.split("(")[0],
+                            data_table,
+                            new_tablename,
+                            selected_columns
+                        )
+                else:
+                    with st.spinner("Running Cortex Analyst..."):
+                        st.session_state['returned_tablename'] = pipeline_runner(
+                            session = st.session_state["session"],
+                            sproc = "GENAI_UTILITIES.EVALUATION.CORTEX_ANALYST_SQL",
+                            input_tablename = data_table,
+                            output_tablename = new_tablename,
+                            columns = [selected_columns],
+                            cortex_analyst = True,
+                            semantic_model = qualified_semantic_model,
+                        )
+                # Set result_data to None so first rendering on results
+                # page will create it as pandas dataframe from Snowpark result dataframe
+                set_session_var_to_none('result_data')
+                st.success(f"Results written to {new_tablename}.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+                st.stop()
+            time.sleep(2)
+            st.rerun()
 
 
 @st.experimental_dialog("Configure Metrics", width="large")
@@ -424,56 +523,58 @@ render_sidebar()
 def pick_data() -> None:
     """Main rendering function for page."""
 
-    if (
-        st.session_state.get("selected_metrics", None) is not None
-        and st.session_state.get("eval_funnel", None) == "new"
-    ):
-        data_split, runner_col, _ = st.columns([1, 1, 2])
-        with data_split:
-            data_toggle = st.toggle(
-                "Separate Expected & Actual",
-                help="""Turn on to specify expected and actual datasets separately.
-                        A join key will be necessary to compare the two datasets.""",
-                value=False,
-            )
-        with runner_col:
-            runner_button = st.button(
-                "Need to generate results?",
-                use_container_width=True,
-                help="""Have reference questions or inputs but still need to run them through your LLM pipeline?
-                Use this dialog to run your reference set through your LLM pipeline and record the results to evaluate here.""",
-            )
-            if runner_button:
-                pipeline_runner_dialog()
-        if not data_toggle:
-            single_col, _ = st.columns(2)
-            with single_col:
-                data_spec(
-                    key_name="single_source",
-                    instructions="Select your evaluation dataset.",
-                    join_key=False,
-                )
-        else:
-            inf_col, ground_col = st.columns(2)
-            with inf_col:
-                data_spec(
-                    key_name="ground", instructions="Select your expected results."
-                )
-            with ground_col:
-                data_spec(
-                    key_name="inference", instructions="Select your actual results."
-                )
-        button_container = row(10, vertical_align="center")
-        preview_button = button_container.button(":mag_right: Preview", use_container_width=True)
-        configure_button = button_container.button(
-            "▶️ Configure", use_container_width=True,
-            type="primary",
+    data_split, runner_col, _ = st.columns([1, 1, 2])
+    # Show table if results were written to a table in stored procedure runner
+    if 'returned_tablename' in st.session_state:
+        st.info(f"Recent results written to {st.session_state['returned_tablename']}.")
+    with data_split:
+        data_toggle = st.toggle(
+            "Separate Expected & Actual",
+            help="""Turn on to specify expected and actual datasets separately.
+                    A join key will be necessary to compare the two datasets.""",
+            value=False,
         )
+    with runner_col:
+        runner_button = st.button(
+            "Need to generate results?",
+            use_container_width=True,
+            help="""Have reference questions or inputs but still need to run them through your LLM pipeline?
+            Use this dialog to run a reference set through your LLM pipeline and record the results to evaluate.""",
+        )
+        if runner_button:
+            pipeline_runner_dialog()
+    if not data_toggle:
+        single_col, _ = st.columns(2)
+        with single_col:
+            data_spec(
+                key_name="single_source",
+                instructions="Select your evaluation dataset.",
+                join_key=False,
+            )
+    else:
+        inf_col, ground_col = st.columns(2)
+        with inf_col:
+            data_spec(
+                key_name="ground", instructions="Select your expected results."
+            )
+        with ground_col:
+            data_spec(
+                key_name="inference", instructions="Select your actual results."
+            )
+    button_container = row(10, vertical_align="center")
+    preview_button = button_container.button(":mag_right: Preview", use_container_width=True)
+    configure_button = button_container.button(
+        "▶️ Configure", 
+        use_container_width=True,
+        help = "Select metrics and data to configure your evaluation.",
+        type="primary",
+        disabled = len(st.session_state.get("selected_metrics", []))==0
+    )
 
-        if preview_button:
-            preview_merge_data()
-        if configure_button:
-            configure_metrics()
+    if preview_button:
+        preview_merge_data()
+    if configure_button:
+        configure_metrics()
 
 
 pick_data()

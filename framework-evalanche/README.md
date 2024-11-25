@@ -21,7 +21,7 @@ Please see TAGGING.md for details on object comments.
 * [Running](#release)
 * [Extras](#extras)
     + [Custom Metrics](#custom-metrics)
-    + [Crafting a LLM Pipeline Stored Procedure](#crafting-a-llm-pipeline-stored-procedure)
+    + [Generating Results to Evaluate](#generating-results-to-evaluate)
 
 # Overview
 Evalanche is a Streamlit in Snowflake (SiS) application that provides a single location to evaluate and compare generative AI use case outputs in a streamlined, on demand, and automated fashion. Regardless if your goal is to measure the quality of RAG-based LLM solutions or accuracy of SQL generation, Evalanche provides a scalable, customizable, and trackable way to do it.
@@ -95,7 +95,10 @@ CALL GENAI_UTILITIES.EVALUATION.DELETE_METRIC('Rudeness');
 
 Lastly, please be aware that Streamlit in Snowflake now supports multiple python versions. Custom metrics may only be available with consistent Python versions. For example, if you create a custom metric while running the app with Python version 3.11, the custom metric will only be available in subsequent sessions when running Python 3.11. 
 
-## Crafting a LLM Pipeline Stored Procedure
+## Generating Results to Evaluate
+Evalanche primarily assumes you've saved LLM outputs to table(s) in Snowflake for us to evaluate. That may not be the case. Evalanche supports two ways to generate outputs using either a custom LLM pipeline or a Cortex Analyst runner. Both options are available from the data page (under "Need to Generate Results?") once you've selected your desired Metric(s).  
+
+### Crafting a Stored Procedure for your Custom LLM Pipeline
 To run a reference dataset through your desired LLM pipelines on the data page, we must first encapsulated the pipeline logic in a Stored Procedure. To take advantage of this feature, the stored procedure must have a single VARIANT input type and return a single value. When we execute the stored procedure, a single row from the reference dataset will be passed in the form of a Python dictionary. In other words, a row in the reference dataset that looks like:
 ```markdown
 | TASK        | PERSONA |
@@ -109,7 +112,7 @@ will be passed to the stored procedure as:
     "PERSONA": "Pirate"
 }
 ```
-A appropriately crafted stored procedure could look like the below.
+An appropriately crafted stored procedure could look like the below.
 ```sql
 CREATE OR REPLACE PROCEDURE MY_PIPELINE(INPUT VARIANT)
   RETURNS STRING
@@ -131,3 +134,9 @@ def run(session, INPUT):
                     prompt = prompt)
 $$;
 ```
+
+### Using the Cortex Analyst Runner
+To run a gold or reference set of questions through Cortex Analyst, select the target semantic model and the table containing the reference questions. The SQL results will be written to a table for further evaluation with the Cortex Analyst-suggested metric. 
+
+# Feedback
+Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).

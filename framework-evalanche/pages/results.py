@@ -21,8 +21,9 @@ from src.snowflake_utils import (
     SAVED_EVAL_TABLE, 
     STAGE_NAME,
     add_row_id,
+    run_async_sql_to_dataframe,
 )
-from src.metrics import Metric
+from src.metrics import Metric, SQLResultsAccuracy
 
 
 def get_result_title() -> str:
@@ -268,7 +269,7 @@ def give_recommendation_instruction() -> None:
     )
 
 
-def get_metric_cols(current_df: DataFrame) -> list:
+def get_metric_cols(current_df: Union[DataFrame, pd.DataFrame]) -> list:
     """Returns list of columns in dataframe that contain metric values.
     
     Some metric names have spaces and Snowpark keeps them in lower case with double quotes.
@@ -277,6 +278,7 @@ def get_metric_cols(current_df: DataFrame) -> list:
     metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
     df_columns = current_df.columns
     return [c_name for c_name in df_columns if c_name.upper() in (m_name.upper() for m_name in metric_names)]
+
 
 
 def show_metric() -> None:
@@ -297,12 +299,13 @@ def show_metric() -> None:
                  Please create a new evaluation or select an existing one from the homepage.""")
         st.stop()
 
-    if st.session_state.get("metric_result_data", None) is not None:
-        df = st.session_state["metric_result_data"]
+    if st.session_state.get("result_data", None) is not None:
+        df = st.session_state["result_data"]
         metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
         kpi_row = row(6, vertical_align="top")
         # Placing entire dataframe in memory seems to be more stable than iterating over columns and averaging in snowpark
-        metric_values = df.select(*metric_names).to_pandas()
+        # metric_values = df.select(*metric_names).to_pandas()
+        metric_values = df[metric_names]
 
         for metric_name, metric_value in metric_values.mean().to_dict().items():
             kpi_row.metric(label=metric_name, value=round(metric_value, 2))
@@ -390,13 +393,37 @@ def update_record(table_update_inputs: Dict[str, str], selected_metric_name: str
     st.session_state["result_data"] = df
 
 
-# metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
+def show_cortex_analyst_sql_results(metric: Metric, prompt_inputs: Dict[str, str]) -> None:
+    """Displays data retrieved from SQL used in Cortex Analyst metrics.
+    
+    Shows results for generated_sql and expected_sql in the prompt_inputs dictionary.
+    Only shows results if metric matches the name property of SQLResultsAccuracy.
+
+    Args:
+        metric (Metric): Column name keys with updated values to replace in dataframe.
+        prompt_inputs (dict[str, str]): Dictionary of prompt inputs for the metric.
+    """
+
+    if type(metric).__name__ is (type(SQLResultsAccuracy()).__name__):
+        with st.expander("Retrieved Data", expanded=False):
+            st.caption("Results limited to 100 rows.")
+            for key in ["generated_sql", "expected_sql"]:
+                st.write(f"{key.upper()} Result")
+                if key in prompt_inputs:
+                    try:
+                        inference_data = run_async_sql_to_dataframe(metric.session, prompt_inputs[key])
+                        st.dataframe(inference_data,
+                                    hide_index = True,)
+                    except Exception as e:
+                        st.write(f"Error: {e}")
+                else:
+                    st.write("No data returned")
 
 @st.experimental_dialog("Review Record", width="large")
 def review_record() -> None:
     """Render dialog box to review a metric result record."""
 
-
+    st.write("Analyze and explore the selected record. Model selection will be used for analysis and metric rerunning. Updates can be saved to viewed results.")
     if st.session_state["selected_dict"] is None or len(st.session_state["selected_dict"]) == 0:
         st.write("Please select a record to review.")
     elif len(st.session_state["selected_dict"]) > 1:
@@ -404,7 +431,6 @@ def review_record() -> None:
     else:
         # Only first record is selected for analysis
         selected_record = st.session_state["selected_dict"][0]
-        # metrics = fetch_metrics(st.session_state["session"], STAGE_NAME)
         metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
 
         metric_col, model_col = st.columns(2)
@@ -435,7 +461,10 @@ def review_record() -> None:
             for key, value in st.session_state["param_selection"][
                     matching_metric.name
                 ].items():
-                entered_value = st.text_area(value, selected_record[value])
+                entered_value = st.text_area(value, 
+                                             selected_record[value],
+                                             key = value)
+
                 prompt_inputs[key] = entered_value
                 table_update_inputs[value] = entered_value
             metric_col, comment_col = st.columns((1, 4))
@@ -452,16 +481,29 @@ def review_record() -> None:
                                         on_click = rerun_metric, args = (prompt_inputs, matching_metric),
                                         use_container_width=True,)
         save = bottom_selection.button("Save", disabled = selected_metric_name is None,
-                                       use_container_width=True,)
+                                       use_container_width=True,
+                                       help = "Save changes to record in current view.")
+        
+        # Unsaved changes in the dialog may linger if user navigates away and returns.
+        # Here we provide a reset button to clear out any unsaved changes.
+        reset = bottom_selection.button("Reset", disabled = selected_metric_name is None,
+                                       use_container_width=True,
+                                       help = "Reset all unsaved changed to selected record.")
 
         if st.session_state.get('analysis', None) is not None:
             st.write(f"**Analysis:** {st.session_state['analysis']}")
-        
+
+        # If evaluating SQL, show SQL results of current inputs
+        show_cortex_analyst_sql_results(matching_metric, prompt_inputs)
+  
         if save:
             update_record(table_update_inputs, 
                             selected_metric_name,
                             selected_record['ROW_ID'])
             st.rerun()
+        if reset:
+            st.rerun()
+
 
 def show_dataframe_results() -> Optional[pd.DataFrame]:
     """
@@ -477,15 +519,8 @@ def show_dataframe_results() -> Optional[pd.DataFrame]:
         pandas Dataframe 
     """
     
-    if st.session_state.get("metric_result_data", None) is not None:
-        if st.session_state.get('result_data', None) is None:
-            st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
-                                        .withColumn("REVIEW", F.lit(False))\
-                                        .withColumn("COMMENT", F.lit(None)).to_pandas()
-            
-            # Store available metrics in session state
-            st.session_state["metrics"] = fetch_metrics(st.session_state["session"], STAGE_NAME)
-        
+ 
+    if st.session_state.get('result_data', None) is not None:    
         df_selection = st.data_editor(
             st.session_state["result_data"],
             hide_index=True,
@@ -498,7 +533,6 @@ def show_dataframe_results() -> Optional[pd.DataFrame]:
 
         return df_selection
     else:
-        st.session_state["result_data"] = None
         return None
 
 
@@ -509,18 +543,14 @@ def trend_avg_metrics() -> None:
     """
 
     if (
-        st.session_state.get("metric_result_data", None) is not None
+        st.session_state.get("result_data", None) is not None
         and st.session_state.get("metrics_in_results", None) is not None
     ):
-        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
+        metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        # We cast to variant in case the metric is a boolean
+        df = st.session_state["result_data"].groupby('METRIC_DATETIME')[metric_cols].mean()
+        
         # METRIC_DATETIME is batched for every run so there should be many rows per metric calculation set
-        df = (
-            st.session_state["metric_result_data"]
-            .group_by("METRIC_DATETIME")
-            .agg(*[F.avg(F.to_variant(col)).alias(col) for col in metric_cols])
-        )
         st.write("Average Metric Scores over Time")
         st.line_chart(
             df,
@@ -536,12 +566,12 @@ def trend_count_metrics() -> None:
     """
 
     if (
-        st.session_state.get("metric_result_data", None) is not None
+        st.session_state.get("result_data", None) is not None
         and st.session_state.get("metrics_in_results", None) is not None
     ):
-        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
+        metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        df = st.session_state["metric_result_data"]
+        df = st.session_state["result_data"]
         st.write("Metric Scores over Time")
         st.bar_chart(
             df,
@@ -557,20 +587,16 @@ def bar_chart_metrics() -> None:
     """
 
     if (
-        st.session_state.get("metric_result_data", None) is not None
+        st.session_state.get("result_data", None) is not None
         and len(st.session_state.get("metrics_in_results", []))>0
     ):
-        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
+        metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        df = st.session_state["metric_result_data"]
-        chart_df = (
-            df.select(metric_cols)
-            .unpivot("SCORE", "METRIC", metric_cols)
-            .group_by("METRIC", "SCORE")
-            .count()
-        )
+        df = pd.melt(st.session_state["result_data"], 
+                     value_vars=metric_cols, var_name = 'METRIC', value_name = 'SCORE')\
+                        .groupby(['METRIC', 'SCORE']).size().reset_index(name='COUNT')
         st.write("Score Counts by Metric")
-        st.bar_chart(chart_df, x="SCORE", y="COUNT", color="METRIC")
+        st.bar_chart(df, x="SCORE", y="COUNT", color="METRIC")
 
 
 def get_trendable_column() -> Union[None, str]:
@@ -616,6 +642,15 @@ def show_results():
     """Main rendering function for page."""
 
     from src.app_utils import fetch_warehouses
+
+    if st.session_state.get("metric_result_data", None) is not None:
+        if st.session_state.get('result_data', None) is None:
+            st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
+                                        .withColumn("REVIEW", F.lit(False))\
+                                        .withColumn("COMMENT", F.lit(None)).to_pandas()
+            
+            # Store available metrics in session state
+            st.session_state["metrics"] = fetch_metrics(st.session_state["session"], STAGE_NAME)
 
     show_metric()
     if st.session_state["eval_funnel"] is not None:

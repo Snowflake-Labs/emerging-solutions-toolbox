@@ -40,13 +40,15 @@ class Metric(ABC):
         import re
 
         model_to_use = model if model else self.model 
-        
-        prompt = self.get_prompt(**kwargs)
+        try:
+            prompt = self.get_prompt(**kwargs)
 
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        rating = re.search(r'\d+', response)
-        if rating:
-            return int(rating.group())
+            response = run_async_sql_complete(self.session, model_to_use, prompt)
+            rating = re.search(r'\d+', response)
+            if rating:
+                return int(rating.group())
+        except Exception:
+            return None
         else:
             return None
         
@@ -69,7 +71,7 @@ Questions are best designed when expected results have less than 100 rows.""",
             prompt=SQLAccuracy_prompt,
             required={
                 "question": "User question",
-                "inference_sql": "LLM-generated SQL statement",
+                "generated_sql": "LLM-generated SQL statement",
                 "expected_sql": "Ground truth SQL statement",
             },
         )
@@ -81,11 +83,11 @@ Questions are best designed when expected results have less than 100 rows.""",
         if self.prompt is not None:
             from src.snowflake_utils import return_sql_result
 
-            if "inference_sql" in kwargs:
-                inference_data = return_sql_result(self.session, kwargs["inference_sql"])
+            if "generated_sql" in kwargs:
+                inference_data = return_sql_result(self.session, kwargs["generated_sql"])
             else:
                 inference_data = "No data returned"
-            if "inference_sql" in kwargs:
+            if "expected_sql" in kwargs:
                 expected_data = return_sql_result(self.session, kwargs["expected_sql"])
             else:
                 expected_data = "No data returned"
@@ -110,13 +112,15 @@ Questions are best designed when expected results have less than 100 rows.""",
     ):
         
         model_to_use = model if model else self.model  
+        try:
+            prompt = self.get_prompt(**kwargs)
 
-        prompt = self.get_prompt(**kwargs)
-
-        response = run_async_sql_complete(self.session, model_to_use, prompt)
-        if "true" in response.lower():
-            return True
-        else:
+            response = run_async_sql_complete(self.session, model_to_use, prompt)
+            if "true" in response.lower():
+                return True
+            else:
+                return False
+        except Exception:
             return False
 
 
