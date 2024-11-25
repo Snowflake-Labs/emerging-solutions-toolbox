@@ -308,6 +308,27 @@ def get_stages(name: str):
     else:
         st.session_state[f"{name}_stages"] = []
 
+def get_semantic_models(name: str):
+    """Call back function to associate available semantic model selector with corresponding stage selection."""
+
+    if (
+        st.session_state[f"{name}_database"] is not None
+        and st.session_state[f"{name}_schema"] is not None
+        and st.session_state[f"{name}_stage"] is not None
+    ):
+        if "session" not in st.session_state:
+            session = get_connection()
+        else:
+            session = st.session_state["session"]
+        stage = f'{st.session_state[f"{name}_database"]}.{st.session_state[f"{name}_schema"]}.{st.session_state[f"{name}_stage"]}'
+        query = f"ls @{stage} pattern='.*\\yaml'"
+        result = session.sql(query)
+        files = [file[0].split("/")[-1] for file in result.collect()]
+        if len(files) > 0:
+            st.session_state[f"{name}_models"] = files
+        else:
+            st.session_state[f"{name}_models"] = []
+
 
 def get_sprocs(name: str):
     """Call back function to associate database and schema selector with corresponding stored procedures."""

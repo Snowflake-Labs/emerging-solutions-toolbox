@@ -2,9 +2,10 @@ SQLAccuracy_prompt = """You are evaluating JSON data against ground truth JSON d
 The JSON data is the output of a SQL query generated to answer a user question.
 You are to determine if the provided JSON data matches the ground truth JSON data
 and answers the user question.
+The Inference JSON does not have to match the Ground Truth JSON perfectly but should contain the correct answer as denoted by the Ground Truth JSON.
 Your answer should be either "True" or "False".
-Answer "True" if you believe the JSON data matches the ground truth JSON data response.
-Answer "False" if you do not believe the JSON data matches the ground truth JSON data.
+Answer "True" if you believe the Inference JSON data reflects the Ground Truth JSON data given the user question.
+Otherwise, answer "False".
 [User Question]
 {question}
 

@@ -143,13 +143,12 @@ def return_sql_result(session: Session, sql: str) -> Union[str, None]:
     """
 
     from snowflake.snowpark import functions as F
-
-    result = (
-        session.sql(sql.replace(";", ""))
-        .limit(100)
-        .select(F.to_varchar(F.array_agg(F.object_construct("*"))))
-    )
     try:
+        result = (
+            session.sql(sql.replace(";", ""))
+            .limit(100)
+            .select(F.to_varchar(F.array_agg(F.object_construct("*"))))
+        )
         return result.collect_nowait().result()[0][0]
     except Exception as e:
         st.error(f"Error: {e}")
@@ -280,3 +279,12 @@ def call_sproc(session: Session, name: str) -> Any:
 
 def call_async_sproc(session: Session, sproc: str, input_value: Dict[str, Any]) -> Any:
     return session.sql(f"CALL {sproc}({input_value})").collect_nowait().result()[0][0]
+
+def run_async_sql_to_dataframe(session: Session, query: str) -> DataFrame:
+    """Runs a SQL query and returns the result as a Snowpark DataFrame."""
+    query_id = session.sql(query.replace(';','')).collect_nowait().query_id
+    async_job = session.create_async_job(query_id)
+
+    return async_job.to_df()
+
+
