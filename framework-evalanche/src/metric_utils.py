@@ -287,7 +287,7 @@ def register_saved_eval_sproc(
         ],
         packages=[
             "joblib==1.4.2",
-            "pandas==2.2.2",
+            "pandas==2.0.3",
             "snowflake-snowpark-python==1.22.1",
             "snowflake-ml-python==1.6.2",
             "streamlit==1.35.0",
@@ -375,7 +375,7 @@ def register_auto_eval_sproc(
         ],
         packages=[
             "joblib==1.4.2",
-            "pandas==2.2.2",
+            "pandas==2.0.3",
             "snowflake-snowpark-python==1.22.1",
             "snowflake-ml-python==1.6.2",
             "streamlit==1.35.0",
