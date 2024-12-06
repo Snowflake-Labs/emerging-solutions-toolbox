@@ -64,6 +64,12 @@ st.set_page_config(
 st.config.set_option("global.minCachedMessageSize", 500 * 1e6)
 
 
+@st.cache_data
+def make_downloadable_df(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv().encode("utf-8")
+
+
 def replace_bool_col_with_str() -> DataFrame:
     """Change boolean metric to string so st.dataframe doesn't show checkboxes."""
 
@@ -116,10 +122,11 @@ def record_evaluation() -> None:
         f"{table_spec['database']}.{table_spec['schema']}.{table_spec['table']}"
     )
     if st.button("Save", disabled=True if table_spec is None else False):
-        df = st.session_state.get("metric_result_data", None)
+        # df = st.session_state.get("metric_result_data", None)
+        df = st.session_state.get("result_data", None)
         if df is not None:
             try:
-                save_eval_to_table(df, table_name)
+                save_eval_to_table(df, table_name, st.session_state["session"])
                 msg = "Evaluation results saved to table."
                 st.success(msg)
                 time.sleep(1.5)
@@ -548,7 +555,7 @@ def trend_avg_metrics() -> None:
     ):
         metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        df = st.session_state["result_data"].groupby('METRIC_DATETIME')[metric_cols].mean()
+        df = st.session_state["result_data"].groupby('METRIC_DATETIME', as_index=False)[metric_cols].mean()
         
         # METRIC_DATETIME is batched for every run so there should be many rows per metric calculation set
         st.write("Average Metric Scores over Time")
@@ -659,7 +666,7 @@ def show_results():
         recommend_inst = top_row.button(
             "🤖 Review Record",
             disabled=True
-            if st.session_state.get("metric_result_data", None) is None
+            if st.session_state.get("result_data", None) is None
             else False,
             use_container_width=True,
             help="Select a row to review.",
@@ -669,10 +676,17 @@ def show_results():
         record_button = top_row.button(
             "📁 Record Results",
             disabled=True
-            if st.session_state.get("metric_result_data", None) is None
+            if st.session_state.get("result_data", None) is None
             else False,
             use_container_width=True,
             help="Record the results to a table.",
+        )
+        top_row.download_button(
+            label="⬇️ Download Results",
+            data=make_downloadable_df(st.session_state["result_data"]),
+            file_name="evalanche_results.csv",
+            mime="text/csv",
+            use_container_width=True,
         )
         save_eval_button = top_row.button(
             "💾 Save Evaluation",
@@ -686,6 +700,7 @@ def show_results():
             use_container_width=True,
             help="Automate and record the evaluation for any new records.",
         )
+
         chart_expander()
         if record_button:
             record_evaluation()

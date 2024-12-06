@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Union
 import streamlit as st
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
+import pandas as pd
 
 SAVED_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
 AUTO_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS"
@@ -203,7 +204,7 @@ def add_row_id(snpk_df: DataFrame) -> DataFrame:
     return snpk_df.with_column("ROW_ID", F.row_number().over(Window.order_by(F.lit(1))))
 
 
-def save_eval_to_table(snpk_df: DataFrame, table_name: str) -> str:
+def save_eval_to_table(df: Union[DataFrame, pd.DataFrame], table_name: str, session: Optional[Session] = None) -> str:
     """Saves evaluation data to a table in Snowflake.
 
     Write mode is set to append so that multiple evaluations can be saved to the same table.
@@ -213,20 +214,38 @@ def save_eval_to_table(snpk_df: DataFrame, table_name: str) -> str:
     Args:
         snpk_df (DataFrame): DataFrame to save to table.
         table_name (string): Fully-qualified Snowflake table to write data to.
+        session (Session): Snowpark session. Default is None.
 
     Returns:
         string: Confirmation message.
     """
+    if isinstance(df, DataFrame):
+        from snowflake.snowpark.functions import current_timestamp
 
-    from snowflake.snowpark.functions import current_timestamp
-
-    columns = snpk_df.columns
-    if "ROW_ID" in columns:
-        snpk_df = snpk_df.drop("ROW_ID")
-    if "METRIC_DATETIME" not in columns:
-        snpk_df = snpk_df.with_column("METRIC_DATETIME", current_timestamp())
-    snpk_df.write.save_as_table(table_name, mode="append", column_order = "name")
-    return f"Metric evaluation results saved to {table_name}."
+        columns = df.columns
+        if "ROW_ID" in columns:
+            df = df.drop("ROW_ID")
+        if "METRIC_DATETIME" not in columns:
+            df = df.with_column("METRIC_DATETIME", current_timestamp())
+        df.write.save_as_table(table_name, mode="append", column_order = "name")
+        return f"Metric evaluation results saved to {table_name}."
+    elif isinstance(df, pd.DataFrame):
+        columns = df.columns
+        if "ROW_ID" in columns:
+            df = df.drop(["ROW_ID"], axis = 1)
+        if "METRIC_DATETIME" not in columns:
+            result = session.create_dataframe([1]).select(current_timestamp()).collect()
+            df["METRIC_DATETIME"] = result[0]["CURRENT_TIMESTAMP()"]
+        db, schema, table = table_name.split(".")
+        if session is not None:
+            session.write_pandas(df,
+                                table,
+                                database=db,
+                                schema=schema,
+                                auto_create_table=True)
+            return f"Metric evaluation results saved to {table_name}."
+    else:
+        raise ValueError("Dataframe must be a Snowpark or Pandas dataframe.")
 
 
 def insert_to_eval_table(

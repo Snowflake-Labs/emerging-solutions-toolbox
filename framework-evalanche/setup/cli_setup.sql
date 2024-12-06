@@ -1,5 +1,5 @@
 SET major = 2;
-SET minor = 1;
+SET minor = 2;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "evalanche",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
