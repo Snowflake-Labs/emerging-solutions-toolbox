@@ -219,8 +219,9 @@ def save_eval_to_table(df: Union[DataFrame, pd.DataFrame], table_name: str, sess
     Returns:
         string: Confirmation message.
     """
+    from snowflake.snowpark.functions import current_timestamp
+    
     if isinstance(df, DataFrame):
-        from snowflake.snowpark.functions import current_timestamp
 
         columns = df.columns
         if "ROW_ID" in columns:
