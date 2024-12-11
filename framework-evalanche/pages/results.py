@@ -448,18 +448,27 @@ def review_record() -> None:
                     on_change=set_score,
                     args=(selected_record,)
                 )
+            if selected_metric_name is not None:     
+                matching_metric = next(
+                    (
+                        metric
+                        for metric in st.session_state["metrics"]
+                        if metric.get_column() == selected_metric_name.upper()
+                    ),
+                    None,
+                )
         with model_col:
-            select_model('review', default = "llama3.2-3b")
+            # Use the default model of the metric class if available
+            if matching_metric is not None:
+                if matching_metric.model is not None:
+                    model_default = matching_metric.model
+                else:
+                    model_default = "llama3.2-3b"
+            else:
+                model_default = "llama3.2-3b"
+            select_model('review', default = model_default)
     
-        if selected_metric_name is not None:     
-            matching_metric = next(
-                (
-                    metric
-                    for metric in st.session_state["metrics"]
-                    if metric.get_column() == selected_metric_name.upper()
-                ),
-                None,
-            )
+        if matching_metric is not None:     
             # Re-add session attribute to metric object
             matching_metric.session = st.session_state["session"]
             

@@ -60,7 +60,7 @@ class Metric(ABC):
 class SQLResultsAccuracy(Metric):
     def __init__(
         self,
-        model: str = "reka-flash"
+        model: str = "mistral-large2"
     ):
         super().__init__(
             name="SQL Results Accuracy",

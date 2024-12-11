@@ -26,6 +26,13 @@ Please see TAGGING.md for details on object comments.
 # Overview
 Evalanche is a Streamlit in Snowflake (SiS) application that provides a single location to evaluate and compare generative AI use case outputs in a streamlined, on demand, and automated fashion. Regardless if your goal is to measure the quality of RAG-based LLM solutions or accuracy of SQL generation, Evalanche provides a scalable, customizable, and trackable way to do it.
 
+> **Note:** Snowflake provides a few tools/frameworks for conducting LLM evaluations. 
+This solution, Evalanche, serves as a generalized application to make it easy to create and automate LLM use case evaluations. 
+Most LLM use cases can be evaluated with Evalanche through out of the box metrics or custom metrics. 
+Alternatively, Snowflake's AI Observability (Private Preview) is powered by open source [TruLens](https://www.trulens.org/), which provides extensible evaluations and tracing for LLM apps including RAGs and LLM agents. 
+Lastly, [Cortex Search Evaluation and Tuning Studio](https://github.com/Snowflake-Labs/cortex-search/tree/main/examples/streamlit-evaluation) (Private Preview) offers systematic evaluation and search quality improvements for specific search-based use cases.
+Please contact your account representative to learn more about any of these other offerings. 
+
 # How it Works
 Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. Together, Metrics and Data Sources can be combined to make an Evaluation.
 
@@ -137,6 +144,9 @@ $$;
 
 ### Using the Cortex Analyst Runner
 To run a gold or reference set of questions through Cortex Analyst, select the target semantic model and the table containing the reference questions. The SQL results will be written to a table for further evaluation with the Cortex Analyst-suggested metric. 
+
+## Model Options and Selection
+Out of the box Metrics have defaulted LLMs. These defaults are selected based on balancing availability, performance, and cost. However, depending on your region, the defaulted LLM may not be available. If that is the case, please select an alternative LLM. See LLM availability [here](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions?utm_cta=website-homepage-live-demo#availability).
 
 # Feedback
 Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).
