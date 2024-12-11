@@ -18,6 +18,28 @@ Otherwise, answer "False".
 [The End of the Ground Truth Data]
 """
 
+## Benchmark prompt used in internal Cortex Analyst benchmarking - under team review
+# SQLAccuracy_prompt = """\
+# [INST] Your task is to determine whether the two given JSON datasets are
+# equivalent semantically in the context of a question. You should attempt to
+# answer the given question by using the data in each JSON dataset. If the two
+# answers are equivalent, those two JSON datasets are considered equivalent.
+# Otherwise, they are not equivalent.
+# If they are equivalent, output "ANSWER: true". If they are
+# not equivalent, output "ANSWER: false".
+
+# ### QUESTION: {question}
+
+# * JSON DATASET 1:
+# {inference_data}
+
+# * DATAFRAME 2:
+# {expected_data}
+
+# Are the two dataframes equivalent?
+# OUTPUT:
+# [/INST] """
+
 Correctness_prompt = """Please act as an impartial judge and evaluate the quality of the response provided by the AI Assistant to the user question displayed below.
 Your evaluation should consider CORRECTNESS. You will be given a reference answer and the AI Assistant's answer.
 Your job is to rate the assistant's answer from 1 to 5, where 5 indicates you strongly agree that the response is
