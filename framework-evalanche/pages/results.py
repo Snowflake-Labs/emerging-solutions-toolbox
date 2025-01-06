@@ -64,10 +64,18 @@ st.set_page_config(
 st.config.set_option("global.minCachedMessageSize", 500 * 1e6)
 
 
-@st.cache_data
-def make_downloadable_df(df):
+# @st.cache_data
+def make_downloadable_df():
+    if st.session_state.get('include_analysis', False):
+        analysis_results = run_full_result_analysis()
+        df = pd.concat([st.session_state["result_data"],
+                        pd.DataFrame(analysis_results)],
+                                axis=1)
+    else:
+        df = st.session_state["result_data"]
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
-    return df.to_csv().encode("utf-8")
+    # return df.to_csv().encode("utf-8")
+    st.session_state['download_result'] = df#.to_csv().encode("utf-8")
 
 
 def replace_bool_col_with_str() -> DataFrame:
@@ -358,19 +366,133 @@ def rerun_metric(prompt_inputs: Dict[str, str], metric: Metric) -> None:
         reset_analysis()
 
 
-def analyze_result(prompt_inputs: Dict[str, str], metric: Metric) -> None:
-    """Callback function to prompt Cortex LLM to review metric's prompt and requried inputs for explanation."""
+def analyze_result(prompt_inputs: Dict[str, str],
+                   metric: Metric,
+                   score: Optional[Union[float, int, bool]] = None,
+                   model: Optional[str] = None,
+                   return_response: bool = False) -> Union[None, str]:
+    """Function to prompt Cortex LLM to review metric's prompt and requried inputs for explanation
+
+    Args:
+        prompt_inputs (dict[str, str]): Dictionary of prompt inputs for the metric's evaluation method.
+        metric (Metric): Metric object to evaluate.
+        score (str): Row's metric score
+                     Optional. If None, uses session state selected_score.
+        model (str): Model to use for evaluation. Default is None.
+                     Optional. If None, uses session state review_model_selector.
+        return_response (bool): Flag to return response or write to session state. Default is False.
+        
+
+    Returns:
+        string or writes to session state
+    """
 
     from src.prompts import Recommendation_prompt
-    from src.snowflake_utils import run_complete
+    from src.snowflake_utils import run_async_sql_complete, get_connection
+
+    # Re-establish session in session state as it seems to be lost at times in workflow
+    if "session" not in st.session_state:
+        st.session_state["session"] = get_connection()
+
+    # When analyzing multiple rows, we don't store score in session state but pass it as an argument for each row
+    if score is None:
+        score = st.session_state["selected_score"]
+
+    if model is None:
+        model = st.session_state['review_model_selector']
 
     original_prompt = metric.get_prompt(**prompt_inputs)
     recommender_prompt = Recommendation_prompt.format(
-        prompt=original_prompt, score=st.session_state["selected_score"]
+        prompt=original_prompt, score=score
     )
-    response = run_complete(st.session_state["session"], st.session_state['review_model_selector'], recommender_prompt)
-    if response is not None:
+    # response = run_complete(st.session_state["session"], model, recommender_prompt)
+    response = run_async_sql_complete(st.session_state["session"], model, recommender_prompt)
+    if response is not None and not return_response:
         st.session_state['analysis'] = response
+    else:
+        return response
+    
+
+def run_full_result_analysis():
+    """Runner function to analyze every row's metric(s) responses with a recommendation prompt.
+    
+    Rows are analyzed in parallel to speed up the process."""
+
+    import multiprocessing
+    from joblib import Parallel, delayed
+
+    metric_cols = get_metric_cols(st.session_state.get("result_data", None))
+    metric_analysis = {} # Capture columnar analysis with metric name as key
+    for metric_name in metric_cols:
+        matching_metric = next(
+            (
+                metric
+                for metric in st.session_state["metrics"]
+                if metric.get_column() == metric_name.upper()
+            ),
+            None,
+            )
+        if matching_metric is not None:
+            matching_metric.session = st.session_state["session"]
+            # Associates metric param with column containing intended value for evaluation
+            prompt_column_specs = st.session_state["param_selection"][matching_metric.name]
+        
+            responses = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
+                delayed(analyze_result_row)(
+                    matching_metric, 
+                    row[metric_name], 
+                    {key: row[value] for key, value in prompt_column_specs.items()})
+                for _, row in st.session_state["result_data"].iterrows()
+            )
+
+        metric_analysis[f'{metric_name}_ANALYSIS'] = responses
+    return metric_analysis
+
+def analyze_result_row(matching_metric: Metric, score: Union[float, int, bool], prompt_inputs: Dict[str, str]) -> Union[None, str]:
+    """Analyzes a given row's metric score given metric evaluation and input arguments.
+
+    Args:
+        matching_metric (Metric): Metric object to evaluate.
+        score (str): Row's metric score
+        prompt_inputs (dict[str, str]): Dictionary of prompt inputs for the metric's evaluation method.
+    
+    Returns:
+        string or writes to session state
+    """
+
+    # Use the default model of the metric class if available
+    if matching_metric.model is not None:
+        model_default = matching_metric.model
+    else:
+        model_default = "llama3.2-3b"
+    return analyze_result(prompt_inputs, matching_metric, score, model_default, True)
+
+
+
+@st.experimental_dialog("Download Results", width="small")
+def download_dialog() -> None:
+    st.write("Download the results to a CSV file. Select **Include Analysis** first to add an AI review of each record.")
+    top_row = row(2, vertical_align="top")
+    if top_row.button("🤖 Include Analysis",
+                      use_container_width=True,
+                      help="""Include AI analysis of each record and metric in download.
+                              This may take a few minutes."""):
+        with st.spinner("Analyzing results...this may take a few minutes."):
+            analysis_results = run_full_result_analysis()
+            data = pd.concat([st.session_state["result_data"],
+                            pd.DataFrame(analysis_results)],
+                                    axis=1)
+        st.success("Analysis complete. Ready for download.")
+    else:
+        data = st.session_state["result_data"]
+
+    top_row.download_button(
+            label="⬇️ Download Results",
+            data=data.to_csv().encode("utf-8"),
+            file_name="evalanche_results.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
 
 def update_record(table_update_inputs: Dict[str, str], selected_metric_name: str, row_id: Union[int,str]) -> None:
@@ -659,6 +781,7 @@ def show_results():
 
     from src.app_utils import fetch_warehouses
 
+
     if st.session_state.get("metric_result_data", None) is not None:
         if st.session_state.get('result_data', None) is None:
             st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
@@ -690,12 +813,13 @@ def show_results():
             use_container_width=True,
             help="Record the results to a table.",
         )
-        top_row.download_button(
+        download_results = top_row.button(
             label="⬇️ Download Results",
-            data=make_downloadable_df(st.session_state["result_data"]),
-            file_name="evalanche_results.csv",
-            mime="text/csv",
+            disabled=True
+            if st.session_state.get("result_data", None) is None
+            else False,
             use_container_width=True,
+            help="Download results to csv.",
         )
         save_eval_button = top_row.button(
             "💾 Save Evaluation",
@@ -713,6 +837,8 @@ def show_results():
         chart_expander()
         if record_button:
             record_evaluation()
+        if download_results:
+            download_dialog()
         if save_eval_button:
             save_eval()
         if automate_button:
@@ -720,6 +846,5 @@ def show_results():
             automate_eval()
         if recommend_inst:
             review_record()
-
 
 show_results()
