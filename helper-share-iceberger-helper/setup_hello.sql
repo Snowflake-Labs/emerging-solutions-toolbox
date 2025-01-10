@@ -35,6 +35,6 @@ grant usage on procedure SRC.update_reference(string,string,string) to applicati
 CREATE OR REPLACE STREAMLIT src.streamlit
   FROM '/code_artifacts'
   MAIN_FILE = '/streamlit.py'
-  COMMENT = 'sit_share_iceberger_helper';
+  COMMENT = '{"origin": "sf_sit","name": "sit_share_iceberger_helper","version": "{major: 1, minor: 0}"}';
 
 GRANT USAGE ON STREAMLIT src.streamlit TO APPLICATION ROLE PUBLIC_DB_ROLE;
