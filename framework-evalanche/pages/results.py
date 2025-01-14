@@ -12,7 +12,6 @@ import snowflake.snowpark.functions as F
 from src.app_utils import (
     render_sidebar, 
     select_model, 
-    fetch_metrics,
     MENU_ITEMS,
 )
 from src.snowflake_utils import (
@@ -20,7 +19,6 @@ from src.snowflake_utils import (
     AUTO_EVAL_TABLE, 
     SAVED_EVAL_TABLE, 
     STAGE_NAME,
-    add_row_id,
     run_async_sql_to_dataframe,
 )
 from src.metrics import Metric, SQLResultsAccuracy
@@ -42,7 +40,7 @@ def get_result_title() -> str:
 
 
 TITLE = get_result_title()
-if st.session_state.get("metric_result_data", None) is not None:
+if st.session_state.get("result_data", None) is not None:
     INSTRUCTIONS = """Evaluation results are shown below.
     Results can be reviewed and saved to a table.
     New evaluations can be saved for future use or automated."""
@@ -78,26 +76,6 @@ def make_downloadable_df():
     st.session_state['download_result'] = df#.to_csv().encode("utf-8")
 
 
-def replace_bool_col_with_str() -> DataFrame:
-    """Change boolean metric to string so st.dataframe doesn't show checkboxes."""
-
-    from snowflake.snowpark.types import StringType
-
-    metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
-
-    df = st.session_state["metric_result_data"]
-    for name in metric_names:
-        df = df.withColumn(
-            name,
-            F.iff(
-                F.is_boolean(F.to_variant(name)),
-                F.cast(F.col(name), StringType()),
-                F.col(name),
-            ),
-        )
-    return df
-
-
 def get_eval_name_desc() -> Tuple[str, str]:
     """
     Returns template to give evaluation name and description.
@@ -130,7 +108,6 @@ def record_evaluation() -> None:
         f"{table_spec['database']}.{table_spec['schema']}.{table_spec['table']}"
     )
     if st.button("Save", disabled=True if table_spec is None else False):
-        # df = st.session_state.get("metric_result_data", None)
         df = st.session_state.get("result_data", None)
         if df is not None:
             try:
@@ -339,7 +316,7 @@ def set_selected_row(selection_df: pd.DataFrame) -> None:
 
     if selection_df is not None:
         reset_analysis()
-        first_metric = get_metric_cols(st.session_state.get("metric_result_data", None))[0]
+        first_metric = get_metric_cols(st.session_state.get("result_data", None))[0]
         selected_row = selection_df[selection_df['REVIEW'] == True]
 
         if selected_row is not None and len(selected_row) >= 1:
@@ -427,7 +404,7 @@ def run_full_result_analysis():
         matching_metric = next(
             (
                 metric
-                for metric in st.session_state["metrics"]
+                for metric in st.session_state["all_metrics"]
                 if metric.get_column() == metric_name.upper()
             ),
             None,
@@ -560,7 +537,7 @@ def review_record() -> None:
     else:
         # Only first record is selected for analysis
         selected_record = st.session_state["selected_dict"][0]
-        metric_cols = get_metric_cols(st.session_state.get("metric_result_data", None))
+        metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
         metric_col, model_col = st.columns(2)
         with metric_col:
@@ -574,7 +551,7 @@ def review_record() -> None:
                 matching_metric = next(
                     (
                         metric
-                        for metric in st.session_state["metrics"]
+                        for metric in st.session_state["all_metrics"]
                         if metric.get_column() == selected_metric_name.upper()
                     ),
                     None,
@@ -738,20 +715,19 @@ def bar_chart_metrics() -> None:
 
 
 def get_trendable_column() -> Union[None, str]:
-    """Returns the first date/timestamp column found in the metric result data.
+    """Returns the True if 'METRIC_DATETIME' in result data.
 
-    Used to ensure that a trendable column is presented which should always be METRIC_DATETIME.
+    Used to ensure that the trendable column is presented which should always be METRIC_DATETIME.
     """
 
     if (
-        st.session_state.get("metric_result_data", None) is not None
+        st.session_state.get("result_data", None) is not None
         and st.session_state.get("metrics_in_results", None) is not None
     ):
-        df = st.session_state["metric_result_data"]
-        for datatype in df.dtypes:
-            if datatype[-1] in ["date", "timestamp"]:
-                return datatype[0]
-        return None
+        if 'METRIC_DATETIME' in st.session_state["result_data"].columns:
+            return True
+        else:
+            return False
 
 
 def chart_expander() -> None:
@@ -759,7 +735,7 @@ def chart_expander() -> None:
 
     with st.expander("Chart Metrics", expanded=False):
         trendable_col = get_trendable_column()
-        if trendable_col is not None:
+        if trendable_col:
             bar_counts, line_trend, bar_trend = st.columns(3)
             with bar_counts:
                 bar_chart_metrics()
@@ -780,16 +756,6 @@ def show_results():
     """Main rendering function for page."""
 
     from src.app_utils import fetch_warehouses
-
-
-    if st.session_state.get("metric_result_data", None) is not None:
-        if st.session_state.get('result_data', None) is None:
-            st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
-                                        .withColumn("REVIEW", F.lit(False))\
-                                        .withColumn("COMMENT", F.lit(None)).to_pandas()
-            
-            # Store available metrics in session state
-            st.session_state["metrics"] = fetch_metrics(st.session_state["session"], STAGE_NAME)
 
     show_metric()
     if st.session_state["eval_funnel"] is not None:

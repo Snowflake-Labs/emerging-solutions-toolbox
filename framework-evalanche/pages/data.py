@@ -9,6 +9,7 @@ from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
 from streamlit_extras.row import row
 from streamlit_extras.stylable_container import stylable_container
+import snowflake.snowpark.functions as F
 
 from src.app_utils import (
     css_yaml_editor,
@@ -19,11 +20,14 @@ from src.app_utils import (
     test_complete,
     set_session_var_to_none,
     MENU_ITEMS,
+    fetch_metrics,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
     get_connection,
     join_data,
+    add_row_id,
+    STAGE_NAME,
 )
 
 TITLE = "Data Selection"
@@ -498,6 +502,7 @@ def run_eval() -> None:
                 "metric_result_data"
             ].queries["queries"][0]
 
+            # metric_result_data contains raw form of metric results
             st.session_state["metric_result_data"] = metric_runner(
                 session=st.session_state["session"],
                 metrics=st.session_state["selected_metrics"],
@@ -506,6 +511,12 @@ def run_eval() -> None:
                 source_df=st.session_state["metric_result_data"],
                 source_sql=None,
             )
+
+            # Prepare view for user to review and comment on results page
+            st.session_state["result_data"] = add_row_id(st.session_state["metric_result_data"])\
+                                        .withColumn("REVIEW", F.lit(False))\
+                                        .withColumn("COMMENT", F.lit(None)).to_pandas()
+            
             # metric_funnel will capture where user came from and dictate next steps allowed
             st.session_state["eval_funnel"] = "new"
             st.switch_page("pages/results.py")
