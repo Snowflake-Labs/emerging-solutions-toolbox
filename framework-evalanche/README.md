@@ -124,7 +124,7 @@ An appropriately crafted stored procedure could look like the below.
 CREATE OR REPLACE PROCEDURE MY_PIPELINE(INPUT VARIANT)
   RETURNS STRING
   LANGUAGE PYTHON
-  RUNTIME_VERSION = '3.8'
+  RUNTIME_VERSION = '3.9'
   PACKAGES = ('snowflake-snowpark-python', 'snowflake-ml-python')
   HANDLER = 'run'
 AS

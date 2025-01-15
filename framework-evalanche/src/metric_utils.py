@@ -60,28 +60,28 @@ def run_metric(
     from joblib import Parallel, delayed
     import streamlit as st
 
-    # Iterating over the data in pandas batches
-    for pandas_df in metric_result_data.to_pandas_batches():
-        # Parallel processing for each row in the dataframe
-        results = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
-            delayed(
-                lambda row: {
-                    "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
-                    # Loop over each metric in the metrics list
-                    **{
-                        metric.get_column(): metric.evaluate(
-                            models[metric.name],  # Pass the model for each metric
-                            **{
-                                key: row[params[metric.name][key]]
-                                for key in params[metric.name]
-                            }
-                        )  # Pass params as **kwargs for each metric
-                        for metric in metrics
-                    },
-                }
-            )(row)
-            for _, row in pandas_df.iterrows()
-        )
+    pandas_df = metric_result_data.to_pandas()
+    # Parallel processing for each row in the dataframe
+    results = Parallel(multiprocessing.cpu_count(), 
+                        backend="threading")(
+        delayed(
+            lambda row: {
+                "ROW_ID": row["ROW_ID"],  # Capture ROW_ID
+                # Loop over each metric in the metrics list
+                **{
+                    metric.get_column(): metric.evaluate(
+                        models[metric.name],  # Pass the model for each metric
+                        **{
+                            key: row[params[metric.name][key]]
+                            for key in params[metric.name]
+                        }
+                    )  # Pass params as **kwargs for each metric
+                    for metric in metrics
+                },
+            }
+        )(row)
+        for _, row in pandas_df.iterrows()
+    )
 
     # Return the results as a dataframe in the session
     return session.create_dataframe(results)

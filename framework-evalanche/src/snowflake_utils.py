@@ -14,7 +14,7 @@ CUSTOM_METRIC_TABLE = "GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS"
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "evalanche",
-    "version": {"major": 1, "minor": 0},
+    "version": {"major": 3, "minor": 1},
 }
 
 models = [
@@ -23,6 +23,7 @@ models = [
     'llama3.1-8b',
     'llama3.1-70b',
     'llama3.1-405b',
+    'claude-3-5-sonnet',
     'snowflake-arctic',
     'reka-core',
     'reka-flash',
@@ -181,7 +182,7 @@ def join_data(
     if inference_key == ground_key:
         on = inference_key
     else:
-        inference_data[inference_key] == ground_data[ground_key]
+        on = inference_data[inference_key] == ground_data[ground_key]
 
     data = inference_data.join(
         ground_data,
