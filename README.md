@@ -45,3 +45,4 @@ A solution can represent one of three types:
 | [Zamboni](/framework-zamboni) | FRAMEWORK | Zamboni allows a customer to create a pipeline of Source-to-Target transformations with little to no ELT engineering required.|
 | [Enable Query Acceleration Service (QAS) for Eligible Warehouses](/helper-enable-qas-eligible-warehouses) | HELPER | A notebook that helps users identify warehouses eligible to enable the query acceleration service (QAS). |
 | [Evalanche](/framework-evalanche) | FRAMEWORK | A Streamlit in Snowflake app to orchestrate any Generative AI use case evaluations. |
+| [Serverless Task Migration](/helper-serverless-task-migration) | HELPER | An app that helps identify any tasks on an account that would benefit from being serverless. |
