@@ -1,7 +1,7 @@
 # Serverless Task Migration
 
 The Serverless task migration app is a tool for analyzing the running tasks on your snowflake account and migrating anything that may not be optimized.
-The app looks at two siatuations in particular
+The app looks at two situations in particular
 
 - Tasks that run quickly, and spin up a warehouse but do not utilize enough time on it to justify the cost of starting it.
 - Tasks that are long running and regularly overshoot their next target start schedule
