@@ -1,0 +1,24 @@
+prompt:
+  name: "Review Sentiment Checker"
+  version: "1.0"
+  messages:
+    - role : "system"
+      content: |
+        You are a helpful marketing assistant. 
+        You will be given a movie review and sentiment 
+        and must determine if the sentiment is accurate.
+        Your responses should be {format}.
+    - role : "user"
+      content: |
+        Here is the review: {review}.
+        Here is the sentiment: {sentiment}.
+  literal_variables:
+    format: "concise"
+  column_variables:
+    review: "REVIEW"
+    sentiment: "SENTIMENT"
+  origin_table: 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED'
+  model: 'llama3.2-3b'
+  model_options: 
+    max_tokens: 100
+    temperature: 0.5
