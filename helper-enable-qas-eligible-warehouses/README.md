@@ -4,9 +4,9 @@ The query acceleration service (QAS) can accelerate parts of the query workload 
 
 For more information, visit:  https://docs.snowflake.com/en/user-guide/query-acceleration-service#label-query-acceleration-eligible-queries.
 
-This notebook identifies warehouses that execute queries that are eligible for QAS, along with the option to enable QAS for each warehouse.  
+This app identifies warehouses that execute queries that are eligible for QAS, along with the option to enable QAS for each warehouse.  
 
-This notebook will:
+This app will:
 - check the `QUERY_ACCELERATION_ELIGIBLE` account usage view for warehouses that execute queries that are eligible for QAS.
     - The user can toggle the minimum number of eligible queries to check for, along with the threshold of average execution time is eligible for the service
 - enable QAS for each selected warehouse (optional)
