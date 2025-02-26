@@ -203,6 +203,11 @@ df.show()
 The PROMPT_TEMPLATE_RUNNER is a Stored Procedure that can be executed standalone with all necessary components driven from a configuration file.
 The below arguments can be passed explicitly to the utility in addition to the configuration file.
 Arguments passed explicitly will be prioritized over those in the configuration file.
+- `name`
+- `version`
+- `messages`
+- `literal_variables`
+- `column_variables`
 - `origin_table`
 - `model`
 - `model_options`
