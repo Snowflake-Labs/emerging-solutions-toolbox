@@ -1,5 +1,5 @@
 SET major = 1;
-SET minor = 1;
+SET minor = 2;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "prompt_template_runner",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -49,7 +49,12 @@ CREATE OR REPLACE FUNCTION GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_PARSER(
 
 
 CREATE OR REPLACE PROCEDURE GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER(
-    prompt_template_file varchar,
+    prompt_template_file varchar DEFAULT NULL,
+    name varchar DEFAULT NULL,
+    version varchar DEFAULT NULL,
+    messages variant DEFAULT to_variant('[]'),
+    literal_variables variant DEFAULT to_variant('{}'),
+    column_variables variant DEFAULT to_variant('{}'),
     origin_table varchar DEFAULT NULL,
     model varchar DEFAULT NULL,
     model_options variant DEFAULT to_variant('{}'),

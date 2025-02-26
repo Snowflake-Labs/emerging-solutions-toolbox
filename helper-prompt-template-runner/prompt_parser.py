@@ -1,11 +1,12 @@
 from typing import Optional, Union, Any
 import datetime
+import logging
 
 import snowflake.snowpark.functions as F
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark import Session
 
-major, minor = 1, 1
+major, minor = 1, 2
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "prompt_template_runner",
@@ -253,13 +254,12 @@ def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFr
     
     try:
         for key, value in metadata.items():
+                
                 if value is None:
                     continue
-                if isinstance(value, dict): # Unnest nested dictionaries to add separate keys
-                    for sub_k, sub_v in value.items():
-                        df = df.with_column(
-                                column,
-                                F.sql_expr(f"OBJECT_INSERT({column}, '{sub_k}', '{sub_v}')")
+                elif key == 'model_options':
+                    df = df.with_column(column,
+                            F.sql_expr(f"OBJECT_INSERT({column}, '{key}', TO_JSON({value}))")
                             )
                 else:
                     df = df.with_column(
@@ -272,7 +272,12 @@ def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFr
 
 def run_prompt_template(
         session: Session,
-        prompt_template_file: str,
+        prompt_template_file: Optional[str] = None,
+        name: Optional[str] = None,
+        version: Optional[str] = None,
+        messages: Optional[list] = None,
+        literal_variables: Optional[dict] = None,
+        column_variables: Optional[dict] = None,
         origin_table: Optional[str] = None,
         model: Optional[str] = None,
         model_options: Optional[dict] = None,
@@ -293,6 +298,11 @@ def run_prompt_template(
         prompt_template_file (str): The file path to the prompt template configuration.
             If the file is in stage, use BUILD_SCOPED_FILE_URL to get the URL.
             If the file is local, use the local file path.
+        name (Optional[str]): The name of the prompt template.
+        version (Optional[str]): The version of the prompt template.
+        messages (Optional[list]): The list of messages to use in the prompt template.
+        literal_variables (Optional[dict]): The dictionary of literal variables to use in the prompt template.
+        column_variables (Optional[dict]): The dictionary of column variables to use in the prompt template.
         origin_table (Optional[str]): The name of the origin table containing the prompts. 
             If None, it will be extracted from the prompt configuration.
         model (Optional[str]): The model to use for generating responses. 
@@ -314,22 +324,57 @@ def run_prompt_template(
         ValueError: If required parameters (origin_table or model) are missing.
     """
 
+    logger = logging.getLogger("prompt_template_runner")
+
     # Set query tag for usage
     set_query_tag(session)
 
-    prompt_config = extract_prompt(prompt_template_file)
+    # Start by extracting the prompt configuration if it exists
+    if prompt_template_file is not None:
+        prompt_config = extract_prompt(prompt_template_file)
+    else: # Will populate with explicitly passed parameters in signature
+        prompt_config = {}
 
-    # Options passed in signature will take priority
-    # Secondarily, we will use the prompt_config values
-    if origin_table is None:
+    if name:
+        prompt_config['name'] = name
+    
+    if version:
+        prompt_config['version'] = version
+    
+    if isinstance(messages, list) and len(messages) > 0:
+        prompt_config['messages'] = messages
+    elif prompt_config.get('messages', None) is not None:
+        prompt_config['messages'] = prompt_config.get('messages')
+    else:
+        logger.warning("No messages provided in prompt_config or signature.")
+        raise ValueError("Error: No messages provided in prompt_config or signature.") # messages are required
+    
+    if isinstance(literal_variables, dict) and len(literal_variables) > 0:
+        prompt_config['literal_variables'] = literal_variables
+    else:
+        prompt_config['literal_variables'] = prompt_config.get('literal_variables', {})
+    
+    if isinstance(column_variables, dict) and len(column_variables) > 0:
+        prompt_config['column_variables'] = column_variables
+    else:
+        prompt_config['column_variables'] = prompt_config.get('column_variables', {})
+    
+    if origin_table is None: # If origin_table is passed in signature, it will take priority
         origin_table = prompt_config.get('origin_table', None)
+        if origin_table is None:
+            logger.warning("No origin_table provided in prompt_config or signature.")
+            logger.info("Creating empty temporary table.")
+
+            # Create empty temporary table for non-tabular generation
+            session.range(1).write.mode('overwrite').save_as_table('temp_placeholder_tbl', table_type='temporary')
+            origin_table = 'temp_placeholder_tbl' # Set origin_table to empty temporary table
+    
     if model is None:
         model = prompt_config.get('model', None)
-
-    # Check for required parameters
-    for param in [origin_table, model]:
-        if param is None:
-            raise ValueError(f"Error: origin_table and model are required in configuration file or explicitly.")
+        if model is None:
+            logger.info("No model provided in prompt_config or signature.")
+            logger.info("Defaulting to model llama3.2-3b.")
+            model = 'llama3.2-3b'
 
     # Check model availability
     available = test_model(session, model)
