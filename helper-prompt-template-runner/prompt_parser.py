@@ -190,7 +190,7 @@ def parse_prompt_template(
     df = session.table(origin_table).with_column('ROW_DATA', F.object_construct('*'))
 
     # Calling the UDTF using call_table_function from snowpark.functions
-    udtf = 'GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_PARSER'
+    udtf = 'PROMPT_TEMPLATE_PARSER'
 
     # We set metadata to exclude so we can add it in once later in stored procedure
     df = df.with_column(prompt_column, F.call_table_function(
