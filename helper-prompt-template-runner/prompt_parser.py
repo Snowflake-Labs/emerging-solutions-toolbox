@@ -227,6 +227,9 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
     if prompt_template_file.startswith('https://'): # BUILD_SCOPED_FILE_URL returns URL
         from snowflake.snowpark.files import SnowflakeFile
         open_file = SnowflakeFile.open(prompt_template_file)
+    elif prompt_template_file.startswith('@'): # Absolute stage path sans scoped URL
+        from snowflake.snowpark.files import SnowflakeFile
+        open_file = SnowflakeFile.open(prompt_template_file, require_scoped_url = False)
     else:
         open_file = open(prompt_template_file, 'r')
         
