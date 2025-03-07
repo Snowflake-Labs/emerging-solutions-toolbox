@@ -11,7 +11,7 @@ Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake 
     - Access to the `ACCOUNT_USAGE` schema in the SNOWFLAKE native app.
 - The user either:
     - has an existing Snowflake `EXTERNAL VOLUME` registered to a storage location in the same cloud/region as the Snowflake account.
-    - has a storage location in the same cloud/region as the Snowflake account (if an existing `EXTERNAL VOLUME`does not exist).
+    - has a storage location in the same cloud/region as the Snowflake account (if an existing `EXTERNAL VOLUME` does not exist).
         - Convert2Iceberg can be used to create an `EXTERNAL VOLUME`.
 
 ## Installation
