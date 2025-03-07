@@ -1,0 +1,38 @@
+[project]
+name = "forecast-model-builder"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "holidays>=0.66",
+    "matplotlib>=3.7.0",
+    "plotly>=6.0.0",
+    "snowflake>=1.0.2",
+    "snowflake-ml-python>=1.7.2",
+    "snowflake-snowpark-python>=1.26.0,<2",
+    "statsmodels>=0.14.4",
+    "streamlit>=1.41,<2",
+    "xgboost==2.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "boto3>=1.35.88",
+  "ipykernel==6.29.5",
+  "pre-commit>=4,<5",
+  "python-dotenv>=1.0.1",
+  "pytest==8.3.4",
+  "ruff==0.8.3,<1",
+  "uv>=0.5.14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "nbclient>=0.10.2",
+    "nbformat>=5.10.4",
+    "quartodoc>=0.9.1",
+]

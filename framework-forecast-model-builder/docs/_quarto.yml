@@ -1,0 +1,4 @@
+project:
+  type: website
+quartodoc:
+  package: ml_forecasting_incubator

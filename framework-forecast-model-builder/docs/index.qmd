@@ -1,0 +1,74 @@
+---
+title: "ml-forecasting-incubator"
+description: "Easily train forecasting models using Snowflake."
+repo-actions: false
+code-annotations: hover
+twitter-card:
+  image: logo.png
+format:
+  html:
+    toc: false
+about:
+  id: about
+  template: jolla
+  links:
+    - icon: gitlab
+      text: GitLab
+      href: https://snow.gitlab-dedicated.com/snowflakecorp/SE/sit/ml-forecasting-incubator
+---
+
+::: {#about}
+:::
+
+{{< pagebreak >}}
+
+::: {.column-page}
+
+### Make forecasting with Snowflake much easier (incubating)
+
+- Use your favorite algorithms to experiment with your data
+- Distribute model training effectively
+- Work with familiar Snowpark dataframe
+- Configure your settings to easily scale your features
+
+## ml-forecasting-incubator
+
+Make temporal transformations much easier.
+
+```{python}
+# | code-fold: true
+# | echo: true
+
+from datetime import date
+
+import pandas as pd
+from ml_forecasting_incubator.transformations import expand_dates
+from snowflake.snowpark import Session
+
+session = Session.builder.getOrCreate()
+data = [date(2024, 12, 31), date(2025, 1, 1), date(2025, 1, 2)]
+df = session.create_dataframe(pd.DataFrame({"DATE_COL": data}))
+expand_dates(df, "DATE_COL").show()
+```
+
+Generate lag features with ease.
+
+```{python}
+# | code-fold: true
+# | echo: true
+
+from datetime import date
+
+import pandas as pd
+from ml_forecasting_incubator.transformations import compute_lags, Frequency
+from snowflake.snowpark import Session
+
+session = Session.builder.getOrCreate()
+data = [
+    {"date_col": date(2021, 1, 1), "value_col": 1},
+    {"date_col": date(2021, 1, 2), "value_col": 2},
+    {"date_col": date(2021, 1, 3), "value_col": 3},
+]
+df = session.create_dataframe(data)
+compute_lags(df, "value_col", "date_col", Frequency.DAY, 1).show()
+```
