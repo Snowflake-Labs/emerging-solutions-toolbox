@@ -1,0 +1,10 @@
+name: app_environment
+channels:
+  - snowflake
+dependencies:
+  - holidays=*
+  - matplotlib=*
+  - plotly=*
+  - snowflake=*
+  - snowflake-ml-python=*
+  - statsmodels=*
