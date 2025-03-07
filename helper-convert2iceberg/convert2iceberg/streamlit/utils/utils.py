@@ -64,7 +64,7 @@ def create_styled_table(header_values, cell_values, column_widths=None, height=1
         cell_alignments = ['center'] 
 	
     if column_widths is None:
-        # Use the default_width for all columns if column_widths is not not provided
+        # Use the default_width for all columns if column_widths is not provided
         num_columns = len(header_values)
         column_widths = [1] * num_columns
 
