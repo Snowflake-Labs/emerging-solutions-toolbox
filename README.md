@@ -47,3 +47,4 @@ A solution can represent one of three types:
 | [Serverless Task Migration](/helper-serverless-task-migration) | HELPER | An app that helps identify any tasks on an account that would benefit from being serverless. |
 | [Prompt Template Runner](/helper-prompt-template-runner) | HELPER | A utility to execute Snowflake Cortex prompts against Snowflake tables/views via configuration file. |
 | [Forecast Model Builder](/framework-forecast-model-builder) | FRAMEWORK | A toolkit for building robust ML forecasts on Snowflake, covering EDA/Modeling/Inference. |
+| [Convert2Iceberg](/helper-convert2iceberg) | HELPER | A utility that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table. |
