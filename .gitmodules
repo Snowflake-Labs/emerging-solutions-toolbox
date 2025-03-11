@@ -34,3 +34,6 @@
 [submodule "sfguide-data-model-mapper"]
 	path = sfguide-data-model-mapper
 	url = https://github.com/Snowflake-Labs/sfguide-data-model-mapper
+[submodule "orchestration-framework"]
+	path = orchestration-framework
+	url = https://github.com/Snowflake-Labs/orchestration-framework
