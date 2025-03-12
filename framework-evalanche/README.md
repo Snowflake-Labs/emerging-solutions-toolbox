@@ -26,12 +26,12 @@ Please see TAGGING.md for details on object comments.
 # Overview
 Evalanche is a Streamlit in Snowflake (SiS) application that provides a single location to evaluate and compare generative AI use case outputs in a streamlined, on demand, and automated fashion. Regardless if your goal is to measure the quality of RAG-based LLM solutions or accuracy of SQL generation, Evalanche provides a scalable, customizable, and trackable way to do it.
 
-> **Note:** Snowflake provides a few tools/frameworks for conducting LLM evaluations. 
-This solution, Evalanche, serves as a generalized application to make it easy to create and automate LLM use case evaluations. 
-Most LLM use cases can be evaluated with Evalanche through out of the box metrics or custom metrics. 
-Alternatively, Snowflake's AI Observability (Private Preview) is powered by open source [TruLens](https://www.trulens.org/), which provides extensible evaluations and tracing for LLM apps including RAGs and LLM agents. 
+> **Note:** Snowflake provides a few tools/frameworks for conducting LLM evaluations.
+This solution, Evalanche, serves as a generalized application to make it easy to create and automate LLM use case evaluations.
+Most LLM use cases can be evaluated with Evalanche through out of the box metrics or custom metrics.
+Alternatively, Snowflake's AI Observability (Private Preview) is powered by open source [TruLens](https://www.trulens.org/), which provides extensible evaluations and tracing for LLM apps including RAGs and LLM agents.
 Lastly, [Cortex Search Evaluation and Tuning Studio](https://github.com/Snowflake-Labs/cortex-search/tree/main/examples/streamlit-evaluation) (Private Preview) offers systematic evaluation and search quality improvements for specific search-based use cases.
-Please contact your account representative to learn more about any of these other offerings. 
+Please contact your account representative to learn more about any of these other offerings.
 
 # How it Works
 Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. Together, Metrics and Data Sources can be combined to make an Evaluation.
@@ -75,7 +75,7 @@ snow streamlit get-url EVALUATION_APP --open --database GENAI_UTILITIES --schema
 
 # Extras
 ## Custom Metrics
-While we continue to add Metrics, you may very well have a use case that warrants a unique one. This is expected. New simple prompt-based metrics can be added from the homepage's Add Metric button. 
+While we continue to add Metrics, you may very well have a use case that warrants a unique one. This is expected. New simple prompt-based metrics can be added from the homepage's Add Metric button.
 
 To craft a new metric, give it a name, description and prompt. Examples are shown in the app. When crafting a prompt, variables should be enclosed with curly brackets (`{}`). Ideal metrics prompt the LLM to return a result of an integer-based scale, such as 1-5 corresponding to a [Likert scale](https://en.wikipedia.org/wiki/Likert_scale). True/False responses should be crafted as 1/0 responses, respectively. These variables will be populated by the values in the user-selected data sources. Here's an example of a basic prompt:
 
@@ -100,10 +100,10 @@ To remove a metric as selectable in the app, deselect it in the Manage Metrics m
 CALL GENAI_UTILITIES.EVALUATION.DELETE_METRIC('Rudeness');
 ```
 
-Lastly, please be aware that Streamlit in Snowflake now supports multiple python versions. Custom metrics may only be available with consistent Python versions. For example, if you create a custom metric while running the app with Python version 3.11, the custom metric will only be available in subsequent sessions when running Python 3.11. 
+Lastly, please be aware that Streamlit in Snowflake now supports multiple python versions. Custom metrics may only be available with consistent Python versions. For example, if you create a custom metric while running the app with Python version 3.11, the custom metric will only be available in subsequent sessions when running Python 3.11.
 
 ## Generating Results to Evaluate
-Evalanche primarily assumes you've saved LLM outputs to table(s) in Snowflake for us to evaluate. That may not be the case. Evalanche supports two ways to generate outputs using either a custom LLM pipeline or a Cortex Analyst runner. Both options are available from the data page (under "Need to Generate Results?") once you've selected your desired Metric(s).  
+Evalanche primarily assumes you've saved LLM outputs to table(s) in Snowflake for us to evaluate. That may not be the case. Evalanche supports two ways to generate outputs using either a custom LLM pipeline or a Cortex Analyst runner. Both options are available from the data page (under "Need to Generate Results?") once you've selected your desired Metric(s).
 
 ### Crafting a Stored Procedure for your Custom LLM Pipeline
 To run a reference dataset through your desired LLM pipelines on the data page, we must first encapsulated the pipeline logic in a Stored Procedure. To take advantage of this feature, the stored procedure must have a single VARIANT input type and return a single value. When we execute the stored procedure, a single row from the reference dataset will be passed in the form of a Python dictionary. In other words, a row in the reference dataset that looks like:
@@ -143,7 +143,7 @@ $$;
 ```
 
 ### Using the Cortex Analyst Runner
-To run a gold or reference set of questions through Cortex Analyst, select the target semantic model and the table containing the reference questions. The SQL results will be written to a table for further evaluation with the Cortex Analyst-suggested metric. 
+To run a gold or reference set of questions through Cortex Analyst, select the target semantic model and the table containing the reference questions. The SQL results will be written to a table for further evaluation with the Cortex Analyst-suggested metric.
 
 ## Model Options and Selection
 Out of the box Metrics have defaulted LLMs. These defaults are selected based on balancing availability, performance, and cost. However, depending on your region, the defaulted LLM may not be available. If that is the case, please select an alternative LLM. See LLM availability [here](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions?utm_cta=website-homepage-live-demo#availability).

@@ -8,8 +8,8 @@ Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
 Please see TAGGING.md for details on object comments.
 
 # Overview
-The Prompt Template Runner enables Snowflake users to create and manage Cortex Complete calls against tables/views using a simple configuration file. 
-The Prompt Template Runner takes inspiration from LangChain [prompt templates](https://python.langchain.com/docs/concepts/prompt_templates/) and [YAML prompts](https://www.restack.io/docs/langchain-knowledge-langchain-yaml-prompt-guide), but is purpose-built to be operationalized against Snowflake table records. 
+The Prompt Template Runner enables Snowflake users to create and manage Cortex Complete calls against tables/views using a simple configuration file.
+The Prompt Template Runner takes inspiration from LangChain [prompt templates](https://python.langchain.com/docs/concepts/prompt_templates/) and [YAML prompts](https://www.restack.io/docs/langchain-knowledge-langchain-yaml-prompt-guide), but is purpose-built to be operationalized against Snowflake table records.
 Here, the key difference is that prompt variables may be imputed by literal constants (similar to Langchain) OR column values from the underlying table.
 
 The helper provides 2 utilities to operationalize templated prompts against Snowflake tables:
@@ -39,8 +39,8 @@ prompt:
   messages:
     - role : "system"
       content: |
-        You are a helpful marketing assistant. 
-        You will be given a movie review and sentiment 
+        You are a helpful marketing assistant.
+        You will be given a movie review and sentiment
         and must determine if the sentiment is accurate.
         Your responses should be {format}.
     - role : "user"
@@ -54,19 +54,19 @@ prompt:
     sentiment: "SENTIMENT"
   origin_table: 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED'
   model: 'llama3.2-3b'
-  model_options: 
+  model_options:
     max_tokens: 100
     temperature: 0.5
 ```
 
 ## Messages
-Messages contains the prompt or history of messages. The argument must be an array of objects representing a conversation in chronological order. Each object must contain a `role` key and a `content` key. The `content` value is a prompt or a response, depending on the role. The role must be one of the following: `system`, `user`, `assistant`. See the [Cortex Complete documentation](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex) for more information. 
+Messages contains the prompt or history of messages. The argument must be an array of objects representing a conversation in chronological order. Each object must contain a `role` key and a `content` key. The `content` value is a prompt or a response, depending on the role. The role must be one of the following: `system`, `user`, `assistant`. See the [Cortex Complete documentation](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex) for more information.
 
 If passing only a single message, set `role` as 'user'.
 
 ## Variables
 Variables are any parts of the prompts/messages that should be replaced for every record in the table.
-These variables can be replaced (e.g. imputed) by a constant, meaning every table record will feature the same value in the prompt. Alternatively, a variable can be replaced (e.g. imputed) by a column value in the corresponding record. 
+These variables can be replaced (e.g. imputed) by a constant, meaning every table record will feature the same value in the prompt. Alternatively, a variable can be replaced (e.g. imputed) by a column value in the corresponding record.
 
 > **Important:** Variables must be enclosed in brackets in the prompts/messages.
 
@@ -109,15 +109,15 @@ The file should be in Snowflake Stage.
 ## PROMPT_TEMPLATE_PARSER
 
 The PROMPT_TEMPLATE_PARSER is a UDTF and should be called against a Snowflake table.
-A configuration file in Snowflake stage can be passed to the UDTF OR an explicit object containing the same arguments can be passed. 
+A configuration file in Snowflake stage can be passed to the UDTF OR an explicit object containing the same arguments can be passed.
 
 ### Examples
 
-Calling PROMPT_TEMPLATE_PARSER using a configuration file in stage. 
+Calling PROMPT_TEMPLATE_PARSER using a configuration file in stage.
 ```sql
 WITH CTE
 AS (
-    SELECT 
+    SELECT
         *,
         OBJECT_CONSTRUCT(*) AS ROW_DICT, -- Necessary to pass row values to prompt
         BUILD_SCOPED_FILE_URL('@JSUMMER.PUBLIC.DROPBOX','prompt_template.yaml') AS CONFIG_FILE -- Always used BUILD_SCOPED_FILE_URL
@@ -127,7 +127,7 @@ SELECT
     * EXCLUDE (ROW_DICT, CONFIG_FILE) -- Don't need to include these extra columns
 FROM CTE
 , TABLE(GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_PARSER(
-        row_data => ROW_DICT, 
+        row_data => ROW_DICT,
         prompt_template_file => CONFIG_FILE,
         include_metadata => TRUE -- Set to FALSE to just get messages array back without metadata
         ))
@@ -225,7 +225,7 @@ CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER(
     prompt_template_file => BUILD_SCOPED_FILE_URL('@JSUMMER.PUBLIC.DROPBOX', 'prompt_template.yaml'),
     origin_table => 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED',
     model => 'llama3.2-1b',
-    model_options => {'temperature': 0.1, 
+    model_options => {'temperature': 0.1,
                       'max_tokens': 90}
     );
 ```

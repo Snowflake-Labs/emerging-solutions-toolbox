@@ -1,6 +1,6 @@
 # Replace Non-Task commands with Dynamic Tables
 
-This notebook identifies `CTAS` and `INSERT OVERWRITE` commands executed multiple times over a given time frame (not via a task), that can be converted to Dynamic tables.  Dynamic tables simplify data engineering in Snowflake by providing a reliable, cost-effective, and automated way to transform data. Not every command can or should be replaced.  
+This notebook identifies `CTAS` and `INSERT OVERWRITE` commands executed multiple times over a given time frame (not via a task), that can be converted to Dynamic tables.  Dynamic tables simplify data engineering in Snowflake by providing a reliable, cost-effective, and automated way to transform data. Not every command can or should be replaced.
 
 This notebook will:
 - check the `QUERY_HISTORY` account usage view for the commands that have successfully completed, more than once, over the last 24 hours.
