@@ -8,16 +8,16 @@ This project provides a process for converting secured views in Snowflake shares
 
 As data-sharing requirements grow, managing secured views in Snowflake can become increasingly complex. Converting these views to dynamic tables offers several key benefits:
 
-- **Performance Optimization**  
+- **Performance Optimization**
   Dynamic tables improve query performance by precomputing results and leveraging Snowflake’s storage optimizations, reducing response times and resource usage compared to repeatedly processing complex secured views.
 
-- **Data Freshness**  
+- **Data Freshness**
   Dynamic tables ensure data is up-to-date with automatic refresh mechanisms, making them ideal for time-sensitive, frequently accessed data shared with external partners.
 
-- **Reduced Maintenance**  
+- **Reduced Maintenance**
   With automatic clustering and data organization, dynamic tables minimize the need for manual maintenance, freeing up resources for analysis rather than upkeep.
 
-- **Scalability and Access Control**  
+- **Scalability and Access Control**
   Dynamic tables scale effortlessly with Snowflake’s architecture, making them better suited for high-volume data sharing while simplifying access control and governance.
 
 Converting secured views to dynamic tables enhances performance, data freshness, and scalability, supporting efficient, secure, and maintainable data-sharing practices.
@@ -28,16 +28,16 @@ Converting secured views to dynamic tables enhances performance, data freshness,
 
 The process involves the following steps:
 
-1. **Identify Secured Views**  
+1. **Identify Secured Views**
    - Scan the Snowflake database to identify secured views within the database share.
 
-2. **Extract Object Dependencies**  
+2. **Extract Object Dependencies**
    - Query dependencies of each secured view to understand the underlying tables and objects.
 
-3. **Qualify Views for Conversion**  
+3. **Qualify Views for Conversion**
    - Apply criteria to determine which secured views are best suited for conversion, such as dependency complexity and potential performance gains.
 
-4. **Generate Conversion Code**  
+4. **Generate Conversion Code**
    - For views that qualify, generate SQL to convert these views into dynamic tables, leveraging Snowflake's dynamic table features for improved performance.
 
 This process streamlines secured view management, helping organizations optimize data-sharing performance and scalability in Snowflake.

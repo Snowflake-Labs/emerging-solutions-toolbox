@@ -1,6 +1,6 @@
 # CONVERT2ICEBERG
 
-Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table, either by selecting the table by name or choosing a query that contains table(s) to convert. In addition, this app also allows the user compare query execution statistics between a query before and after the conversion to Iceberg. 
+Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table, either by selecting the table by name or choosing a query that contains table(s) to convert. In addition, this app also allows the user compare query execution statistics between a query before and after the conversion to Iceberg.
 
 ## Prerequisites:
 - The user deploying this app must have a role with the following privileges:
@@ -15,7 +15,7 @@ Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake 
         - Convert2Iceberg can be used to create an `EXTERNAL VOLUME`.
 
 ## Installation
-This repo includes the `c2i_install` notebook, located in the `installer/` directory, that installs the Convert2Iceberg SiS app. The notebook should be imported in the appicable Snowflake account and executed, using the desired role. Refer to the notebook for more details. 
+This repo includes the `c2i_install` notebook, located in the `installer/` directory, that installs the Convert2Iceberg SiS app. The notebook should be imported in the appicable Snowflake account and executed, using the desired role. Refer to the notebook for more details.
 
 **NOTE:** the `c2i_install` notebook is standalone and always references the latest version of Convert2Iceberg. This allows the notebook to be distributed separately from the full repo.
 

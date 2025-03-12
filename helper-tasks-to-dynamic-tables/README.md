@@ -1,6 +1,6 @@
 # Replace Tasks with Dynamic Tables
 
-This notebook identifies eligible tasks that can be converted to Dynamic tables.  Dynamic tables simplify data engineering in Snowflake by providing a reliable, cost-effective, and automated way to transform data. Not every stream/task can or should be replaced.  
+This notebook identifies eligible tasks that can be converted to Dynamic tables.  Dynamic tables simplify data engineering in Snowflake by providing a reliable, cost-effective, and automated way to transform data. Not every stream/task can or should be replaced.
 
 This notebook will:
 - check actively running tasks in a Snowflake account to find tasks that `INSERT` or `MERGE` into an existing table (from a base table) or create a table using `CTAS`

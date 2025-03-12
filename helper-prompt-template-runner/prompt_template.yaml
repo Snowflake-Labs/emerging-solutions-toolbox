@@ -4,8 +4,8 @@ prompt:
   messages:
     - role : "system"
       content: |
-        You are a helpful marketing assistant. 
-        You will be given a movie review and sentiment 
+        You are a helpful marketing assistant.
+        You will be given a movie review and sentiment
         and must determine if the sentiment is accurate.
         Your responses should be {format}.
     - role : "user"
@@ -19,6 +19,6 @@ prompt:
     sentiment: "SENTIMENT"
   origin_table: 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED'
   model: 'llama3.2-3b'
-  model_options: 
+  model_options:
     max_tokens: 100
     temperature: 0.5

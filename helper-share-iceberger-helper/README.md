@@ -17,4 +17,3 @@ Please see TAGGING.md for details on object comments.
 This utilizes Streamlit, Snowpark, Tasks, and Iceberg Tables to bring you the experience.
 
 To get started run provider_install.sql and follow its instructions!
-
