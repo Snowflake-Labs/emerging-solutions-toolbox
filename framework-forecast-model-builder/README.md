@@ -23,7 +23,7 @@ notebook to Snowsight.
 2. Follow the documented instructions in the Deployment notebook. Here are instructions
 for using the zipped file to stage method:
   - Go to the Emerging Solutions Toolbox Github Repository and download a zipped file
-  of the repository.Image
+  of the repository.
   - Go to the Forecast Model Builder Deployment Notebook and run the DEPLOYMENT cell in
   the notebook. This cell will create a stage if it doesn't already exist named
   FORECAST_MODEL_BUILDER.BASE.NOTEBOOK_TEMPLATES.
