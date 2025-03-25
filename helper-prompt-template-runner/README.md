@@ -29,7 +29,7 @@ The configuration file currently supports the below elements in the top-level `p
 | `column_variables` | Objects mapping variable and **column** replacement value in prompt. |
 | `origin_table` | Table against which Cortex Complete will be called. |
 | `model` | Cortex Complete [model string](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex#arguments). |
-| `model_options` | Object specifiying zero or more [model hyperparameters](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex#arguments). |
+| `model_options` | Object specifying zero or more [model hyperparameters](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex#arguments). |
 
 Here is an example of a YAML prompt configuration file:
 ```yaml
