@@ -2,21 +2,14 @@
 import streamlit as st
 
 from snowflake.snowpark.context import get_active_session
-from snowflake.connector.pandas_tools import pd_writer
-import snowflake.snowpark.functions as F
 from abc import ABC, abstractmethod
-import base64
 import datetime
 import json
 import pandas as pd
-import plotly.figure_factory as ff
 import plotly.express as px
-import plotly.graph_objects as go
-import random
 import re
 import sqlparse
-from sqlparse.sql import IdentifierList, Identifier
-from sqlparse.tokens import Keyword, DML
+from sqlparse.sql import Identifier
 import time
 import utils.utils as u
 

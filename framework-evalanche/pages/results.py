@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 from snowflake.snowpark import DataFrame
 from streamlit_extras.row import row
-import snowflake.snowpark.functions as F
 
 from src.app_utils import (
     render_sidebar, 

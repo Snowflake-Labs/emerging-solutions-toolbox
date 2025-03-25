@@ -383,7 +383,6 @@ def add_to_selected_metrics(metric_name: str) -> None:
 
 def new_eval_section() -> None:
     """Renders the New Evaluations section of the home page."""
-    import uuid
     metric_display = fetch_metric_display()
 
     with st.container(border=True):

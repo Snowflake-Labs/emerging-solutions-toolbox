@@ -4,9 +4,7 @@ from snowflake.snowpark.context import get_active_session
 import snowflake.permissions as permissions;
 from abc import ABC, abstractmethod
 import streamlit as st
-import base64
 import json
-from PIL import Image
 import pandas as pd
 
 

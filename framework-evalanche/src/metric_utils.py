@@ -1,7 +1,6 @@
 # Python 3.8 type hints
 from typing import Dict, List, Optional
 
-import pandas as pd
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
 
@@ -58,7 +57,6 @@ def run_metric(
     import multiprocessing
 
     from joblib import Parallel, delayed
-    import streamlit as st
 
     pandas_df = metric_result_data.to_pandas()
     # Parallel processing for each row in the dataframe
