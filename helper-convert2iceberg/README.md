@@ -15,7 +15,7 @@ Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake 
         - Convert2Iceberg can be used to create an `EXTERNAL VOLUME`.
 
 ## Installation
-This repo includes the `c2i_install` notebook, located in the `installer/` directory, that installs the Convert2Iceberg SiS app. The notebook should be imported in the appicable Snowflake account and executed, using the desired role. Refer to the notebook for more details.
+This repo includes the `c2i_install` notebook, located in the `installer/` directory, that installs the Convert2Iceberg SiS app. The notebook should be imported in the applicable Snowflake account and executed, using the desired role. Refer to the notebook for more details.
 
 **NOTE:** the `c2i_install` notebook is standalone and always references the latest version of Convert2Iceberg. This allows the notebook to be distributed separately from the full repo.
 
