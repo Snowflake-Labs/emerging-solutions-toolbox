@@ -1,7 +1,7 @@
 from abc import ABC
 
 # Python 3.8 type hints
-from typing import Dict, Union, Optional
+from typing import Dict, Optional, Union
 
 from src.prompts import *
 from src.snowflake_utils import run_async_sql_complete

@@ -1,11 +1,11 @@
 # Import python packages
+import json
+from abc import ABC, abstractmethod
+
+import pandas as pd
+import snowflake.permissions as permissions
 import streamlit as st
 from snowflake.snowpark.context import get_active_session
-import snowflake.permissions as permissions;
-from abc import ABC, abstractmethod
-import streamlit as st
-import json
-import pandas as pd
 
 
 # Sets the page based on page name

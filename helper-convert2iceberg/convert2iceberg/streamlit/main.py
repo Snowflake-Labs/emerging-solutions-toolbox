@@ -1,17 +1,17 @@
 # Import python packages
-import streamlit as st
-
-from snowflake.snowpark.context import get_active_session
-from abc import ABC, abstractmethod
 import datetime
 import json
+import re
+import time
+from abc import ABC, abstractmethod
+
 import pandas as pd
 import plotly.express as px
-import re
 import sqlparse
-from sqlparse.sql import Identifier
-import time
+import streamlit as st
 import utils.utils as u
+from snowflake.snowpark.context import get_active_session
+from sqlparse.sql import Identifier
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
