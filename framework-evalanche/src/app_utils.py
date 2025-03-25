@@ -139,7 +139,7 @@ def add_metric_to_table(session: Session,
                         ):
     """Adds metric to CUSTOM_METRICS table in Snowflake."""
     import datetime
-    from snowflake.snowpark.functions import current_timestamp, when_matched, when_not_matched
+    from snowflake.snowpark.functions import when_matched, when_not_matched
     
     metric_table = session.table(table_name)
     metric_columns = metric_table.columns

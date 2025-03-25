@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 
 # Python 3.8 type hints
 from typing import Dict, Union, Optional

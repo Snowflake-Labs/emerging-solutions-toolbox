@@ -20,14 +20,12 @@ from src.app_utils import (
     test_complete,
     set_session_var_to_none,
     MENU_ITEMS,
-    fetch_metrics,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
     get_connection,
     join_data,
     add_row_id,
-    STAGE_NAME,
 )
 
 TITLE = "Data Selection"
