@@ -240,8 +240,15 @@ def expand_datetime(
         The DataFrame with the expanded datetime columns.
 
     """
+    # First ensure that the time period column is TimestampType so that we can do the hour, minute, and second calculations
+    input_col_names = input_sdf.columns
+    sdf_engineered = input_sdf.with_column(
+        time_period_column, F.col(time_period_column).cast(T.TimestampType())
+    ).select(input_col_names)
+
+    # Calculate the temporal components
     sdf_engineered = (
-        input_sdf.with_column("YEAR", F.year(time_period_column))
+        sdf_engineered.with_column("YEAR", F.year(time_period_column))
         .with_column("MONTH", F.month(time_period_column))
         .with_column("WEEK_OF_YEAR", F.weekofyear(time_period_column))
         .with_column("DAY_OF_WEEK", F.dayofweek(time_period_column))
