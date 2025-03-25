@@ -1,10 +1,9 @@
-from typing import Optional, Union, Any
 import datetime
 import logging
+from typing import Any, Optional, Union
 
 import snowflake.snowpark.functions as F
-from snowflake.snowpark import DataFrame
-from snowflake.snowpark import Session
+from snowflake.snowpark import DataFrame, Session
 
 major, minor = 1, 2
 QUERY_TAG = {

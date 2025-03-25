@@ -1,13 +1,11 @@
 # Python 3.8 type hints
-from typing import Any, Dict, List, Optional
 import time
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
-from streamlit_extras.grid import grid
-from streamlit_extras.row import row
-from streamlit_extras.stylable_container import stylable_container
-
 from src.app_utils import (
+    ABOUT,
+    MENU_ITEMS,
     css_yaml_editor,
     fetch_evals,
     fetch_metric_display,
@@ -15,19 +13,18 @@ from src.app_utils import (
     get_metric_preview,
     render_sidebar,
     set_session_var_to_none,
-    MENU_ITEMS,
-    ABOUT,
 )
 from src.snowflake_utils import (
     AUTO_EVAL_TABLE,
+    CUSTOM_METRIC_TABLE,
     SAVED_EVAL_TABLE,
     STAGE_NAME,
-    CUSTOM_METRIC_TABLE,
-)
-from src.snowflake_utils import (
     call_sproc,
     get_connection,
 )
+from streamlit_extras.grid import grid
+from streamlit_extras.row import row
+from streamlit_extras.stylable_container import stylable_container
 
 TITLE = "⛰️Evalanche: GenAI Evaluation"
 INSTRUCTIONS = """
@@ -63,16 +60,16 @@ render_sidebar()
                         width="large")
 def add_new_metric():
     from src.app_utils import (
-        select_model,
-        vars_entry,
-        upload_staged_pickle,
         add_metric_to_table,
+        select_model,
+        upload_staged_pickle,
+        vars_entry,
     )
     from src.metric_utils import (
-        create_custom_metric,
         DEFAULT_CUSTOM_METRIC_DESC,
         DEFAULT_CUSTOM_METRIC_NAME,
         DEFAULT_CUSTOM_METRIC_PROMPT,
+        create_custom_metric,
     )
     from src.metrics import provided_metrics
     
@@ -383,7 +380,6 @@ def add_to_selected_metrics(metric_name: str) -> None:
 
 def new_eval_section() -> None:
     """Renders the New Evaluations section of the home page."""
-    import uuid
     metric_display = fetch_metric_display()
 
     with st.container(border=True):
