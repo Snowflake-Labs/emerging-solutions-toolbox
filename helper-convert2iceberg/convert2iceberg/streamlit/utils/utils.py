@@ -1,8 +1,10 @@
-import streamlit as st
 import base64
+
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
+import streamlit as st
+
 
 def render_image(image: str):
     image_name = f'{image}'

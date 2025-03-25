@@ -3,11 +3,10 @@ from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
 from snowflake.snowpark import Session
-
 from src.metrics import Metric
 from src.snowflake_utils import (
-    get_connection,
     CUSTOM_METRIC_TABLE,
+    get_connection,
     models,
 )
 
@@ -92,8 +91,9 @@ def test_complete(session, model, prompt = "Repeat the word hello once and only 
         
 def upload_staged_pickle(session: Session, instance: Any, file_name: str, stage_name: str) -> None:
     """Pickles object and uploads to Snowflake stage."""
-    import cloudpickle as pickle
     import os
+
+    import cloudpickle as pickle
 
     # Pickle the instance
     with open(file_name, "wb") as f:
@@ -139,6 +139,7 @@ def add_metric_to_table(session: Session,
                         ):
     """Adds metric to CUSTOM_METRICS table in Snowflake."""
     import datetime
+
     from snowflake.snowpark.functions import when_matched, when_not_matched
     
     metric_table = session.table(table_name)
@@ -221,8 +222,7 @@ def fetch_metrics(session: Session,
 def fetch_metric_display() -> List[Dict[str, Any]]:
     """Combines metrics and custom metrics displays, if any, and returns list of displays."""
 
-    from src.metrics import metric_display
-    from src.metrics import provided_metrics
+    from src.metrics import metric_display, provided_metrics
 
 
     custom_metrics = [metric for metric in st.session_state['all_metrics'] 

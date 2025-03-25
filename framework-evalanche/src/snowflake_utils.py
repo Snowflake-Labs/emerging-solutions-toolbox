@@ -1,10 +1,10 @@
 # Python 3.8 type hints
 from typing import Any, Dict, Optional, Union
 
+import pandas as pd
 import streamlit as st
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
-import pandas as pd
 
 SAVED_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.SAVED_EVALUATIONS"
 AUTO_EVAL_TABLE = "GENAI_UTILITIES.EVALUATION.AUTO_EVALUATIONS"

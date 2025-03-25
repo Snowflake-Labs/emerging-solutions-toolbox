@@ -3,11 +3,9 @@ from typing import Dict, List, Optional
 
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
-
 from src.app_utils import format_query_tag
-from src.metrics import Metric, AnswerRelevancy
+from src.metrics import AnswerRelevancy, Metric
 from src.snowflake_utils import QUERY_TAG
-
 
 DEFAULT_CUSTOM_METRIC_NAME = "MyRelevancy"
 DEFAULT_CUSTOM_METRIC_DESC = AnswerRelevancy().description
@@ -456,7 +454,6 @@ def get_stream_inserts_sql(
     """
 
     from snowflake.snowpark.functions import col
-
     from src.snowflake_utils import get_sql
 
     df = session.table(stream_name).filter(col("METADATA$ACTION") == "INSERT")

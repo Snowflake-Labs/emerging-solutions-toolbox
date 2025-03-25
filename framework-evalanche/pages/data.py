@@ -2,31 +2,30 @@ import time
 from collections import OrderedDict
 
 # Python 3.8 type hints
-from typing import List, Union, Dict, Tuple, Any
+from typing import Any, Dict, List, Tuple, Union
 
+import snowflake.snowpark.functions as F
 import streamlit as st
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark.session import Session
-from streamlit_extras.row import row
-from streamlit_extras.stylable_container import stylable_container
-import snowflake.snowpark.functions as F
-
 from src.app_utils import (
+    MENU_ITEMS,
     css_yaml_editor,
     fetch_columns,
     render_sidebar,
-    table_data_selector,
     select_model,
-    test_complete,
     set_session_var_to_none,
-    MENU_ITEMS,
+    table_data_selector,
+    test_complete,
 )
 from src.metric_utils import metric_runner
 from src.snowflake_utils import (
+    add_row_id,
     get_connection,
     join_data,
-    add_row_id,
 )
+from streamlit_extras.row import row
+from streamlit_extras.stylable_container import stylable_container
 
 TITLE = "Data Selection"
 
@@ -257,10 +256,9 @@ def pipeline_runner(
     """
 
     import multiprocessing
+
     from joblib import Parallel, delayed
-
     from snowflake.snowpark.functions import lit
-
     from src.snowflake_utils import add_row_id, save_eval_to_table
 
     df = add_row_id(session.table(input_tablename))
@@ -311,7 +309,12 @@ def pipeline_runner(
 def pipeline_runner_dialog() -> None:
     """Dialog to run reference data through LLM pipeline and record results for evaluation."""
 
-    from src.app_utils import get_sprocs, select_schema_context, get_stages, get_semantic_models
+    from src.app_utils import (
+        get_semantic_models,
+        get_sprocs,
+        get_stages,
+        select_schema_context,
+    )
 
 
     st.write("""Have reference questions or inputs but still need to run them through your LLM pipeline?

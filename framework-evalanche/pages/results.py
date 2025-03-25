@@ -1,26 +1,25 @@
 import time
 
 # Python 3.8 type hints
-from typing import Tuple, Union, Optional, Dict
+from typing import Dict, Optional, Tuple, Union
 
 import pandas as pd
 import streamlit as st
 from snowflake.snowpark import DataFrame
-from streamlit_extras.row import row
-
 from src.app_utils import (
-    render_sidebar, 
-    select_model, 
     MENU_ITEMS,
-)
-from src.snowflake_utils import (
-    save_eval_to_table,
-    AUTO_EVAL_TABLE, 
-    SAVED_EVAL_TABLE, 
-    STAGE_NAME,
-    run_async_sql_to_dataframe,
+    render_sidebar,
+    select_model,
 )
 from src.metrics import Metric, SQLResultsAccuracy
+from src.snowflake_utils import (
+    AUTO_EVAL_TABLE,
+    SAVED_EVAL_TABLE,
+    STAGE_NAME,
+    run_async_sql_to_dataframe,
+    save_eval_to_table,
+)
+from streamlit_extras.row import row
 
 
 def get_result_title() -> str:
@@ -364,7 +363,7 @@ def analyze_result(prompt_inputs: Dict[str, str],
     """
 
     from src.prompts import Recommendation_prompt
-    from src.snowflake_utils import run_async_sql_complete, get_connection
+    from src.snowflake_utils import get_connection, run_async_sql_complete
 
     # Re-establish session in session state as it seems to be lost at times in workflow
     if "session" not in st.session_state:
@@ -395,6 +394,7 @@ def run_full_result_analysis():
     Rows are analyzed in parallel to speed up the process."""
 
     import multiprocessing
+
     from joblib import Parallel, delayed
 
     metric_cols = get_metric_cols(st.session_state.get("result_data", None))
