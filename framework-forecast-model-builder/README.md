@@ -1,49 +1,111 @@
-# Forecast Model Builder
+# ML-Forecasting-Incubator
 
-The Forecast Model Builder helps with the process of building an end-to-end Snowflake
-Notebook-based forecasting solution for your time series data including:
+-----------------------------------------------
 
-- Performing Exploratory Data Analysis on your time series data
-- Executing feature engineering, advanced modeling, and model registration for your
-single or multi-series partitioned data
-- Running inferencing against the models stored in the registry
+# Deployment Notebook Instructions
 
-For examples, please review the [Quickstart](https://quickstarts.snowflake.com/guide/building_scalable_time_series_forecasting_models_on_snowflake/index.html#0)
-and the [Medium article](https://medium.com/@rachel.blum_83237/c389e108f0be). 
+## Overview
 
-## Architecture
+FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** solution into your **Snowflake** account. Several objects, including solution notebooks and a demo dataset, will be created.
 
-![image](https://github.com/user-attachments/assets/fbcb05dc-d307-4e23-8cd4-d1f8c99dd6c3)
+- In **Cell 1** you **establish the deployment settings**.  There are 4 user constants that can be set:
+  - `DEPLOYMENT_WH`
+  - `SOLUTION_DB`
+  - `SOLUTION_BASE_SCHEMA`
+  - `DEPLOYMENT_STAGE` <br>
 
-## Installation/Setup
+- **Cell 2** will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration. <br>
 
-1. Download from GitHub and then import the Forecast_Model_Builder_Deployment.ipynb
-notebook to Snowsight.
+- In **Cell 3, you create a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference).
 
-2. Follow the documented instructions in the Deployment notebook. Here are instructions
-for using the zipped file to stage method:
-  - Go to the Emerging Solutions Toolbox Github Repository and download a zipped file
-  of the repository.
-  - Go to the Forecast Model Builder Deployment Notebook and run the DEPLOYMENT cell in
-  the notebook. This cell will create a stage if it doesn't already exist named
-  FORECAST_MODEL_BUILDER.BASE.NOTEBOOK_TEMPLATES.
-  - Upload a zipped copy of the Forecast Model Builder Github Repository to that stage. 
-  - Re-run the DEPLOYMENT cell
-  - You should see the success message of "FORECAST_MODEL_BUILDER fully deployed!"
-  - Run the cell PROJECT_DEPLOY.
-  - Set your project name. Each project gets own schema and set of notebooks and each
-  notebook will be prefixed with the Project Name.
-  - Click the Create button and go back to the main Notebooks page.
-3. The project name you provide will be the prefix for the notebooks and the schema
-name that are created in this deployment
-4. The solution including three notebooks (eda, modeling and inference) will be created
-within your new named schema (<YOUR_PROJECT_NAME>).
+
+## Instructions
+
+The instructions vary depending on the privileges granted to the user running this deployment notebook. Follow the instructions that match your level of access.
+
+### Option 1 (Fastest):
+**If your role has privileges to CREATE DATABASE …**
+1. In **Cell 1** you can leave the user constants set to their default values, and the notebook will create objects with the names established. It is fine to specify an already-existing warehouse to use instead of a new one to create. If your role does not have privileges to create a warehouse, then you must specify an existing one.
+2. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+3. In the input box below **Cell 3**, name your forecasting project. **Run Cell 3**. This will create a project schema and the three notebooks in that schema.
+
+
+### Option 2:
+**If your role CANNOT have privileges to CREATE DATABASE but CAN be granted privileges to CREATE SCHEMA …**
+1. Ask a Snowflake database administrator (DBA) to create or grant access to a **database** for the solution. It is easiest if the DBA can **GRANT OWNERSHIP** on that **database** to your role.
+   ```sql
+   CREATE DATABASE IF NOT EXISTS <SOLUTION_DB>;
+   ```
+   If your role cannot be granted ownership of the database, you will need the following privileges:
+   ```sql
+   GRANT USAGE ON DATABASE <SOLUTION_DB> TO ROLE <role>;
+   GRANT CREATE SCHEMA ON DATABASE <SOLUTION_DB> TO ROLE <role>;
+   ```
+2. Outside of the deployment notebook, you need to create a **base schema** and **stage**. <br>
+(You will list these object names in the SOLUTION_BASE_SCHEMA and DEPLOYMENT_STAGE constants in Cell 1.)
+   ```sql
+   CREATE SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>;
+   CREATE STAGE <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>.<DEPLOYMENT_STAGE>;
+   ```
+3. In **Cell 1** specify this database, schema, and stage, and an existing warehouse for the four user constants. **Run Cell 1**.
+4. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+5. In the input box below **Cell 3**, name your forecasting project. **Run Cell 3**. This will create a project schema and the three notebooks in that schema.
+
+### Option 3:
+**If your role CANNOT have privileges to CREATE SCHEMA …**
+
+If your role has not been granted the privilege to CREATE SCHEMA on an existing database, you must use existing schemas for each new project.
+
+NOTE: Caution must be applied when using this approach. This deployment notebook tries to create new solution notebooks for each new forecasting project, but it will not be able to create future project notebooks if ones with the same names already exist in the specified schema. Additionally, the solution notebooks create tables, and the user must be careful not to give future models the same names as past models. For this reason, it is **highly recommended that each forecasting project be given its own schema**.
+
+1. A database, solution base schema, solution base stage, and project schema are required. If not available, ask a Snowflake database administrator (DBA) to create or grant access to the following objects:
+   ```sql
+   CREATE DATABASE IF NOT EXISTS <SOLUTION_DB>;
+   CREATE SCHEMA IF NOT EXISTS <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>;
+   CREATE STAGE IF NOT EXISTS <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>.<DEPLOYMENT_STAGE>;
+   CREATE SCHEMA IF NOT EXISTS <SOLUTION_DB>.<PROJECT_SCHEMA>;
+   ```
+2. Your role will need the following privileges granted by a DBA:
+   ```sql
+   GRANT USAGE ON DATABASE <SOLUTION_DB> TO ROLE <role>;
+
+   -- Solution Base Schema
+   GRANT USAGE ON SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT CREATE TABLE ON SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT CREATE FILE FORMAT ON SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT CREATE PROCEDURE ON SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT SELECT ON FUTURE TABLES IN SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT SELECT ON FUTURE VIEWS IN SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT USAGE ON FUTURE FUNCTIONS IN SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+   GRANT USAGE ON FUTURE PROCEDURES IN SCHEMA <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA> TO ROLE <role>;
+
+   -- Deployment Stage
+   GRANT READ, WRITE ON STAGE <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>.<DEPLOYMENT_STAGE> TO ROLE <role>;
+
+   -- Project Schema
+   GRANT USAGE ON SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT CREATE NOTEBOOK ON SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT CREATE TABLE ON SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT CREATE FUNCTION ON SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT CREATE MODEL ON SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT USAGE ON FUTURE FUNCTIONS IN SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   GRANT USAGE ON FUTURE MODELS IN SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
+   ```
+3. In **Cell 1** of the deployment notebook, specify an existing warehouse, database, schema, and stage for the four user constants. **Run Cell 1**.
+4. In **Cell 2**, open the code and comment out this line near the bottom:
+   ```python
+   session.sql(create_schema_sql).collect()
+   ```
+5. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+6. In the input box below **Cell 3**, choose an existing schema name as your project name (e.g.\<PROJECT_SCHEMA\>). <br>
+**NOTE:** You must choose a different schema than the one specified in the SOLUTION_BASE_SCHEMA constant.
+7. **Run Cell 3**. This will create the 3 notebooks in the schema you specified. <br>
+REMINDER: if you specify the same schema for a future project, this cell will not be able to create new solution notebooks if you haven’t renamed the old notebooks in that schema.
+
+-----------------------------------------------
 
 ## Support Notice
-
-All sample code is provided for reference purposes only. Please note that this code is
-provided “AS IS” and without warranty.  Snowflake will not offer any support for use of
-the sample code.
+All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
 
 Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
