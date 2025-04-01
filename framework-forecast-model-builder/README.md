@@ -1,4 +1,10 @@
-# ML-Forecasting-Incubator
+# Forecast Model Builder
+
+Forecast Model Builder is a notebook-based solution that simplifies the process of training and deploying time-series forecast models in Snowflake.
+[Click here](https://quickstarts.snowflake.com/guide/building_scalable_time_series_forecasting_models_on_snowflake/index.html#0) to walk through a Quickstart of the solution.
+<br>
+<br>
+
 
 -----------------------------------------------
 
@@ -6,15 +12,16 @@
 
 ## Overview
 
-FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** solution into your **Snowflake** account. Several objects, including solution notebooks and a demo dataset, will be created.
+FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** solution into your **Snowflake** account. Several objects, including solution notebooks and a demo dataset, will be created. To get started download the [.ipynb file](https://github.com/Snowflake-Labs/emerging-solutions-toolbox/blob/main/framework-forecast-model-builder/FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb) from the repo and import the notebook into Snowsight. (For instructions on how to create a new Snowflake Notebook from an existing file, please see [this documentation](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks-create#create-a-new-notebook) and follow the instructions for creating a notebook from an existing file.)
 
-- In **Cell 1** you **establish the deployment settings**.  There are 4 user constants that can be set:
+- In **Cell 1** of the deployment notebook you **establish the deployment settings**.  There are 4 user constants that can be set:
   - `DEPLOYMENT_WH`
   - `SOLUTION_DB`
   - `SOLUTION_BASE_SCHEMA`
   - `DEPLOYMENT_STAGE` <br>
 
-- **Cell 2** will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration. <br>
+- **Cell 2** will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration.<br>
+This cell will also store mock time series data in a Snowflake table named \<`SOLUTION_DB`\>.\<`SOLUTION_BASE_SCHEMA`\>.DAILY_PARTITIONED_SAMPLE_DATA.<br>
 
 - In **Cell 3, you create a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference).
 
@@ -26,7 +33,7 @@ The instructions vary depending on the privileges granted to the user running th
 ### Option 1 (Fastest):
 **If your role has privileges to CREATE DATABASE …**
 1. In **Cell 1** you can leave the user constants set to their default values, and the notebook will create objects with the names established. It is fine to specify an already-existing warehouse to use instead of a new one to create. If your role does not have privileges to create a warehouse, then you must specify an existing one.
-2. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+2. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. (To stage a zip file, see [File Staging Instructions](#file-staging-instructions) below.) Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
 3. In the input box below **Cell 3**, name your forecasting project. **Run Cell 3**. This will create a project schema and the three notebooks in that schema.
 
 
@@ -48,7 +55,7 @@ The instructions vary depending on the privileges granted to the user running th
    CREATE STAGE <SOLUTION_DB>.<SOLUTION_BASE_SCHEMA>.<DEPLOYMENT_STAGE>;
    ```
 3. In **Cell 1** specify this database, schema, and stage, and an existing warehouse for the four user constants. **Run Cell 1**.
-4. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+4. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. (To stage a zip file, see [File Staging Instructions](#file-staging-instructions) below.) Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
 5. In the input box below **Cell 3**, name your forecasting project. **Run Cell 3**. This will create a project schema and the three notebooks in that schema.
 
 ### Option 3:
@@ -96,11 +103,27 @@ NOTE: Caution must be applied when using this approach. This deployment notebook
    ```python
    session.sql(create_schema_sql).collect()
    ```
-5. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
-6. In the input box below **Cell 3**, choose an existing schema name as your project name (e.g.\<PROJECT_SCHEMA\>). <br>
-**NOTE:** You must choose a different schema than the one specified in the SOLUTION_BASE_SCHEMA constant.
+5. **Run Cell 2**. If the Emerging Solution Toolbox files have not already been deployed, you will be prompted to either stage the zip file or use a git integration. (To stage a zip file, see [File Staging Instructions](#file-staging-instructions) below.) Once everything is deployed, **re-run Cell 2**. You should see 4 check marks.
+6. In the input box below **Cell 3**, choose an existing schema name as your project name (e.g.\<`PROJECT_SCHEMA`\>). <br>
+**NOTE:** You must choose a different schema than the one specified in the `SOLUTION_BASE_SCHEMA` constant.
 7. **Run Cell 3**. This will create the 3 notebooks in the schema you specified. <br>
 REMINDER: if you specify the same schema for a future project, this cell will not be able to create new solution notebooks if you haven’t renamed the old notebooks in that schema.
+
+<br>
+
+-----------------------------------------------
+
+# File Staging Instructions
+
+If you choose to stage a zip file when prompted by Cell 2 of the deployment notebook, follow these steps:
+
+1. Download a zipped file of the entire [Emerging Solutions Toolbox](https://github.com/Snowflake-Labs/emerging-solutions-toolbox) GitHub repository.
+![Alt text](assets/screenshot_dowload_zip.png)
+
+2. Upload the zip file to \<`DEPLOYMENT_STAGE`\>.
+![Alt text](assets/screenshot_upload_zip.png)
+
+<br>
 
 -----------------------------------------------
 
