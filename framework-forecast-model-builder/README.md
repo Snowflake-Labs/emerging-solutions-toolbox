@@ -1,6 +1,6 @@
 # Forecast Model Builder
 
-Forecast Model Builder is a notebook-based solution that simplifies the process of training and deploying time-series forecast models in Snowflake.
+Forecast Model Builder is a notebook-based solution that simplifies the process of training and deploying time-series forecast models in Snowflake. <br>
 [Click here](https://quickstarts.snowflake.com/guide/building_scalable_time_series_forecasting_models_on_snowflake/index.html#0) to walk through a Quickstart of the solution.
 <br>
 <br>
@@ -14,7 +14,7 @@ Forecast Model Builder is a notebook-based solution that simplifies the process 
 
 FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** solution into your **Snowflake** account. Several objects, including solution notebooks and a demo dataset, will be created. To get started download the [.ipynb file](https://github.com/Snowflake-Labs/emerging-solutions-toolbox/blob/main/framework-forecast-model-builder/FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb) from the repo and import the notebook into Snowsight. (For instructions on how to create a new Snowflake Notebook from an existing file, please see [this documentation](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks-create#create-a-new-notebook) and follow the instructions for creating a notebook from an existing file.)
 
-- In **Cell 1** of the deployment notebook you **establish the deployment settings**.  There are 4 user constants that can be set:
+- **Cell 1** of the deployment notebook allows you to **establish the deployment settings**.  There are 4 user constants that can be set:
   - `DEPLOYMENT_WH`
   - `SOLUTION_DB`
   - `SOLUTION_BASE_SCHEMA`
@@ -23,12 +23,26 @@ FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** s
 - **Cell 2** will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration.<br>
 This cell will also store mock time series data in a Snowflake table named \<`SOLUTION_DB`\>.\<`SOLUTION_BASE_SCHEMA`\>.DAILY_PARTITIONED_SAMPLE_DATA.<br>
 
-- In **Cell 3, you create a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference).
+- **Cell 3 creates a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference). <br>
+<br>
 
+Once setup is complete you will see the following database and associated objects:
 
-## Instructions
+- <`SOLUTION_DB`>
+   - <`SOLUTION_BASE_SCHEMA`>
+      - **Tables** <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DAILY_PARTITIONED_SAMPLE_DATA
+      - **Stages** <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<`DEPLOYMENT_STAGE`>
+      - **Procedures** <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATE_PROJECT(VARCHAR, VARCHAR)
+   - <`PROJECT_SCHEMA`>
 
-The instructions vary depending on the privileges granted to the user running this deployment notebook. Follow the instructions that match your level of access.
+You can start using the **Forecast Model Builder** solution by running the **Snowflake Notebooks** that were created during the deployment process.
+
+## Deployment Steps
+
+The **instructions** vary depending on the privileges granted to the user running this deployment notebook. Follow the instructions that match your level of access.
 
 ### Option 1 (Fastest):
 **If your role has privileges to CREATE DATABASE …**
