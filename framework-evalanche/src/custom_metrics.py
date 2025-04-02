@@ -1,9 +1,6 @@
 # Python 3.8 type hints
-from typing import Union, Optional
 
-from src.metrics import Metric
 from src.prompts import *
-from src.snowflake_utils import run_async_sql_complete
 
 """
 The below commented code is an example of a custom metric that can be added to the Evalanche.
