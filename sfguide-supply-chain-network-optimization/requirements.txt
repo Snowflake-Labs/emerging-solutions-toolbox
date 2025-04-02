@@ -1,0 +1,8 @@
+streamlit
+pyarrow
+snowflake-connector-python
+snowflake-snowpark-python
+pandas
+cryptography
+pulp
+faker
