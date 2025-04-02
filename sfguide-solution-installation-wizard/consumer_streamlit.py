@@ -76,7 +76,9 @@ class SnowflakeScriptRunner:
             comment_code_regex_dash = re.compile(r"(?<!:)--.*")
             comment_code_regex_multi = re.compile(r"(?<!:)(/\*)(.|\n)*?(\*/)")
             snowsql_code_regex = re.compile(r"^(?<!:)!.*")
-            semicolon_not_in_text_block_regex = re.compile(r";(?!\n\$)(?!`)(?!\n\n(snow|ret))(?!')")
+            semicolon_not_in_text_block_regex = re.compile(
+                r";(?!\n\$)(?!`)(?!\n\n(snow|ret))(?!')"
+            )
             original_script = self.original_script
             script_conn = self.script_conn
 
@@ -85,7 +87,9 @@ class SnowflakeScriptRunner:
 
             print("Starting script")
             script_stream_original = io.StringIO(original_script)
-            script_stream_no_multi = io.StringIO(re.sub(comment_code_regex_multi, '', original_script))
+            script_stream_no_multi = io.StringIO(
+                re.sub(comment_code_regex_multi, "", original_script)
+            )
             prepared_script_text = ""
             cleaned_script_text = ""
 
@@ -96,7 +100,7 @@ class SnowflakeScriptRunner:
                     line = line.replace(check, replace)
 
                 # Remove SnowSQL lines to enable easier running in worksheets
-                line = re.sub(snowsql_code_regex, '', line)
+                line = re.sub(snowsql_code_regex, "", line)
 
                 prepared_script_text += line
 
@@ -106,11 +110,11 @@ class SnowflakeScriptRunner:
                     line = line.replace(check, replace)
 
                 # Remove SnowSQL lines to enable easier running in worksheets
-                line = re.sub(snowsql_code_regex, '', line)
+                line = re.sub(snowsql_code_regex, "", line)
 
                 # Remove commented SQL lines
-                line = re.sub(comment_code_regex_slash, '', line)
-                line = re.sub(comment_code_regex_dash, '', line)
+                line = re.sub(comment_code_regex_slash, "", line)
+                line = re.sub(comment_code_regex_dash, "", line)
 
                 cleaned_script_text += line
 
@@ -121,7 +125,9 @@ class SnowflakeScriptRunner:
                 print("Running statements for script")
 
                 # Get statement list
-                statement_list = re.split(semicolon_not_in_text_block_regex, cleaned_script_text)
+                statement_list = re.split(
+                    semicolon_not_in_text_block_regex, cleaned_script_text
+                )
 
                 # Remove nones
                 for j, item in enumerate(statement_list):
@@ -151,8 +157,8 @@ class SnowflakeScriptRunner:
         """
         Prepares scripts to be run manually
         """
-        check_words = [':::']
-        replace_words = ['===']
+        check_words = [":::"]
+        replace_words = ["==="]
 
         for key, value in placeholders.items():
             check_words.append(key)
@@ -169,40 +175,52 @@ snowflake_script_runner = SnowflakeScriptRunner()
 
 # Retrieve some base account information for consumer and provider
 if "current_organization_name" not in st.session_state:
-    st.session_state.current_organization_name = session.sql("select current_organization_name()").collect()[0][0]
+    st.session_state.current_organization_name = session.sql(
+        "select current_organization_name()"
+    ).collect()[0][0]
 
 if "current_account_name" not in st.session_state:
-    st.session_state.current_account_name = session.sql("select current_account_name()").collect()[0][0]
+    st.session_state.current_account_name = session.sql(
+        "select current_account_name()"
+    ).collect()[0][0]
 
 if "current_account_locator" not in st.session_state:
-    st.session_state.current_account_locator = session.sql("select current_account()").collect()[0][0]
+    st.session_state.current_account_locator = session.sql(
+        "select current_account()"
+    ).collect()[0][0]
 
 if "provider_organization_name" not in st.session_state:
-    st.session_state.provider_organization_name = \
-        session.sql("select provider_organization_name from app_shared.provider_account_identifier").collect()[0][0]
+    st.session_state.provider_organization_name = session.sql(
+        "select provider_organization_name from app_shared.provider_account_identifier"
+    ).collect()[0][0]
 
 if "provider_account_name" not in st.session_state:
-    st.session_state.provider_account_name = \
-        session.sql("select provider_account_name from app_shared.provider_account_identifier").collect()[0][0]
+    st.session_state.provider_account_name = session.sql(
+        "select provider_account_name from app_shared.provider_account_identifier"
+    ).collect()[0][0]
 
 if "provider_account_locator" not in st.session_state:
-    st.session_state.provider_account_locator = \
-        session.sql("select provider_account_locator from app_shared.provider_account_identifier").collect()[0][0]
+    st.session_state.provider_account_locator = session.sql(
+        "select provider_account_locator from app_shared.provider_account_identifier"
+    ).collect()[0][0]
 
 if "workflows" not in st.session_state:
     workflows = []
-    for row in session.sql("select distinct workflow_name, workflow_description from "
-                           "app_shared.script").to_local_iterator():
+    for row in session.sql(
+        "select distinct workflow_name, workflow_description from " "app_shared.script"
+    ).to_local_iterator():
         workflows.append([row[0], row[1]])
 
     st.session_state.workflows = workflows
 
 if "placeholders" not in st.session_state:
     placeholders = {}
-    for row in session.sql("select placeholder_text, replacement_value from app_shared.placeholder_definition where "
-                           "consumer_organization_name = current_organization_name() and consumer_account_name = "
-                           "current_account_name()").to_local_iterator():
-        placeholders[row['PLACEHOLDER_TEXT']] = row['REPLACEMENT_VALUE']
+    for row in session.sql(
+        "select placeholder_text, replacement_value from app_shared.placeholder_definition where "
+        "consumer_organization_name = current_organization_name() and consumer_account_name = "
+        "current_account_name()"
+    ).to_local_iterator():
+        placeholders[row["PLACEHOLDER_TEXT"]] = row["REPLACEMENT_VALUE"]
 
     st.session_state.placeholders = placeholders
 
@@ -221,8 +239,12 @@ def set_default_sidebar():
     with st.sidebar:
         st.title("Solution Installation Wizard")
         st.markdown("")
-        st.markdown("This application helps consumers deploy apps from a provider in a secure, transparent way.")
-        st.markdown("Typically, the deployed app is meant to be listed back to the original provider.")
+        st.markdown(
+            "This application helps consumers deploy apps from a provider in a secure, transparent way."
+        )
+        st.markdown(
+            "Typically, the deployed app is meant to be listed back to the original provider."
+        )
         st.markdown("")
         st.markdown("")
         st.markdown("")
@@ -230,8 +252,8 @@ def set_default_sidebar():
             # reset pages to default to ensure old workflow pages are cleared
             pages = [OverviewPage()]
             st.session_state.pages = pages
-            set_page('Overview')
-            st.experimental_rerun()
+            set_page("Overview")
+            st.rerun()
 
 
 class Page(ABC):
@@ -288,8 +310,16 @@ class OverviewPage(Page):
         set_default_sidebar()
 
 
-def set_dynamic_page(progress_percent, next_page, script_name, script_order, is_autorun,
-                     is_autorun_code_visible, script_description, script_text):
+def set_dynamic_page(
+    progress_percent,
+    next_page,
+    script_name,
+    script_order,
+    is_autorun,
+    is_autorun_code_visible,
+    script_description,
+    script_text,
+):
     st.title("Step " + str(script_order) + " - " + script_name)
     st.progress(progress_percent)
     st.subheader("Step Description: " + script_description)
@@ -318,12 +348,16 @@ def set_dynamic_page(progress_percent, next_page, script_name, script_order, is_
 
             if submitted:
                 with st.spinner("Running script..."):
-                    snowflake_script_runner.prepare(session, is_autorun, script_text, placeholders)
+                    snowflake_script_runner.prepare(
+                        session, is_autorun, script_text, placeholders
+                    )
                     snowflake_script_runner.execute()
 
                 st.success("Script run successfully!", icon="✅")
     else:
-        st.caption("Please copy, paste, and run the following script in a SnowSight worksheet.")
+        st.caption(
+            "Please copy, paste, and run the following script in a SnowSight worksheet."
+        )
         st.code(prepared_script, line_numbers=True)
 
     if next_page == "Overview":
@@ -332,11 +366,16 @@ def set_dynamic_page(progress_percent, next_page, script_name, script_order, is_
             # reset pages to default to ensure old workflow pages are cleared
             pages = [OverviewPage()]
             st.session_state.pages = pages
-            set_page('Overview')
-            st.experimental_rerun()
+            set_page("Overview")
+            st.rerun()
     else:
         st.caption("Once run, please hit Next to proceed")
-        st.button(label="Next", help="To the next workflow step", on_click=set_page, args=(next_page,))
+        st.button(
+            label="Next",
+            help="To the next workflow step",
+            on_click=set_page,
+            args=(next_page,),
+        )
 
 
 def launch_workflow(selected_workflow):
@@ -344,7 +383,10 @@ def launch_workflow(selected_workflow):
 
     script_rows = session.sql(
         "select distinct script_name, script_order, is_autorun, is_autorun_code_visible, script_description, "
-        "script_text from app_shared.script where workflow_name = '" + selected_workflow + "'").collect()
+        "script_text from app_shared.script where workflow_name = '"
+        + selected_workflow
+        + "'"
+    ).collect()
 
     script_count = len(script_rows)
 
@@ -363,25 +405,35 @@ def launch_workflow(selected_workflow):
         else:
             next_page = f"Workflow {index + 1}"
 
-        script_name = row['SCRIPT_NAME']
-        script_order = row['SCRIPT_ORDER']
-        is_autorun = row['IS_AUTORUN']
-        is_autorun_code_visible = row['IS_AUTORUN_CODE_VISIBLE']
-        script_description = row['SCRIPT_DESCRIPTION']
-        script_text = row['SCRIPT_TEXT']
+        script_name = row["SCRIPT_NAME"]
+        script_order = row["SCRIPT_ORDER"]
+        is_autorun = row["IS_AUTORUN"]
+        is_autorun_code_visible = row["IS_AUTORUN_CODE_VISIBLE"]
+        script_description = row["SCRIPT_DESCRIPTION"]
+        script_text = row["SCRIPT_TEXT"]
 
         dynamic_class_definition = {
             "__init__": Page_init,
-            "print_page": eval("lambda self: set_dynamic_page("
-                               + str(progress_percent) + ",'"
-                               + next_page + "','"
-                               + script_name + "',"
-                               + script_order + ","
-                               + str(is_autorun) + ","
-                               + str(is_autorun_code_visible) + ",'''"
-                               + script_description + "''','''"
-                               + script_text + "''')"),
-            "print_sidebar": lambda self: set_default_sidebar()
+            "print_page": eval(
+                "lambda self: set_dynamic_page("
+                + str(progress_percent)
+                + ",'"
+                + next_page
+                + "','"
+                + script_name
+                + "',"
+                + script_order
+                + ","
+                + str(is_autorun)
+                + ","
+                + str(is_autorun_code_visible)
+                + ",'''"
+                + script_description
+                + "''','''"
+                + script_text
+                + "''')"
+            ),
+            "print_sidebar": lambda self: set_default_sidebar(),
         }
 
         dynamic_class = type(page_class_name, (Page,), dynamic_class_definition)
@@ -392,10 +444,10 @@ def launch_workflow(selected_workflow):
 
     st.session_state.pages = pages
 
-    set_page('Workflow 1')
+    set_page("Workflow 1")
 
     # Rerun page with set page to prevent double click
-    st.experimental_rerun()
+    st.rerun()
 
 
 # Set starting set of pages

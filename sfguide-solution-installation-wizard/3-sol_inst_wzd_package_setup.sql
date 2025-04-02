@@ -337,7 +337,7 @@ def set_default_sidebar():
             pages = [OverviewPage()]
             st.session_state.pages = pages
             set_page('Overview')
-            st.experimental_rerun()
+            st.rerun()
 
 
 class Page(ABC):
@@ -439,7 +439,7 @@ def set_dynamic_page(progress_percent, next_page, script_name, script_order, is_
             pages = [OverviewPage()]
             st.session_state.pages = pages
             set_page('Overview')
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.caption("Once run, please hit Next to proceed")
         st.button(label="Next", help="To the next workflow step", on_click=set_page, args=(next_page,))
@@ -501,7 +501,7 @@ def launch_workflow(selected_workflow):
     set_page('Workflow 1')
 
     # Rerun page with set page to prevent double click
-    st.experimental_rerun()
+    st.rerun()
 
 
 # Set starting set of pages
