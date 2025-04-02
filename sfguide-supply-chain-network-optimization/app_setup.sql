@@ -1183,26 +1183,26 @@ def set_default_sidebar():
         st.markdown("")
         if st.button(label="Data Preparation 🗃️", help="Warning: Unsaved changes will be lost!"):
             set_page('Data Preparation')
-            st.experimental_rerun()
+            st.rerun()
         if st.button(label="Model Parameters 🧮", help="Warning: Unsaved changes will be lost!"):
             set_page('Model Parameters')
-            st.experimental_rerun()
+            st.rerun()
         if st.button(label="Model Execution 🚀", help="Warning: Unsaved changes will be lost!"):
             set_page('Model Execution')
-            st.experimental_rerun()
+            st.rerun()
         if st.button(label="Model Results 📊", help="Warning: Unsaved changes will be lost!"):
             set_page('Model Results')
-            st.experimental_rerun()
+            st.rerun()
         if st.button(label="Cortex Enrichment 🤖", help="Warning: Unsaved changes will be lost!"):
             set_page('Cortex Enrichment')
-            st.experimental_rerun()
+            st.rerun()
         st.markdown("")
         st.markdown("")
         st.markdown("")
         st.markdown("")
         if st.button(label="Return Home", help="Warning: Unsaved changes will be lost!"):
             set_page('Welcome')
-            st.experimental_rerun()
+            st.rerun()
 
 
 class WelcomePage(Page):

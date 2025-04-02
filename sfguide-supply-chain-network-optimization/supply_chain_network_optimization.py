@@ -1,4 +1,3 @@
-
 from snowflake.snowpark.context import get_active_session
 import streamlit as st
 from abc import ABC, abstractmethod
@@ -9,7 +8,7 @@ import pandas as pd
 from faker import Faker
 from random import randint
 from pulp import *
-from snowflake.cortex import Complete,ExtractAnswer
+from snowflake.cortex import Complete, ExtractAnswer
 import json
 
 
@@ -45,7 +44,7 @@ session = set_session()
 fake = Faker()
 
 # demo data
-factories_sql = '''insert overwrite into supply_chain_network_optimization_db.entities.factory
+factories_sql = """insert overwrite into supply_chain_network_optimization_db.entities.factory
     select
             1000 as id
         ,   '_Factory_1_' as name
@@ -165,8 +164,8 @@ union
         ,   'United States' as country
         ,   4500 as production_capacity
         ,   500 as production_cost
-;'''
-distributor_sql = '''insert overwrite into supply_chain_network_optimization_db.entities.distributor
+;"""
+distributor_sql = """insert overwrite into supply_chain_network_optimization_db.entities.distributor
     select
             2000 as id     
         ,   '_Distributor_1_' as name
@@ -466,8 +465,8 @@ union
         ,   'United States' as country
         ,   4700 as throughput_capacity
         ,   8 as throughput_cost
-;'''
-fact_to_dist_sql = '''insert overwrite into supply_chain_network_optimization_db.relationships.factory_to_distributor_rates
+;"""
+fact_to_dist_sql = """insert overwrite into supply_chain_network_optimization_db.relationships.factory_to_distributor_rates
 with mileage as
     ((st_distance(fact.long_lat, dist.long_lat))/1609.344),
 cost_factor as
@@ -483,8 +482,8 @@ cross join supply_chain_network_optimization_db.entities.distributor dist
 order by
         fact.name asc
     ,   dist.name asc
-;'''
-dist_to_cust_sql = '''insert overwrite into supply_chain_network_optimization_db.relationships.distributor_to_customer_rates
+;"""
+dist_to_cust_sql = """insert overwrite into supply_chain_network_optimization_db.relationships.distributor_to_customer_rates
 with mileage as
     ((st_distance(dist.long_lat, to_geography(cust.long_lat)))/1609.344),
 cost_factor as
@@ -500,7 +499,7 @@ cross join supply_chain_network_optimization_db.entities.customer cust
 order by
         dist.name asc
     ,   cust.name asc
-;'''
+;"""
 
 # needed after any factory changes due to pivot
 fact_to_dist_rate_matrix_sql = """select 'create or replace table 
@@ -533,10 +532,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/snowflakecorp/supply-chain-optimization',
-        'Report a bug': "https://github.com/snowflakecorp/supply-chain-optimization",
-        'About': "This app performs network optimization model for a 3-tier supply chain"
-    }
+        "Get Help": "https://github.com/snowflakecorp/supply-chain-optimization",
+        "Report a bug": "https://github.com/snowflakecorp/supply-chain-optimization",
+        "About": "This app performs network optimization model for a 3-tier supply chain",
+    },
 )
 
 # Set starting page
@@ -631,7 +630,9 @@ class OptimizationModel:
         routes = [(w, b) for w in warehouses for b in bars]
 
         # A dictionary called 'Vars' is created to contain the referenced variables(the routes)
-        decision_vars = LpVariable.dicts("Route", (warehouses, bars), 0, None, LpInteger)
+        decision_vars = LpVariable.dicts(
+            "Route", (warehouses, bars), 0, None, LpInteger
+        )
 
         # The objective function is added to 'prob' first
         prob += (
@@ -666,24 +667,32 @@ class OptimizationModel:
     def prepare_data(self, session):
         # Entities
         # Factory values
-        factories_query = session.table("supply_chain_network_optimization_db.entities.factory").select(
-            col("name")).collect()
+        factories_query = (
+            session.table("supply_chain_network_optimization_db.entities.factory")
+            .select(col("name"))
+            .collect()
+        )
         factories = []
         for i in range(len(factories_query)):
             factories.append(factories_query[i][0])
         self.factories = factories
 
-        production_capacity_values_query = session.table(
-            "supply_chain_network_optimization_db.entities.factory").select(
-            col("production_capacity")).collect()
+        production_capacity_values_query = (
+            session.table("supply_chain_network_optimization_db.entities.factory")
+            .select(col("production_capacity"))
+            .collect()
+        )
         production_capacity_values = []
         for i in range(len(production_capacity_values_query)):
             production_capacity_values.append(production_capacity_values_query[i][0])
         production_capacities = dict(zip(factories, production_capacity_values))
         self.production_capacities = production_capacities
 
-        production_cost_values_query = session.table("supply_chain_network_optimization_db.entities.factory").select(
-            col("production_cost")).collect()
+        production_cost_values_query = (
+            session.table("supply_chain_network_optimization_db.entities.factory")
+            .select(col("production_cost"))
+            .collect()
+        )
         production_cost_values = []
         for i in range(len(production_cost_values_query)):
             production_cost_values.append(float(production_cost_values_query[i][0]))
@@ -691,25 +700,32 @@ class OptimizationModel:
         self.production_costs = production_costs
 
         # Distributor values
-        distributors_query = session.table("supply_chain_network_optimization_db.entities.distributor").select(
-            col("name")).collect()
+        distributors_query = (
+            session.table("supply_chain_network_optimization_db.entities.distributor")
+            .select(col("name"))
+            .collect()
+        )
         distributors = []
         for i in range(len(distributors_query)):
             distributors.append(distributors_query[i][0])
         self.distributors = distributors
 
-        throughput_capacity_values_query = session.table(
-            "supply_chain_network_optimization_db.entities.distributor").select(
-            col("throughput_capacity")).collect()
+        throughput_capacity_values_query = (
+            session.table("supply_chain_network_optimization_db.entities.distributor")
+            .select(col("throughput_capacity"))
+            .collect()
+        )
         throughput_capacity_values = []
         for i in range(len(throughput_capacity_values_query)):
             throughput_capacity_values.append(throughput_capacity_values_query[i][0])
         throughput_capacities = dict(zip(distributors, throughput_capacity_values))
         self.throughput_capacities = throughput_capacities
 
-        throughput_cost_values_query = session.table(
-            "supply_chain_network_optimization_db.entities.distributor").select(
-            col("throughput_cost")).collect()
+        throughput_cost_values_query = (
+            session.table("supply_chain_network_optimization_db.entities.distributor")
+            .select(col("throughput_cost"))
+            .collect()
+        )
         throughput_cost_values = []
         for i in range(len(throughput_cost_values_query)):
             throughput_cost_values.append(float(throughput_cost_values_query[i][0]))
@@ -717,15 +733,21 @@ class OptimizationModel:
         self.throughput_costs = throughput_costs
 
         # Customer Values
-        customers_query = session.table("supply_chain_network_optimization_db.entities.customer").select(
-            col("name")).collect()
+        customers_query = (
+            session.table("supply_chain_network_optimization_db.entities.customer")
+            .select(col("name"))
+            .collect()
+        )
         customers = []
         for i in range(len(customers_query)):
             customers.append(customers_query[i][0])
         self.customers = customers
 
-        demand_values_query = session.table("supply_chain_network_optimization_db.entities.customer").select(
-            col("demand")).collect()
+        demand_values_query = (
+            session.table("supply_chain_network_optimization_db.entities.customer")
+            .select(col("demand"))
+            .collect()
+        )
         demand_values = []
         for i in range(len(demand_values_query)):
             demand_values.append(demand_values_query[i][0])
@@ -734,44 +756,52 @@ class OptimizationModel:
 
         # Relationships
         # Factory to Distributor freight values
-        f2d_rate_values = session.sql('''select *
+        f2d_rate_values = session.sql(
+            """select *
         from supply_chain_network_optimization_db.relationships.factory_to_distributor_rates_matrix
-        order by distributor asc;''').collect()
+        order by distributor asc;"""
+        ).collect()
         f2d_rates = []
         for i in range(len(factories)):
-            f2d_rates.append(f2d_rate_values[i][1:len(factories)])
+            f2d_rates.append(f2d_rate_values[i][1 : len(factories)])
 
         f2d_costs = makeDict([factories, distributors], f2d_rates, 0)
         self.factory_to_distributor_rates = f2d_costs
 
         # Factory to Distributor mileage values
-        f2d_mileage_values = session.sql('''select *
+        f2d_mileage_values = session.sql(
+            """select *
                 from supply_chain_network_optimization_db.relationships.factory_to_distributor_mileage_matrix
-                order by distributor asc;''').collect()
+                order by distributor asc;"""
+        ).collect()
         f2d_mileage = []
         for i in range(len(factories)):
-            f2d_mileage.append(f2d_mileage_values[i][1:len(factories)])
+            f2d_mileage.append(f2d_mileage_values[i][1 : len(factories)])
 
         f2d_distance = makeDict([factories, distributors], f2d_mileage, 0)
         self.factory_to_distributor_mileage = f2d_distance
 
         # Distributor to Customer freight values
-        d2c_rate_values = session.sql('''select *
+        d2c_rate_values = session.sql(
+            """select *
                 from supply_chain_network_optimization_db.relationships.distributor_to_customer_rates_matrix
-                order by customer asc;''').collect()
+                order by customer asc;"""
+        ).collect()
         d2c_rates = []
         for i in range(len(distributors)):
-            d2c_rates.append(f2d_rate_values[i][1:len(distributors)])
+            d2c_rates.append(f2d_rate_values[i][1 : len(distributors)])
         d2c_costs = makeDict([distributors, customers], d2c_rates, 0)
         self.distributor_to_customer_rates = d2c_costs
 
         # Distributor to Customer freight values
-        d2c_mileage_values = session.sql('''select *
+        d2c_mileage_values = session.sql(
+            """select *
                         from supply_chain_network_optimization_db.relationships.distributor_to_customer_mileage_matrix
-                        order by customer asc;''').collect()
+                        order by customer asc;"""
+        ).collect()
         d2c_mileage = []
         for i in range(len(distributors)):
-            d2c_mileage.append(d2c_mileage_values[i][1:len(distributors)])
+            d2c_mileage.append(d2c_mileage_values[i][1 : len(distributors)])
         d2c_distance = makeDict([distributors, customers], d2c_mileage, 0)
         self.distributor_to_customer_mileage = d2c_distance
 
@@ -799,19 +829,45 @@ class OptimizationModel:
 
         # The decision variables - The decisions the solver changes to decide an optimal outcome
         # A dictionary called 'Vars' is created to contain the referenced variables(the routes)
-        f2d_decision_vars = LpVariable.dicts("F2DRoute", (factories, distributors), 0, None, LpInteger)
-        d2c_decision_vars = LpVariable.dicts("D2CRoute", (distributors, customers), 0, None, LpInteger)
+        f2d_decision_vars = LpVariable.dicts(
+            "F2DRoute", (factories, distributors), 0, None, LpInteger
+        )
+        d2c_decision_vars = LpVariable.dicts(
+            "D2CRoute", (distributors, customers), 0, None, LpInteger
+        )
 
         # The Objective Function - What the real goal is and how it is calculated
         # The objective function is added to 'prob' first
-        f2d_miles = lpSum([f2d_decision_vars[f][d] * factory_to_distributor_mileage[f][d] for (f, d) in f2d_routes])
-        d2c_miles = lpSum([d2c_decision_vars[d][c] * distributor_to_customer_mileage[d][c] for (d, c) in d2c_routes])
-        f_production = lpSum([f2d_decision_vars[f][d] * production_costs[f] for (f, d) in f2d_routes])
-        f2d_freight = lpSum([f2d_decision_vars[f][d] * factory_to_distributor_rates[f][d]
-                             for (f, d) in f2d_routes])
-        d_throughput = lpSum([d2c_decision_vars[d][c] * throughput_costs[d] for (d, c) in d2c_routes])
-        d2c_freight = lpSum([d2c_decision_vars[d][c] * distributor_to_customer_rates[d][c]
-                             for (d, c) in d2c_routes])
+        f2d_miles = lpSum(
+            [
+                f2d_decision_vars[f][d] * factory_to_distributor_mileage[f][d]
+                for (f, d) in f2d_routes
+            ]
+        )
+        d2c_miles = lpSum(
+            [
+                d2c_decision_vars[d][c] * distributor_to_customer_mileage[d][c]
+                for (d, c) in d2c_routes
+            ]
+        )
+        f_production = lpSum(
+            [f2d_decision_vars[f][d] * production_costs[f] for (f, d) in f2d_routes]
+        )
+        f2d_freight = lpSum(
+            [
+                f2d_decision_vars[f][d] * factory_to_distributor_rates[f][d]
+                for (f, d) in f2d_routes
+            ]
+        )
+        d_throughput = lpSum(
+            [d2c_decision_vars[d][c] * throughput_costs[d] for (d, c) in d2c_routes]
+        )
+        d2c_freight = lpSum(
+            [
+                d2c_decision_vars[d][c] * distributor_to_customer_rates[d][c]
+                for (d, c) in d2c_routes
+            ]
+        )
 
         # Determine which objective based on the problem
         if problem_name == "Minimize_Distance":
@@ -834,28 +890,30 @@ class OptimizationModel:
         # Factories can only ship as much as they can produce
         for f in factories:
             prob += (
-                lpSum([f2d_decision_vars[f][d] for d in distributors]) <= production_capacities[f],
+                lpSum([f2d_decision_vars[f][d] for d in distributors])
+                <= production_capacities[f],
                 f"Sum_of_Products_out_of_Factory_{f}",
             )
 
         # Factories can only ship to distributors up until their throughput capacity
         for d in distributors:
             prob += (
-                lpSum([f2d_decision_vars[f][d] for f in factories]) <= throughput_capacities[d],
+                lpSum([f2d_decision_vars[f][d] for f in factories])
+                <= throughput_capacities[d],
                 f"Sum_of_Products_into_Distributor_{d}",
             )
 
         # Distributors need to have inventory replenished
         for d in distributors:
-            prob += (
-                    lpSum([f2d_decision_vars[f][d] for f in factories]) >= lpSum([d2c_decision_vars[d][c] for c in
-                                                                                  customers])
+            prob += lpSum([f2d_decision_vars[f][d] for f in factories]) >= lpSum(
+                [d2c_decision_vars[d][c] for c in customers]
             )
 
         # Distributors can only ship their throughput capacity
         for d in distributors:
             prob += (
-                lpSum([d2c_decision_vars[d][c] for c in customers]) <= throughput_capacities[d],
+                lpSum([d2c_decision_vars[d][c] for c in customers])
+                <= throughput_capacities[d],
                 f"Sum_of_Products_out_of_Distributor_{d}",
             )
 
@@ -906,30 +964,44 @@ def set_default_sidebar():
     with st.sidebar:
         st.title("Supply Chain Network Optimization 🐻‍❄")
         st.markdown("")
-        st.markdown("This application sets up and runs 3-tier network optimization models.")
+        st.markdown(
+            "This application sets up and runs 3-tier network optimization models."
+        )
         st.markdown("")
-        if st.button(label="Data Preparation 🗃️", help="Warning: Unsaved changes will be lost!"):
-            set_page('Data Preparation')
-            st.experimental_rerun()
-        if st.button(label="Model Parameters 🧮", help="Warning: Unsaved changes will be lost!"):
-            set_page('Model Parameters')
-            st.experimental_rerun()
-        if st.button(label="Model Execution 🚀", help="Warning: Unsaved changes will be lost!"):
-            set_page('Model Execution')
-            st.experimental_rerun()
-        if st.button(label="Model Results 📊", help="Warning: Unsaved changes will be lost!"):
-            set_page('Model Results')
-            st.experimental_rerun()
-        if st.button(label="Cortex Enrichment 🤖", help="Warning: Unsaved changes will be lost!"):
-            set_page('Cortex Enrichment')
-            st.experimental_rerun()
+        if st.button(
+            label="Data Preparation 🗃️", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Data Preparation")
+            st.rerun()
+        if st.button(
+            label="Model Parameters 🧮", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Model Parameters")
+            st.rerun()
+        if st.button(
+            label="Model Execution 🚀", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Model Execution")
+            st.rerun()
+        if st.button(
+            label="Model Results 📊", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Model Results")
+            st.rerun()
+        if st.button(
+            label="Cortex Enrichment 🤖", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Cortex Enrichment")
+            st.rerun()
         st.markdown("")
         st.markdown("")
         st.markdown("")
         st.markdown("")
-        if st.button(label="Return Home", help="Warning: Unsaved changes will be lost!"):
-            set_page('Welcome')
-            st.experimental_rerun()
+        if st.button(
+            label="Return Home", help="Warning: Unsaved changes will be lost!"
+        ):
+            set_page("Welcome")
+            st.rerun()
 
 
 class WelcomePage(Page):
@@ -944,29 +1016,44 @@ class WelcomePage(Page):
         # Welcome page
         st.subheader("Welcome ❄️")
 
-        st.write('''The Supply Chain Network Optimization Model utilizes [Linear Programming](
-        https://en.wikipedia.org/wiki/Linear_programming), also called linear optimization or constraint programming.''')
-
-        st.write('''Linear programming uses a system of inequalities to define a feasible regional mathematical space, and a 
-        'solver' that traverses that space by adjusting a number of decision variables, efficiently finding the most optimal 
-        set of decisions given constraints to meet a stated objective function.''')
-
-        st.write('''It is possible to also introduce integer-based decision 
-        variables, which transforms the problem from a linear program into a mixed integer program, but the mechanics are 
-        fundamentally the same.''')
-
-        st.write("The objective function defines the goal - maximizing or minimizing a value, such as profit or costs.")
-        st.write("Decision variables are a set of decisions - the values that the solver can change to impact the "
-                 "objective value.")
         st.write(
-            "The constraints define the realities of the business - such as only shipping up to a stated capacity.")
+            """The Supply Chain Network Optimization Model utilizes [Linear Programming](
+        https://en.wikipedia.org/wiki/Linear_programming), also called linear optimization or constraint programming."""
+        )
 
-        st.write("We are utilizing the PuLP library, which allows us to define a linear program and use virtually any "
-                 "solver we want.  We are using PuLP's default free [CBC solver](https://github.com/coin-or/Cbc) for our "
-                 "models.")
+        st.write(
+            """Linear programming uses a system of inequalities to define a feasible regional mathematical space, and a 
+        'solver' that traverses that space by adjusting a number of decision variables, efficiently finding the most optimal 
+        set of decisions given constraints to meet a stated objective function."""
+        )
+
+        st.write(
+            """It is possible to also introduce integer-based decision 
+        variables, which transforms the problem from a linear program into a mixed integer program, but the mechanics are 
+        fundamentally the same."""
+        )
+
+        st.write(
+            "The objective function defines the goal - maximizing or minimizing a value, such as profit or costs."
+        )
+        st.write(
+            "Decision variables are a set of decisions - the values that the solver can change to impact the "
+            "objective value."
+        )
+        st.write(
+            "The constraints define the realities of the business - such as only shipping up to a stated capacity."
+        )
+
+        st.write(
+            "We are utilizing the PuLP library, which allows us to define a linear program and use virtually any "
+            "solver we want.  We are using PuLP's default free [CBC solver](https://github.com/coin-or/Cbc) for our "
+            "models."
+        )
 
         with st.expander("Additional Resources", expanded=True):
-            st.write("Interested in [Optimization Programming using PuLP](https://coin-or.github.io/pulp/)?")
+            st.write(
+                "Interested in [Optimization Programming using PuLP](https://coin-or.github.io/pulp/)?"
+            )
 
     def print_sidebar(self):
         set_default_sidebar()
@@ -984,14 +1071,18 @@ class DataPreparationPage(Page):
                 cust_id = operator.add(i, 3001)
                 lat = coordinates_list[0]
                 lon = coordinates_list[1]
-                long_lat = "POINT (" + coordinates_list[1] + " " + coordinates_list[0] + ")"
+                long_lat = (
+                    "POINT (" + coordinates_list[1] + " " + coordinates_list[0] + ")"
+                )
                 name = str(fake.company()) + "_" + str(i)
                 demand = randint(1, 100)
                 customer_list.append([cust_id, name, lon, lat, long_lat, demand])
 
             # Set up database
-            data = session.create_dataframe(customer_list, schema=["ID", "NAME", "LATITUDE", "LONGITUDE",
-                                                                   "LONG_LAT", "DEMAND"])
+            data = session.create_dataframe(
+                customer_list,
+                schema=["ID", "NAME", "LATITUDE", "LONGITUDE", "LONG_LAT", "DEMAND"],
+            )
             data.write.mode("overwrite").saveAsTable("entities.customer")
             session.sql(factories_sql).collect()
             session.sql(distributor_sql).collect()
@@ -1006,17 +1097,25 @@ class DataPreparationPage(Page):
             st.session_state.customer_data = customer_list
 
         def sync_factory_data(session):
-            fact_to_dist_rate_pivot_sql = session.sql(fact_to_dist_rate_matrix_sql).collect()[0][0]
+            fact_to_dist_rate_pivot_sql = session.sql(
+                fact_to_dist_rate_matrix_sql
+            ).collect()[0][0]
             session.sql(fact_to_dist_rate_pivot_sql).collect()
 
-            fact_to_dist_mileage_pivot_sql = session.sql(fact_to_dist_mileage_matrix_sql).collect()[0][0]
+            fact_to_dist_mileage_pivot_sql = session.sql(
+                fact_to_dist_mileage_matrix_sql
+            ).collect()[0][0]
             session.sql(fact_to_dist_mileage_pivot_sql).collect()
 
         def sync_distributor_data(session):
-            dist_to_cust_rate_pivot_sql = session.sql(dist_to_cust_rate_matrix_sql).collect()[0][0]
+            dist_to_cust_rate_pivot_sql = session.sql(
+                dist_to_cust_rate_matrix_sql
+            ).collect()[0][0]
             session.sql(dist_to_cust_rate_pivot_sql).collect()
 
-            dist_to_cust_mileage_pivot_sql = session.sql(dist_to_cust_mileage_matrix_sql).collect()[0][0]
+            dist_to_cust_mileage_pivot_sql = session.sql(
+                dist_to_cust_mileage_matrix_sql
+            ).collect()[0][0]
             session.sql(dist_to_cust_mileage_pivot_sql).collect()
 
         col1, col2 = st.columns((6, 1))
@@ -1024,27 +1123,43 @@ class DataPreparationPage(Page):
 
         st.subheader("Let's Mock Some Data ❄️")
 
-        st.write("The following will set up all of the data objects in Snowflake for the model, including generating a "
-                 "synthetic set of customers.")
+        st.write(
+            "The following will set up all of the data objects in Snowflake for the model, including generating a "
+            "synthetic set of customers."
+        )
 
-        st.write("There is some randomness associated with the data generation, so it is possible to get infeasible "
-                 "results if too many customers are created.  The number and capacities of factories and distributors "
-                 "are fixed.  We recommend going with the 1000 for a feasible model, but feel free to increase in "
-                 "order to see what infeasible results look like.  Also, using the Model Parameters page, "
-                 "you can increase capacities to make more customers feasible.")
+        st.write(
+            "There is some randomness associated with the data generation, so it is possible to get infeasible "
+            "results if too many customers are created.  The number and capacities of factories and distributors "
+            "are fixed.  We recommend going with the 1000 for a feasible model, but feel free to increase in "
+            "order to see what infeasible results look like.  Also, using the Model Parameters page, "
+            "you can increase capacities to make more customers feasible."
+        )
 
         count_column, submit_column = st.columns(2)
 
-        customer_count = count_column.number_input(label="How many test customers would you like to include?",
-                                                   min_value=1,
-                                                   max_value=1000000, value=1000)
+        customer_count = count_column.number_input(
+            label="How many test customers would you like to include?",
+            min_value=1,
+            max_value=1000000,
+            value=1000,
+        )
         submit_column.write(" #")
 
         if submit_column.button("Generate Data"):
             with st.spinner("Generating Synthetic Customer Data..."):
                 deploy_demo_data(customer_count, session)
-                df = pd.DataFrame(st.session_state.customer_data,
-                                  columns=["ID", "LONGITUDE", "LATITUDE", "LAT_LONG", "NAME", "DEMAND"])
+                df = pd.DataFrame(
+                    st.session_state.customer_data,
+                    columns=[
+                        "ID",
+                        "LONGITUDE",
+                        "LATITUDE",
+                        "LAT_LONG",
+                        "NAME",
+                        "DEMAND",
+                    ],
+                )
                 st.dataframe(df)
 
     def print_sidebar(self):
@@ -1062,54 +1177,73 @@ class ModelParametersPage(Page):
         # Used to view and modify model values within Snowflake
         st.subheader("Model Parameters ❄️")
 
-        factory_tab, distributor_tab, customer_tab, f2d_rates_tab, d2c_rates_tab = st.tabs(["Factories", "Distributors",
-                                                                                            "Customers", "F2D Rates",
-                                                                                            "D2C Rates"])
+        factory_tab, distributor_tab, customer_tab, f2d_rates_tab, d2c_rates_tab = (
+            st.tabs(
+                ["Factories", "Distributors", "Customers", "F2D Rates", "D2C Rates"]
+            )
+        )
         with st.spinner("Retrieving Filter Values..."):
-            factories_query = session.table("supply_chain_network_optimization_db.entities.factory").select(
-                col("name")).collect()
+            factories_query = (
+                session.table("supply_chain_network_optimization_db.entities.factory")
+                .select(col("name"))
+                .collect()
+            )
             factories = []
             for i in range(len(factories_query)):
                 factories.append(factories_query[i][0])
 
-            distributors_query = session.table("supply_chain_network_optimization_db.entities.distributor").select(
-                col("name")).collect()
+            distributors_query = (
+                session.table(
+                    "supply_chain_network_optimization_db.entities.distributor"
+                )
+                .select(col("name"))
+                .collect()
+            )
             distributors = []
             for i in range(len(distributors_query)):
                 distributors.append(distributors_query[i][0])
 
-            customers_query = session.table("supply_chain_network_optimization_db.entities.customer").select(
-                col("name")).collect()
+            customers_query = (
+                session.table("supply_chain_network_optimization_db.entities.customer")
+                .select(col("name"))
+                .collect()
+            )
             customers = []
             for i in range(len(customers_query)):
                 customers.append(customers_query[i][0])
 
         with factory_tab:
-            results = session.table("supply_chain_network_optimization_db.entities.factory")
+            results = session.table(
+                "supply_chain_network_optimization_db.entities.factory"
+            )
             st.write(results)
 
         with distributor_tab:
-            results = session.table("supply_chain_network_optimization_db.entities.distributor")
+            results = session.table(
+                "supply_chain_network_optimization_db.entities.distributor"
+            )
             st.write(results)
 
         with customer_tab:
-            results = session.table("supply_chain_network_optimization_db.entities.customer")
+            results = session.table(
+                "supply_chain_network_optimization_db.entities.customer"
+            )
             st.write(results)
 
         with f2d_rates_tab:
             factory_name = st.selectbox("Choose a factory name", factories)
 
             results = session.table(
-                "supply_chain_network_optimization_db.relationships.factory_to_distributor_rates").filter(
-                col("factory") == factory_name)
+                "supply_chain_network_optimization_db.relationships.factory_to_distributor_rates"
+            ).filter(col("factory") == factory_name)
             st.write(results)
 
         with d2c_rates_tab:
             distributor_name = st.selectbox("Choose a distributor name", distributors)
 
             results = session.table(
-                "supply_chain_network_optimization_db.relationships.distributor_to_customer_rates").filter(
-                col("distributor") == distributor_name)
+                "supply_chain_network_optimization_db.relationships.distributor_to_customer_rates"
+            ).filter(col("distributor") == distributor_name)
             st.write(results)
 
         st.write("After updating the parameters, please move on to model execution!")
@@ -1131,9 +1265,15 @@ class ModelExecutionPage(Page):
 
         with st.form("model_parameters_form"):
             st.write("The model runner runs three different scenarios:")
-            st.write("-- Minimize Distance (Crawl) - Emulating a fairly naive present-day")
-            st.write("-- Minimize Freight (Walk) - Emulating an organization with freight analytics capability")
-            st.write("-- Minimize Total Fulfillment (Run) - Emulating a fully realized network analytics capability")
+            st.write(
+                "-- Minimize Distance (Crawl) - Emulating a fairly naive present-day"
+            )
+            st.write(
+                "-- Minimize Freight (Walk) - Emulating an organization with freight analytics capability"
+            )
+            st.write(
+                "-- Minimize Total Fulfillment (Run) - Emulating a fully realized network analytics capability"
+            )
 
             submitted = st.form_submit_button("Run")
 
@@ -1144,13 +1284,22 @@ class ModelExecutionPage(Page):
             }
 
             if submitted:
-                if session.table("supply_chain_network_optimization_db.entities.customer").count() > 0:
+                if (
+                    session.table(
+                        "supply_chain_network_optimization_db.entities.customer"
+                    ).count()
+                    > 0
+                ):
                     with st.spinner("Solving Models..."):
                         model = OptimizationModel()
                         model.prepare_data(session)
 
                         model_count = 1
-                        for current_model in ["Minimize_Distance", "Minimize_Freight", "Minimize_Total_Fulfillment"]:
+                        for current_model in [
+                            "Minimize_Distance",
+                            "Minimize_Freight",
+                            "Minimize_Total_Fulfillment",
+                        ]:
                             model.solve(current_model)
 
                             decision_variables = []
@@ -1161,24 +1310,41 @@ class ModelExecutionPage(Page):
 
                             run_date = datetime.datetime.now()
 
-                            model_list = [[model.problem_name, run_date, model.lp_status, model.objective_value,
-                                           decision_variables, model.total_f2d_miles, model.total_d2c_miles,
-                                           model.total_production_costs, model.total_f2d_freight,
-                                           model.total_throughput_costs,
-                                           model.total_d2c_freight]]
+                            model_list = [
+                                [
+                                    model.problem_name,
+                                    run_date,
+                                    model.lp_status,
+                                    model.objective_value,
+                                    decision_variables,
+                                    model.total_f2d_miles,
+                                    model.total_d2c_miles,
+                                    model.total_production_costs,
+                                    model.total_f2d_freight,
+                                    model.total_throughput_costs,
+                                    model.total_d2c_freight,
+                                ]
+                            ]
 
-                            model_df = session.create_dataframe(model_list, schema=["problem_name",
-                                                                                    "run_date",
-                                                                                    "lp_status",
-                                                                                    "objective_value",
-                                                                                    "decision_variables",
-                                                                                    "total_f2d_miles",
-                                                                                    "total_d2c_miles",
-                                                                                    "total_production_costs",
-                                                                                    "total_f2d_freight",
-                                                                                    "total_throughput_costs",
-                                                                                    "total_d2c_freight"])
-                            model_df.write.mode("append").saveAsTable("results.model_results")
+                            model_df = session.create_dataframe(
+                                model_list,
+                                schema=[
+                                    "problem_name",
+                                    "run_date",
+                                    "lp_status",
+                                    "objective_value",
+                                    "decision_variables",
+                                    "total_f2d_miles",
+                                    "total_d2c_miles",
+                                    "total_production_costs",
+                                    "total_f2d_freight",
+                                    "total_throughput_costs",
+                                    "total_d2c_freight",
+                                ],
+                            )
+                            model_df.write.mode("append").saveAsTable(
+                                "results.model_results"
+                            )
 
                             st.subheader("Model Name: " + model.problem_name)
 
@@ -1190,7 +1356,10 @@ class ModelExecutionPage(Page):
 
                             with st.expander("Sample of Decisions: "):
                                 # The optimised objective function value is printed to the screen
-                                st.write("Objective Value (based on goal): ", model.objective_value)
+                                st.write(
+                                    "Objective Value (based on goal): ",
+                                    model.objective_value,
+                                )
 
                                 variable_count = 0
                                 for v in model.decision_variables:
@@ -1198,24 +1367,50 @@ class ModelExecutionPage(Page):
                                         st.write(v.name, "=", v.varValue)
                                         variable_count += 1
 
-                            total_fulfillment_costs = model.total_production_costs + model.total_f2d_freight + \
-                                                      model.total_throughput_costs + model.total_d2c_freight
+                            total_fulfillment_costs = (
+                                model.total_production_costs
+                                + model.total_f2d_freight
+                                + model.total_throughput_costs
+                                + model.total_d2c_freight
+                            )
 
-                            st.write("Total Fulfillment Costs: ", total_fulfillment_costs)
+                            st.write(
+                                "Total Fulfillment Costs: ", total_fulfillment_costs
+                            )
 
                             with st.expander("Result Details: "):
-                                st.write("Factory-to-Distributor Miles: ", model.total_f2d_miles)
-                                st.write("Distributor-to-Customer Miles: ", model.total_d2c_miles)
-                                st.write("Total Production Costs: ", model.total_production_costs)
-                                st.write("Total Factory-to-Distributor Freight: ", model.total_f2d_freight)
-                                st.write("Total Distributor Throughput Costs: ", model.total_throughput_costs)
-                                st.write("Total Distributor-to-Customer Freight: ", model.total_d2c_freight)
+                                st.write(
+                                    "Factory-to-Distributor Miles: ",
+                                    model.total_f2d_miles,
+                                )
+                                st.write(
+                                    "Distributor-to-Customer Miles: ",
+                                    model.total_d2c_miles,
+                                )
+                                st.write(
+                                    "Total Production Costs: ",
+                                    model.total_production_costs,
+                                )
+                                st.write(
+                                    "Total Factory-to-Distributor Freight: ",
+                                    model.total_f2d_freight,
+                                )
+                                st.write(
+                                    "Total Distributor Throughput Costs: ",
+                                    model.total_throughput_costs,
+                                )
+                                st.write(
+                                    "Total Distributor-to-Customer Freight: ",
+                                    model.total_d2c_freight,
+                                )
 
                     st.success("Models Solved!")
                     st.snow()
                 else:
-                    st.warning("Data is not loaded, please go back to Data Preparation and generate customer data "
-                               "first.")
+                    st.warning(
+                        "Data is not loaded, please go back to Data Preparation and generate customer data "
+                        "first."
+                    )
 
         st.write("After running the models, please move on to the results!")
 
@@ -1236,9 +1431,14 @@ class ModelResultsPage(Page):
 
         problem_name_col, run_date_col = st.columns(2)
 
-        problem_name_query = session.table(
-            "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw").select(
-            col("problem_name")).distinct().collect()
+        problem_name_query = (
+            session.table(
+                "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw"
+            )
+            .select(col("problem_name"))
+            .distinct()
+            .collect()
+        )
         problem_names = []
         for i in range(len(problem_name_query)):
             problem_names.append(problem_name_query[i][0])
@@ -1246,10 +1446,16 @@ class ModelResultsPage(Page):
         with problem_name_col:
             problem_name = st.selectbox("Select a Problem Name", problem_names)
 
-        run_date_query = session.table(
-            "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw").filter(
-            col("problem_name") == problem_name).select(col("run_date")).distinct().sort(col("run_date").desc()) \
+        run_date_query = (
+            session.table(
+                "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw"
+            )
+            .filter(col("problem_name") == problem_name)
+            .select(col("run_date"))
+            .distinct()
+            .sort(col("run_date").desc())
             .collect()
+        )
         run_dates = []
         for i in range(len(run_date_query)):
             run_dates.append(run_date_query[i][0])
@@ -1257,30 +1463,56 @@ class ModelResultsPage(Page):
         with run_date_col:
             run_date = st.selectbox("Select a Run Date", run_dates)
 
-        f2d_results_df = session.table(
-            "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw").filter(
-            col("problem_name") == problem_name).filter(col("run_date") == run_date)
-        c2d_results_df = session.table(
-            "supply_chain_network_optimization_db.results.distributor_to_customer_shipment_details_vw").filter(
-            col("problem_name") == problem_name).filter(col("run_date") == run_date)
+        f2d_results_df = (
+            session.table(
+                "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw"
+            )
+            .filter(col("problem_name") == problem_name)
+            .filter(col("run_date") == run_date)
+        )
+        c2d_results_df = (
+            session.table(
+                "supply_chain_network_optimization_db.results.distributor_to_customer_shipment_details_vw"
+            )
+            .filter(col("problem_name") == problem_name)
+            .filter(col("run_date") == run_date)
+        )
 
-        factories_query = session.table(
-            "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw").select(
-            col("factory_name")).distinct().sort(col("factory_name").asc()).collect()
+        factories_query = (
+            session.table(
+                "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw"
+            )
+            .select(col("factory_name"))
+            .distinct()
+            .sort(col("factory_name").asc())
+            .collect()
+        )
         factories = [""]
         for i in range(len(factories_query)):
             factories.append(factories_query[i][0])
 
-        distributors_query = session.table(
-            "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw").select(
-            col("distributor_name")).distinct().sort(col("distributor_name").asc()).collect()
+        distributors_query = (
+            session.table(
+                "supply_chain_network_optimization_db.results.factory_to_distributor_shipment_details_vw"
+            )
+            .select(col("distributor_name"))
+            .distinct()
+            .sort(col("distributor_name").asc())
+            .collect()
+        )
         distributors = [""]
         for i in range(len(distributors_query)):
             distributors.append(distributors_query[i][0])
 
-        customers_query = session.table(
-            "supply_chain_network_optimization_db.results.distributor_to_customer_shipment_details_vw").select(
-            col("customer_name")).distinct().sort(col("customer_name").asc()).collect()
+        customers_query = (
+            session.table(
+                "supply_chain_network_optimization_db.results.distributor_to_customer_shipment_details_vw"
+            )
+            .select(col("customer_name"))
+            .distinct()
+            .sort(col("customer_name").asc())
+            .collect()
+        )
         customers = [""]
         for i in range(len(customers_query)):
             customers.append(customers_query[i][0])
@@ -1300,21 +1532,37 @@ class ModelResultsPage(Page):
 
         with fact_to_dist_col:
             st.write("Amount shipped from Factories to Distributors:")
-            st.write(f2d_results_df.select(col("factory_name"), col("distributor_name"),
-                                           col("factory_to_distributor_shipped_amount"))
-                     .filter(col("factory_to_distributor_shipped_amount") > 0)
-                     .filter((col("factory_name") == factory_name) | (factory_name == ""))
-                     .filter((col("distributor_name") == distributor_name) | (distributor_name == ""))
-                     .collect())
+            st.write(
+                f2d_results_df.select(
+                    col("factory_name"),
+                    col("distributor_name"),
+                    col("factory_to_distributor_shipped_amount"),
+                )
+                .filter(col("factory_to_distributor_shipped_amount") > 0)
+                .filter((col("factory_name") == factory_name) | (factory_name == ""))
+                .filter(
+                    (col("distributor_name") == distributor_name)
+                    | (distributor_name == "")
+                )
+                .collect()
+            )
 
         with dist_to_cust_col:
             st.write("Amount shipped from Distributors to Customers:")
-            st.write(c2d_results_df.select(col("distributor_name"), col("customer_name"),
-                                           col("distributor_to_customer_shipped_amount"))
-                     .filter(col("distributor_to_customer_shipped_amount") > 0)
-                     .filter((col("distributor_name") == distributor_name) | (distributor_name == ""))
-                     .filter((col("customer_name") == customer_name) | (customer_name == ""))
-                     .collect())
+            st.write(
+                c2d_results_df.select(
+                    col("distributor_name"),
+                    col("customer_name"),
+                    col("distributor_to_customer_shipped_amount"),
+                )
+                .filter(col("distributor_to_customer_shipped_amount") > 0)
+                .filter(
+                    (col("distributor_name") == distributor_name)
+                    | (distributor_name == "")
+                )
+                .filter((col("customer_name") == customer_name) | (customer_name == ""))
+                .collect()
+            )
 
         # Maps
         st.subheader("Shipment Maps")
@@ -1322,29 +1570,60 @@ class ModelResultsPage(Page):
 
         if f2d_results_df.count() > 0:
             with factory_map_col:
-                st.map(f2d_results_df
-                       .filter(col("factory_to_distributor_shipped_amount") > 0)
-                       .filter((col("factory_name") == factory_name) | (factory_name == ""))
-                       .filter((col("distributor_name") == distributor_name) | (distributor_name == ""))
-                       .select(col("factory_latitude").cast("float").alias("latitude"),
-                               col("factory_longitude").cast("float").alias("longitude")).collect())
+                st.map(
+                    f2d_results_df.filter(
+                        col("factory_to_distributor_shipped_amount") > 0
+                    )
+                    .filter(
+                        (col("factory_name") == factory_name) | (factory_name == "")
+                    )
+                    .filter(
+                        (col("distributor_name") == distributor_name)
+                        | (distributor_name == "")
+                    )
+                    .select(
+                        col("factory_latitude").cast("float").alias("latitude"),
+                        col("factory_longitude").cast("float").alias("longitude"),
+                    )
+                    .collect()
+                )
 
         if c2d_results_df.count() > 0:
             with distributor_map_col:
-                st.map(c2d_results_df
-                       .filter(col("distributor_to_customer_shipped_amount") > 0)
-                       .filter((col("distributor_name") == distributor_name) | (distributor_name == ""))
-                       .select(col("distributor_latitude").cast("float").alias("latitude"),
-                               col("distributor_longitude").cast("float").alias("longitude")).collect())
+                st.map(
+                    c2d_results_df.filter(
+                        col("distributor_to_customer_shipped_amount") > 0
+                    )
+                    .filter(
+                        (col("distributor_name") == distributor_name)
+                        | (distributor_name == "")
+                    )
+                    .select(
+                        col("distributor_latitude").cast("float").alias("latitude"),
+                        col("distributor_longitude").cast("float").alias("longitude"),
+                    )
+                    .collect()
+                )
 
         if c2d_results_df.count() > 0:
             with customer_map_col:
-                st.map(c2d_results_df
-                       .filter(col("distributor_to_customer_shipped_amount") > 0)
-                       .filter((col("distributor_name") == distributor_name) | (distributor_name == ""))
-                       .filter((col("customer_name") == customer_name) | (customer_name == ""))
-                       .select(col("customer_latitude").cast("float").alias("latitude"),
-                               col("customer_longitude").cast("float").alias("longitude")).collect())
+                st.map(
+                    c2d_results_df.filter(
+                        col("distributor_to_customer_shipped_amount") > 0
+                    )
+                    .filter(
+                        (col("distributor_name") == distributor_name)
+                        | (distributor_name == "")
+                    )
+                    .filter(
+                        (col("customer_name") == customer_name) | (customer_name == "")
+                    )
+                    .select(
+                        col("customer_latitude").cast("float").alias("latitude"),
+                        col("customer_longitude").cast("float").alias("longitude"),
+                    )
+                    .collect()
+                )
 
     def print_sidebar(self):
         set_default_sidebar()
@@ -1356,51 +1635,51 @@ class CortexPage(Page):
 
     def print_page(self):
 
-        closest_airport_sql = '''select
+        closest_airport_sql = """select
         id
     ,   snowflake.cortex.complete(
         'llama2-70b-chat', 
         concat('A factory is located in ', city, ', ', state, ', ', country, ' at latitude ', latitude, ' and longitude ', longitude, '.  Given that latitude and longitude represent geographic coordinates, what is the closest airport?  You are only allowed to respond with the name of the airport, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.')) as closest_airport
-from supply_chain_network_optimization_db.entities.factory'''
-        closest_interstate_sql = '''select
+from supply_chain_network_optimization_db.entities.factory"""
+        closest_interstate_sql = """select
         id
     ,   snowflake.cortex.complete(
         'llama2-70b-chat', 
         concat('A factory is located in ', city, ', ', state, ', ', country, ' at latitude ', latitude, ' and longitude ', longitude, '.  Given that latitude and longitude represent geographic coordinates, what is the closest interstate?  You are only allowed to respond with the name of the interstate, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.')) as closest_interstate
-from supply_chain_network_optimization_db.entities.factory'''
-        closest_river_sql = '''select
+from supply_chain_network_optimization_db.entities.factory"""
+        closest_river_sql = """select
         id
     ,   snowflake.cortex.complete(
         'llama2-70b-chat', 
         concat('A factory is located in ', city, ', ', state, ', ', country, ' at latitude ', latitude, ' and longitude ', longitude, '.  Given that latitude and longitude represent geographic coordinates, what is the closest river?  You are only allowed to respond with the name of the river, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Simply respond with the name of the river.')) as closest_river
-from supply_chain_network_optimization_db.entities.factory'''
-        average_temperature_sql = '''select
+from supply_chain_network_optimization_db.entities.factory"""
+        average_temperature_sql = """select
         id
     ,   regexp_substr(snowflake.cortex.complete(
         'llama2-70b-chat', 
         concat('A factory is located in ', city, ', ', state, ', ', country, ' at latitude ', latitude, ' and longitude ', longitude, '.  Given that latitude and longitude represent geographic coordinates, what is the average annual temperature in fahrenheit?  Format your answer as a number without text.  Do not include celsius.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number.')),'[0-9]{1,3}\\.?[0-9]?') as average_temperature
-from supply_chain_network_optimization_db.entities.factory'''
-        average_rainfall_sql = '''select
+from supply_chain_network_optimization_db.entities.factory"""
+        average_rainfall_sql = """select
         id
     ,   regexp_substr(snowflake.cortex.complete(
         'llama2-70b-chat', 
         concat('A factory is located in ', city, ', ', state, ', ', country, ' at latitude ', latitude, ' and longitude ', longitude, '.  Given that latitude and longitude represent geographic coordinates, what is the average annual rainfall in inches?  Format your answer as a number without text.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number.')),'[0-9]{1,4}\\.?[0-9]?') as average_rainfall
-from supply_chain_network_optimization_db.entities.factory'''
+from supply_chain_network_optimization_db.entities.factory"""
 
         sql_statements = {
-                "Closest Airport": closest_airport_sql
-            ,   "Closest Interstate": closest_interstate_sql
-            ,   "Closest River": closest_river_sql
-            ,   "Average Temperature": average_temperature_sql
-            ,   "Average Rainfall": average_rainfall_sql
+            "Closest Airport": closest_airport_sql,
+            "Closest Interstate": closest_interstate_sql,
+            "Closest River": closest_river_sql,
+            "Average Temperature": average_temperature_sql,
+            "Average Rainfall": average_rainfall_sql,
         }
 
         prompt_examples = {
-                "Closest Airport": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest airport?  You are only allowed to respond with the name of the airport, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence."""
-            ,   "Closest Interstate": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest interstate?  You are only allowed to respond with the name of the interstate, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence."""
-            ,   "Closest River": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest river?  You are only allowed to respond with the name of the river, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Simply respond with the name of the river."""
-            ,   "Average Temperature": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the average annual temperature in fahrenheit?  Format your answer as a number without text.  Do not include celsius.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number."""
-            ,   "Average Rainfall": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the average annual rainfall in inches?  Format your answer as a number without text.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number."""
+            "Closest Airport": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest airport?  You are only allowed to respond with the name of the airport, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.""",
+            "Closest Interstate": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest interstate?  You are only allowed to respond with the name of the interstate, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.""",
+            "Closest River": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the closest river?  You are only allowed to respond with the name of the river, nothing more.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Simply respond with the name of the river.""",
+            "Average Temperature": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the average annual temperature in fahrenheit?  Format your answer as a number without text.  Do not include celsius.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number.""",
+            "Average Rainfall": """A factory is located in Springfield, Illinois, United States at latitude 39.798363 and longitude -89.654961.  Given that latitude and longitude represent geographic coordinates, what is the average annual rainfall in inches?  Format your answer as a number without text.  Do not explain the answer.  Do not add comments.  Do not include a note.  Do not reply in a sentence.  Only reply with a number.""",
         }
 
         col1, col2 = st.columns((6, 1))
@@ -1409,22 +1688,38 @@ from supply_chain_network_optimization_db.entities.factory'''
         # Used for analyzing results with Cortex
         st.subheader("Cortex Enrichment ❄️")
 
-        st.info("The following page includes Cortex's Large Language Model (LLM) functions, which are in *Preview*")
+        st.info(
+            "The following page includes Cortex's Large Language Model (LLM) functions, which are in *Preview*"
+        )
 
-        st.write("Let's enrich our information on our factories to see if we can get greater context for the supply "
-                 "chain.")
+        st.write(
+            "Let's enrich our information on our factories to see if we can get greater context for the supply "
+            "chain."
+        )
 
         if "factory_df" not in st.session_state:
-            st.session_state.factory_df = session.table("supply_chain_network_optimization_db.entities.factory")\
-                .select(col("id"), col("name"), col("latitude"), col("longitude"), col("city"), col("state"), col("country"))\
+            st.session_state.factory_df = (
+                session.table("supply_chain_network_optimization_db.entities.factory")
+                .select(
+                    col("id"),
+                    col("name"),
+                    col("latitude"),
+                    col("longitude"),
+                    col("city"),
+                    col("state"),
+                    col("country"),
+                )
                 .distinct()
+            )
 
         with st.form("EnrichmentForm"):
             st.subheader("Enrichment Selection")
 
             st.write("Choose which fields you'd like to add to the factory data.")
-            st.write("The data will be provided via Cortex, using the llama2-70b-chat model.  Check out the expander below to see the "
-                     "prompts/queries directly.")
+            st.write(
+                "The data will be provided via Cortex, using the llama2-70b-chat model.  Check out the expander below to see the "
+                "prompts/queries directly."
+            )
 
             add_closest_airport = st.checkbox("Closest Airport", value=False)
             add_closest_interstate = st.checkbox("Closest Interstate", value=False)
@@ -1439,28 +1734,50 @@ from supply_chain_network_optimization_db.entities.factory'''
 
                 if add_closest_airport:
                     closest_airport_df = session.sql(closest_airport_sql)
-                    factory_df = factory_df.join(closest_airport_df, factory_df.id == closest_airport_df.id, rsuffix="_airport")
+                    factory_df = factory_df.join(
+                        closest_airport_df,
+                        factory_df.id == closest_airport_df.id,
+                        rsuffix="_airport",
+                    )
 
                 if add_closest_interstate:
                     closest_interstate_df = session.sql(closest_interstate_sql)
-                    factory_df = factory_df.join(closest_interstate_df, factory_df.id == closest_interstate_df.id, rsuffix="_interstate")
+                    factory_df = factory_df.join(
+                        closest_interstate_df,
+                        factory_df.id == closest_interstate_df.id,
+                        rsuffix="_interstate",
+                    )
 
                 if add_closest_river:
                     closest_river_df = session.sql(closest_river_sql)
-                    factory_df = factory_df.join(closest_river_df, factory_df.id == closest_river_df.id, rsuffix="_river")
+                    factory_df = factory_df.join(
+                        closest_river_df,
+                        factory_df.id == closest_river_df.id,
+                        rsuffix="_river",
+                    )
 
                 if add_average_temperature:
                     average_temperature_df = session.sql(average_temperature_sql)
-                    factory_df = factory_df.join(average_temperature_df, factory_df.id == average_temperature_df.id, rsuffix="_temperature")
+                    factory_df = factory_df.join(
+                        average_temperature_df,
+                        factory_df.id == average_temperature_df.id,
+                        rsuffix="_temperature",
+                    )
 
                 if add_average_rainfall:
                     average_rainfall_df = session.sql(average_rainfall_sql)
-                    factory_df = factory_df.join(average_rainfall_df, factory_df.id == average_rainfall_df.id, rsuffix="_rainfall")
+                    factory_df = factory_df.join(
+                        average_rainfall_df,
+                        factory_df.id == average_rainfall_df.id,
+                        rsuffix="_rainfall",
+                    )
 
                 st.dataframe(factory_df)
 
         with st.expander("See the queries themselves"):
-            selected_query = st.selectbox("Which query would you like to view?", sql_statements.keys())
+            selected_query = st.selectbox(
+                "Which query would you like to view?", sql_statements.keys()
+            )
             st.code(sql_statements[selected_query])
 
             st.write("Example Prompt")
@@ -1470,7 +1787,14 @@ from supply_chain_network_optimization_db.entities.factory'''
         set_default_sidebar()
 
 
-pages = [WelcomePage(), DataPreparationPage(), ModelParametersPage(), ModelExecutionPage(), ModelResultsPage(), CortexPage()]
+pages = [
+    WelcomePage(),
+    DataPreparationPage(),
+    ModelParametersPage(),
+    ModelExecutionPage(),
+    ModelResultsPage(),
+    CortexPage(),
+]
 
 
 def main():
