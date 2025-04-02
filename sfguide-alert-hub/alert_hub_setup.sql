@@ -49,7 +49,7 @@ use schema alert_hub.admin;
 create or replace function alert_hub.admin.get_sql_jinja(template string, parameters variant)
   returns string
   language python
-  runtime_version = 3.8
+  runtime_version = 3.10
   handler='apply_sql_template'
   packages = ('six','jinja2==3.0.3','markupsafe')
   comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
@@ -345,7 +345,7 @@ create or replace table alert_hub.admin.notification_integration comment='{"orig
 create or replace function alert_hub.admin.construct_notification_integration(not_int_name varchar, type varchar, enabled boolean, parameters object)
 returns string
 language python
-runtime_version = 3.8
+runtime_version = 3.10
 packages=('snowflake-snowpark-python')
 handler = 'construct_notification_integration'
 comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
@@ -396,7 +396,7 @@ $$
 create or replace procedure alert_hub.admin.deploy_notification_integration(notification_integration_name varchar)
 returns string
 language python
-runtime_version = 3.8
+runtime_version = 3.10
 packages=('snowflake-snowpark-python')
 handler = 'deploy_notification_integration'
 comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
@@ -453,7 +453,7 @@ $$
 create or replace procedure alert_hub.admin.notify(action_name varchar, condition_results array)
 returns string
 language python
-runtime_version = 3.8
+runtime_version = 3.10
 packages=('snowflake-snowpark-python')
 handler = 'notify'
 comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
@@ -509,7 +509,7 @@ $$;
 create or replace function alert_hub.admin.construct_alert(warehouse varchar, schedule varchar, alert_name varchar, condition_query varchar, action_name varchar)
 returns string
 language python
-runtime_version = 3.8
+runtime_version = 3.10
 handler = 'construct_alert'
 comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
 as
@@ -547,7 +547,7 @@ create or replace table alert_hub.admin.alert (warehouse_name varchar, alert_sch
 create or replace procedure alert_hub.admin.deploy_alert(alert_name varchar)
 returns string
 language python
-runtime_version = 3.8
+runtime_version = 3.10
 packages=('snowflake-snowpark-python')
 handler = 'deploy_alert'
 comment='{"origin":"sf_sit","name":"alert_hub","version":{"major":1, "minor":0},"attributes":{"component":"alert_hub"}}'
@@ -629,7 +629,7 @@ create or replace table alert_hub.deployment.script (
 create or replace procedure alert_hub.deployment.put_to_stage(stage varchar,filename varchar, content varchar)
 returns string
 language python
-runtime_version=3.8
+runtime_version=3.10
 packages=('snowflake-snowpark-python')
 handler='put_to_stage'
 AS $$
