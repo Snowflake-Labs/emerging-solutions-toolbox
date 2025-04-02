@@ -25,9 +25,6 @@
 [submodule "sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks"]
 	path = sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
 	url = https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
-[submodule "semantic-model-generator"]
-	path = semantic-model-generator
-	url = https://github.com/Snowflake-Labs/semantic-model-generator
 [submodule "dspy"]
 	path = dspy
 	url = https://github.com/stanfordnlp/dspy
