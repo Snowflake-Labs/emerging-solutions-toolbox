@@ -104,7 +104,7 @@ create or replace schema streamlit_deploy_demo_db.code;
 create or replace procedure streamlit_deploy_demo_db.code.put_to_stage(stage varchar,filename varchar, content varchar)
 returns string
 language python
-runtime_version=3.8
+runtime_version=3.10
 packages=('snowflake-snowpark-python')
 handler='put_to_stage'
 AS :::

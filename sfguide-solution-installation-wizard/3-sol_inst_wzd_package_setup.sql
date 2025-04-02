@@ -32,7 +32,7 @@ drop schema sol_inst_wzd_deployment_db.public;
 create or replace procedure sol_inst_wzd_deployment_db.code.put_to_stage(stage varchar,filename varchar, content varchar)
 returns string
 language python
-runtime_version=3.8
+runtime_version=3.10
 packages=('snowflake-snowpark-python')
 handler='put_to_stage'
 comment='{"origin":"sf_sit","name":"scad","version":{"major":1, "minor":0},"attributes":{"component":"scad"}}'
