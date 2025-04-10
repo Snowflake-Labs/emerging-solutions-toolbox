@@ -1,6 +1,21 @@
 # CONVERT2ICEBERG
 
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
 Convert2Iceberg is a Streamlit in Snowflake (SiS) app that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table, either by selecting the table by name or choosing a query that contains table(s) to convert. In addition, this app also allows the user compare query execution statistics between a query before and after the conversion to Iceberg.
+
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 ## Prerequisites:
 - The user deploying this app must have a role with the following privileges:
@@ -24,11 +39,6 @@ This app is scoped only to the tables and queries that the installing role has a
 
 This is due to Caller's Rights being blocked in SiS. This app will be updated to support multiple roles, once the limitation is removed.
 
-## Support Notice
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+## Tagging
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-The purpose of the code is to provide customers with easy access to innovative ideas that have been built to accelerate customers' adoption of key Snowflake features.  We certainly look for customers' feedback on these solutions and will be updating features, fixing bugs, and releasing new solutions on a regular basis.
-
-Please see TAGGING.md for details on object comments.
+Please see `TAGGING.md` for details on object comments.
