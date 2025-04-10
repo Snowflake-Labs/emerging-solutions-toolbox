@@ -1,22 +1,27 @@
 # Cohort Builder for Snowflake
 
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
 The Cohort Builder solution provides a method for creating and managing cohorts through a Streamlit application, utilizing Snowflake and Snowpark.
-
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty. Snowflake will not offer any support for use of the sample code.
-
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-Please see TAGGING.md for details on object comments.
-
-## Overview
-
-The Cohort Builder Model leverages Snowflake and Snowpark to create, manage, and schedule cohorts effectively.
 
 A cohort is a group of subjects that share a common characteristic or experience within a defined period. This tool allows users to build cohorts based on specific criteria, manage existing cohorts, and schedule cohort updates.
 
 **Cohort building** involves defining the criteria for inclusion in a cohort.
 **Cohort management** includes updating and maintaining cohorts over time.
 **Cohort scheduling** ensures that cohorts are refreshed at specified intervals to include the latest data.
+
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 ## Problem(s) to be Solved
 
@@ -60,3 +65,7 @@ The model assumes that the criteria for cohort inclusion are well-defined and th
 4. Follow in-app instructions to build, manage, and schedule your cohorts.
 
 By following these steps, users can leverage the power of Snowflake and Snowpark to create and maintain effective cohorts tailored to their specific needs.
+
+## Tagging
+
+Please see `TAGGING.md` for details on object comments.
