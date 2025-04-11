@@ -1,0 +1,14 @@
+definition_version: '2'
+entities:
+  cortex_search_app:
+    type: streamlit
+    identifier:
+      name: CORTEX_SEARCH_APP
+    main_file: app.py
+    pages_dir: pages
+    query_warehouse: CORTEX_SEARCH_TUTORIAL_WH
+    stage: CORTEX_SEARCH_STAGE
+    artifacts:
+      - app.py
+      - environment.yml
+      - pages

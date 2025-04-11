@@ -1,0 +1,17 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-toml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+-   repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+    -   id: codespell
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.1
+    hooks:
+      - id: ruff
+      - id: ruff-format

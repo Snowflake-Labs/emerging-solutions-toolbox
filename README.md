@@ -48,3 +48,4 @@ A solution can represent one of three types:
 | [Forecast Model Builder](/framework-forecast-model-builder) | FRAMEWORK | A toolkit for building robust ML forecasts on Snowflake, covering EDA/Modeling/Inference. |
 | [Convert2Iceberg](/helper-convert2iceberg) | HELPER | A utility that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table. |
 | [orchestration-framework](/orchestration-framework) | FRAMEWORK | A framework and application that executes various Cortex services. |
+| [PDF Contracts Solution](/sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake) | FRAMEWORK | A framework and application that executes various Cortex services. |
