@@ -1,5 +1,9 @@
 # Forecast Model Builder
 
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
 Forecast Model Builder is a notebook-based solution that simplifies the process of training and deploying time-series forecast models in Snowflake. <br>
 [Click here](https://quickstarts.snowflake.com/guide/building_scalable_time_series_forecasting_models_on_snowflake/index.html#0) to walk through a Quickstart of the solution.
 <br>
@@ -142,8 +146,16 @@ If you choose to stage a zip file when prompted by Cell 2 of the deployment note
 -----------------------------------------------
 
 ## Support Notice
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
 
 Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
-Please see TAGGING.md for details on object comments.
+## Tagging
+
+Please see `TAGGING.md` for details on object comments.
