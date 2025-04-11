@@ -1,0 +1,5 @@
+# Documenting attribution for some of the icons used in application
+<a href="https://www.flaticon.com/free-icons/application" title="application icons">Application icons created by Dooder - Flaticon</a>
+<a href="https://www.flaticon.com/free-icons/data-table" title="data table icons">Data table icons created by Flat Icons - Flaticon</a>
+<a href="https://www.flaticon.com/free-icons/furniture-and-household" title="furniture and household icons">Furniture and household icons created by Mayor Icons - Flaticon</a>
+<a href="https://www.flaticon.com/free-icons/mind-map" title="mind map icons">Mind map icons created by rizal2109 - Flaticon</a>
