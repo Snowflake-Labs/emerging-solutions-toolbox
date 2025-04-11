@@ -1,8 +1,21 @@
 # Secured Views to Dynamic Tables Conversion
 
-## Overview
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
 
 This project provides a process for converting secured views in Snowflake shares to dynamic tables. Secured views are essential for data governance, enabling organizations to share data while maintaining strict control over sensitive information. However, as data volumes grow, secured views can become challenging to manage and can impact performance. By converting these views to dynamic tables, we enhance data freshness, reduce maintenance overhead, and optimize performance.
+
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 ## Why Convert Secured Views to Dynamic Tables?
 
@@ -42,11 +55,6 @@ The process involves the following steps:
 
 This process streamlines secured view management, helping organizations optimize data-sharing performance and scalability in Snowflake.
 
-## Support Notice
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+## Tagging
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-The purpose of the code is to provide customers with easy access to innovative ideas that have been built to accelerate customers' adoption of key Snowflake features.  We certainly look for customers' feedback on these solutions and will be updating features, fixing bugs, and releasing new solutions on a regular basis.
-
-Please see TAGGING.md for details on object comments.
+Please see `TAGGING.md` for details on object comments.
