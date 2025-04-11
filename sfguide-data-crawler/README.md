@@ -1,19 +1,28 @@
 # Data Crawler Overview
-Created by Jason Summer, *Solution Innovation Architect - AI/ML*
 
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-Please see TAGGING.md for details on object comments.
-
-## Purpose
 The Data Crawler utility is a Snowflake stored procedure that prompts a Cortex Large Language Model (LLM) to generate a natural language description of each table contained in a Snowflake database and/or schema. The output of the utility are catalog table(s) containing natural language summaries of tables’ contents which can be easily searched, reviewed, revised and searched by team members.
 
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
+
 ## Data
+
 Prompts passed to the LLM include a given Snowflake table’s database name, schema name, table name, column names, table comment (if available and specified by user), and a sample of table data. Tables in databases or schemas can be crawled. When crawling a user-specified database or schema, all tables and views readable to the current user’s role executing the utility will be included. Table viewing follows standard Snowflake Role Based Access Control.
 
 ## AI Security
+
 Snowflake hosts and/or manages three types of large language models that power its AI Features: its own proprietary LLMs, open-source LLMs, and licensed proprietary LLMs (collectively, “LLMs”). Snowflake’s AI Features are subject to Snowflake’s standard shared responsibility model for data protection, governance, and security. Snowflake understands that trust is the foundation of its customer relationships and is committed to maintaining high standards of data security and privacy.
 
 ## Cortex LLMs
@@ -71,4 +80,9 @@ The final script creates a simple Streamlit user interface, `Data Crawler` with 
 The search feature on the `manage` page is a semantic search based on vector embeddings. Tables descriptions will be listed according to their semantic similarity to the text searched.
 
 ## Feedback
+
 Feedback welcome. Reach out to jason.summer@snowflake.com.
+
+## Tagging
+
+Please see `TAGGING.md` for details on object comments.
