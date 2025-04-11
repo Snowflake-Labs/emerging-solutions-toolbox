@@ -1,13 +1,9 @@
 # Supply Chain Network Optimization
-The Supply Chain Network Optimization solution provides a method for optimizing decisions through linear programming, utilizing Snowflake, Streamlit, Snowpark, and PuLP.
 
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty. Snowflake will not offer any support for use of the sample code.
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-Please see TAGGING.md for details on object comments.
-
-## Overview
 The Supply Chain Network Optimization Model utilizes [Linear Programming](https://en.wikipedia.org/wiki/Linear_programming), also called linear optimization or constraint programming.
 
 Linear programming uses a system of inequalities to define a feasible regional mathematical space, and a 'solver' that traverses that space by adjusting a number of decision variables, efficiently finding the most optimal set of decisions given constraints to meet a stated objective function.
@@ -19,6 +15,17 @@ The **objective function** defines the goal - maximizing or minimizing a value, 
 The **constraints** define the realities of the business - such as only shipping up to a stated capacity.
 
 We are utilizing the PuLP library, which allows us to define a linear program using Python and use virtually any solver we want.  We are using PuLP's included [CBC solver](https://github.com/coin-or/Cbc) for our models.
+
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 ## Problem(s) to be Solved
 For our model, we are large business with a large network of factories, distributors, and customers.  We want to deliver product in the cheapest possible way.
@@ -39,12 +46,18 @@ We are solving the problem with three different objectives... emulating a "crawl
 This is also a cost optimization model... it assumes you have to ship every customer their demand, even if it is a money-losing shipment.  To flip it to a "what customers should I ship to?", you would adjust the objective function to a profit maximimization model, and you would need to tie in revenue to it - first by adding price to every current customer, and adding every potential customer you know about and estimates of their volume/price/freight costs.
 
 ## Cortex
+
 In addition to making an optimal decision set for over 25k decisions, we can also leverage Snowflake's Cortex Large Language Model (LLM) functionality.  This gives us a good view into how we can leverage AI for enriching our supply chain data in an effort to understand the broader context of the supply chain.  Our examples add a few new fields that are generated through prompts.
 
 **Note** - AI is an imprecise science that is improving every day, so it is important to check results for reasonableness and to understand that values are approximate.  It is perfect for adding some additional flavor to our data, but is not ideal for analyzing our model results.
 
 ## Directions
+
 1. Run app_setup.sql as ACCOUNTADMIN in your Snowflake account
 2. In Snowsight, set your role to SCNO_ROLE, navigate to Projects on the left hand bar, and select Streamlit
 3. Select SUPPLY_CHAIN_NETWORK_OPTIMIZATION in your list of Streamlit Apps
 4. Follow in-app instructions
+
+## Tagging
+
+Please see `TAGGING.md` for details on object comments.
