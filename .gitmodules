@@ -34,3 +34,6 @@
 [submodule "orchestration-framework"]
 	path = orchestration-framework
 	url = https://github.com/Snowflake-Labs/orchestration-framework
+[submodule "sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake"]
+	path = sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake
+	url = https://github.com/Snowflake-Labs/sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake.git

@@ -1,0 +1,8 @@
+name: sf_env
+channels:
+  - snowflake
+dependencies:
+  - pypdfium2
+  - snowflake
+  - snowflake-ml-python
+  - streamlit=1.35.0
