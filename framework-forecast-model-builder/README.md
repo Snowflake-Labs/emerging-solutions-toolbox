@@ -18,16 +18,16 @@ Forecast Model Builder is a notebook-based solution that simplifies the process 
 
 FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb deploys the **Forecast Model Builder** solution into your **Snowflake** account. Several objects, including solution notebooks and a demo dataset, will be created. To get started download the [.ipynb file](https://github.com/Snowflake-Labs/emerging-solutions-toolbox/blob/main/framework-forecast-model-builder/FORECAST_MODEL_BUILDER_DEPLOYMENT.ipynb) from the repo and import the notebook into Snowsight. (For instructions on how to create a new Snowflake Notebook from an existing file, please see [this documentation](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks-create#create-a-new-notebook) and follow the instructions for creating a notebook from an existing file.)
 
-- **Cell 1** of the deployment notebook allows you to **establish the deployment settings**.  There are 4 user constants that can be set:
+- Python **Cell 1** (__1_USER_CONSTANTS_) of the deployment notebook allows you to **establish the deployment settings**.  There are 4 user constants that can be set:
   - `DEPLOYMENT_WH`
   - `SOLUTION_DB`
   - `SOLUTION_BASE_SCHEMA`
   - `DEPLOYMENT_STAGE` <br>
 
-- **Cell 2** will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration.<br>
+- Python **Cell 2** (__2_DEPLOYMENT_) will try to create the objects specified in the 4 user constants (if they do not already exist) and then prompt you to stage a zipped copy of the Emerging Solutions Toolbox or use a git integration.<br>
 This cell will also store mock time series data in a Snowflake table named \<`SOLUTION_DB`\>.\<`SOLUTION_BASE_SCHEMA`\>.DAILY_PARTITIONED_SAMPLE_DATA.<br>
 
-- **Cell 3 creates a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference). <br>
+- Python **Cell 3** (__3_PROJECT_DEPLOY_) **creates a new project. It is recommended that each forecasting project have a dedicated schema. If your role has the privilege to create schemas on SOLUTION_DB**, this cell will automatically create a new schema for each new project name. In that schema, this cell creates three notebooks (eda, modeling, and inference). <br>
 <br>
 
 Once setup is complete you will see the following database and associated objects:
@@ -46,7 +46,7 @@ You can start using the **Forecast Model Builder** solution by running the **Sno
 
 ## Deployment Steps
 
-The **instructions** vary depending on the privileges granted to the user running this deployment notebook. Follow the instructions that match your level of access.
+The **instructions** vary depending on the privileges granted to the user running this deployment notebook. **Follow the instruction option below that matches your level of access.**
 
 ### Option 1 (Fastest):
 **If your role has privileges to CREATE DATABASE …**
@@ -117,7 +117,7 @@ NOTE: Caution must be applied when using this approach. This deployment notebook
    GRANT USAGE ON FUTURE MODELS IN SCHEMA <SOLUTION_DB>.<PROJECT_SCHEMA> TO ROLE <role>;
    ```
 3. In **Cell 1** of the deployment notebook, specify an existing warehouse, database, schema, and stage for the four user constants. **Run Cell 1**.
-4. In **Cell 2**, open the code and comment out this line near the bottom:
+4. In **Cell 2**, unhide the code using the dropdown in the upper right corner of the cell and comment out this single line near the bottom:
    ```python
    session.sql(create_schema_sql).collect()
    ```

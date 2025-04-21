@@ -1,4 +1,4 @@
 project:
   type: website
 quartodoc:
-  package: ml_forecasting_incubator
+  package: forecast_model_builder
