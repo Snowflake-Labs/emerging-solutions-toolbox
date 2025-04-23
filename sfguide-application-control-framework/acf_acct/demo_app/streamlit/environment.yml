@@ -1,0 +1,8 @@
+name: sf_env
+channels:
+- snowflake
+dependencies:
+- streamlit=1.39.0
+- snowflake-native-apps-permission
+- altair
+- plotly
