@@ -25,9 +25,6 @@
 [submodule "sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks"]
 	path = sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
 	url = https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks
-[submodule "semantic-model-generator"]
-	path = semantic-model-generator
-	url = https://github.com/Snowflake-Labs/semantic-model-generator
 [submodule "dspy"]
 	path = dspy
 	url = https://github.com/stanfordnlp/dspy
@@ -37,3 +34,6 @@
 [submodule "orchestration-framework"]
 	path = orchestration-framework
 	url = https://github.com/Snowflake-Labs/orchestration-framework
+[submodule "sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake"]
+	path = sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake
+	url = https://github.com/Snowflake-Labs/sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake.git

@@ -1,0 +1,21 @@
+[project]
+name = "sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake"
+version = "0.1.0"
+description = "Powering a PDF Chatbot with Cortex Search and Document AI using Snowflake."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "langchain==0.1.15",
+    "pandas==2.2.2",
+    "pyPDF2==2.10.5",
+    "requests==2.32.3",
+    "snowflake>=0.12.1",
+    "snowflake-snowpark-python>=1.25.0"
+]
+
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["app"]

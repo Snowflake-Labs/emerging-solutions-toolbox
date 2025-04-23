@@ -133,3 +133,7 @@ dmypy.json
 
 .idea/
 .DS_Store
+
+# Quarto site
+docs/_site
+/.quarto/
