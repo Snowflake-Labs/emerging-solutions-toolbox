@@ -1,0 +1,1316 @@
+/*************************************************************************************************************
+Script :            setup_script.sql
+Create Date:        [[CURRENT_DATE]]
+Author:             Marc Henderson
+Description:        This template is used by the ACF Streamlit UI to create the Native App setup script 
+                    that includes the Provider's custom functions/procedures     
+Used By:            Streamlit UI
+
+Copyright © 2025 Snowflake Inc. All rights reserved
+
+*************************************************************************************************************/
+
+CREATE APPLICATION ROLE IF NOT EXISTS APP_ROLE;
+
+--create app schema  (only create items in this schema for each new install, not upgrades)
+CREATE SCHEMA IF NOT EXISTS app;
+GRANT USAGE ON SCHEMA app TO APPLICATION ROLE APP_ROLE;
+
+--create APP_KEY table
+CREATE TABLE IF NOT EXISTS APP.APP_KEY(app_key VARCHAR) AS
+                            SELECT ENCRYPT(HASH(CURRENT_ACCOUNT()||UPPER(CURRENT_DATABASE())||DATEADD(YEAR, 1119, SYSDATE())), UUID_STRING())::string;
+ALTER TABLE APP.APP_KEY SET COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"app_key","type":"table"}}';
+GRANT SELECT ON TABLE APP.APP_KEY TO APPLICATION ROLE APP_ROLE;
+
+--create APP_MODE table
+CREATE TABLE IF NOT EXISTS APP.APP_MODE(key VARCHAR, value VARCHAR) AS
+WITH app_mode_cte AS (
+select $1 AS key
+        ,$2 as value
+    FROM 
+    (VALUES  
+     ('app_mode', '[[APP_MODE]]')
+     ,('events_shared', 'n')
+     ,('tracker_configured', 'n')
+     ,('trust_center_access', 'n')
+    )
+)
+SELECT * FROM app_mode_cte;
+
+ALTER TABLE APP.APP_MODE SET COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"app_mode","type":"table"}}';
+GRANT SELECT ON TABLE APP.APP_MODE TO APPLICATION ROLE APP_ROLE;
+
+--create TRUST_CENTER_CHECK table
+CREATE TABLE IF NOT EXISTS APP.TRUST_CENTER_CHECK(key VARCHAR, value VARCHAR) AS
+WITH trust_center_check_cte AS (
+select $1 AS key
+        ,$2 as value
+    FROM 
+    (VALUES  
+      ('last_check_timestamp', '9999-01-01')
+     ,('risk_count', '0')
+     ,('affected_scanners', '')
+    )
+)
+SELECT * FROM trust_center_check_cte;
+
+ALTER TABLE APP.TRUST_CENTER_CHECK SET COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"trust_center_check","type":"table"}}';
+GRANT SELECT ON TABLE APP.TRUST_CENTER_CHECK TO APPLICATION ROLE APP_ROLE;
+
+--create METRICS table
+CREATE TABLE IF NOT EXISTS APP.METRICS(msg VARIANT);
+ALTER TABLE APP.METRICS SET COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"metrics","type":"table"}}';
+
+--create RUN_TRACKER table  this table is used to track runs for historical purposes
+CREATE TABLE IF NOT EXISTS APP.RUN_TRACKER(timestamp TIMESTAMP_NTZ, request_id VARCHAR, request_type VARCHAR, input_table VARCHAR, output_table VARCHAR) COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"run_tracker","type":"table"}}';
+
+--additional hidden objects here
+
+--create UTIL_APP schema
+CREATE OR ALTER VERSIONED SCHEMA util_app; 
+GRANT USAGE ON SCHEMA util_app TO APPLICATION ROLE APP_ROLE;
+
+--create METADATA_C_V view for Consumer
+CREATE OR REPLACE SECURE VIEW UTIL_APP.METADATA_C_V COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"metadata_c_v","type":"secure_view"}}'
+AS SELECT * FROM METADATA.METADATA_V 
+    WHERE LOWER(consumer_name) = 
+    (SELECT LOWER(consumer_name) FROM METADATA.METADATA_V 
+      WHERE LOWER(account_locator) = LOWER(CURRENT_ACCOUNT())
+      AND LOWER(key) = LOWER('app_mode')
+      AND LOWER(value) = LOWER('[[APP_MODE]]'))
+    AND LOWER(account_locator) = LOWER(CURRENT_ACCOUNT()) AND LOWER(key) NOT IN ('auto_enable','app_key');
+
+GRANT SELECT ON VIEW UTIL_APP.METADATA_C_V TO APPLICATION ROLE APP_ROLE;
+
+--create SCANNERS_C_V view for Consumer
+CREATE OR REPLACE SECURE VIEW UTIL_APP.SCANNERS_C_V COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"scanners_c_v","type":"secure_view"}}'
+AS SELECT * FROM TRUST_CENTER.SCANNERS_V;
+
+GRANT SELECT ON VIEW UTIL_APP.SCANNERS_C_V TO APPLICATION ROLE APP_ROLE;
+    
+--create LIMIT_TRACKER table
+EXECUTE IMMEDIATE
+$$
+  DECLARE
+    create_table_stmt VARCHAR;
+    alter_table_stmt VARCHAR;
+    onboarded_stmt VARCHAR;
+    onboarded_res RESULTSET;
+    onboarded_value VARCHAR;
+  BEGIN
+    onboarded_stmt := 'SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'enabled\'';
+    onboarded_res := (EXECUTE IMMEDIATE :onboarded_stmt);
+                                          
+    LET c_onboarded_value CURSOR FOR onboarded_res;
+
+    OPEN c_onboarded_value;
+    FETCH c_onboarded_value INTO onboarded_value;
+
+    IF(onboarded_value IS NULL) THEN
+      create_table_stmt := 'CREATE TABLE IF NOT EXISTS APP.LIMIT_TRACKER(key VARCHAR, value VARCHAR) AS
+                              SELECT \'total_requests\', \'0\' UNION ALL
+                              SELECT \'requests_processed_this_interval\', \'0\' UNION ALL
+                              SELECT \'input_records\', \'0\' UNION ALL
+                              SELECT \'input_records_this_interval\', \'0\' UNION ALL
+                              SELECT \'total_records_processed\', \'0\' UNION ALL
+                              SELECT \'records_processed_this_interval\', \'0\' UNION ALL
+                              SELECT \'total_matches\', \'0\' UNION ALL
+                              SELECT \'matches_this_interval\', \'0\' UNION ALL
+                              SELECT \'last_request_timestamp\', \'9998-01-01\';';
+    ELSE
+      create_table_stmt := 'CREATE TABLE IF NOT EXISTS APP.LIMIT_TRACKER(key VARCHAR, value VARCHAR) AS
+                              SELECT \'total_requests\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'total_requests\' UNION ALL
+                              SELECT \'requests_processed_this_interval\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'requests_processed_this_interval\' UNION ALL
+                              SELECT \'input_records\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'input_records\' UNION ALL
+                              SELECT \'input_records_this_interval\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'input_records_this_interval\' UNION ALL
+                              SELECT \'total_records_processed\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'total_records_processed\' UNION ALL
+                              SELECT \'records_processed_this_interval\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'records_processed_this_interval\' UNION ALL
+                              SELECT \'total_matches\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'total_matches\' UNION ALL
+                              SELECT \'matches_this_interval\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'matches_this_interval\' UNION ALL
+                              SELECT \'last_request_timestamp\', value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \'last_request_timestamp\';';
+    END IF;
+
+    EXECUTE IMMEDIATE :create_table_stmt;
+
+    alter_table_stmt := 'ALTER TABLE APP.LIMIT_TRACKER SET COMMENT = \'{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"limit_tracker","type":"table"}}\'';
+    EXECUTE IMMEDIATE :alter_table_stmt;
+
+    RETURN 'done';
+  END;
+$$;
+
+--create ALL_PROCS table to list all of the potential stored procedures that can be accessed via the REQUEST stored procedure
+CREATE OR REPLACE TABLE UTIL_APP.ALL_PROCS (proc_name VARCHAR, proc_signature VARCHAR, require_input_table VARCHAR) COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"all_procs","type":"table"}}';
+
+--create ALLOWED_PROCS_V view to list the stored procedures that the consumer can access, based on APP_MODE
+CREATE OR REPLACE SECURE VIEW UTIL_APP.ALLOWED_PROCS_V COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"allowed_procs_v","type":"secure_view"}}'
+AS SELECT * FROM UTIL_APP.ALL_PROCS
+WHERE ARRAY_CONTAINS(LOWER(proc_name)::variant, (SELECT SPLIT(LOWER(value), ',') FROM UTIL_APP.METADATA_C_V WHERE key = 'allowed_procs'));
+
+GRANT SELECT ON VIEW UTIL_APP.ALLOWED_PROCS_V TO APPLICATION ROLE APP_ROLE;
+
+--create REQUEST_SUMMARY_C_V view
+CREATE OR REPLACE SECURE VIEW UTIL_APP.REQUEST_SUMMARY_C_V COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"verification_metrics","type":"secure_view"}}'
+AS
+SELECT
+  MSG:account::VARCHAR account
+  ,MSG:consumer_name::VARCHAR consumer_name
+  ,MAX(REPLACE(MSG:entry_type,'"','')) entry_type
+  ,MSG:event_attributes[0]:request_id::VARCHAR request_id
+  ,MAX(MSG:event_attributes[1]:proc_name::VARCHAR) proc_name
+  ,MAX(MSG:event_attributes[2]:proc_parameters::VARCHAR) proc_parameters
+  ,MAX(MSG:message:metrics:input_table_name::VARCHAR) input_table_name
+  ,MAX(MSG:message:metrics:input_record_count::NUMBER(38,0)) input_record_count
+  ,MAX(MSG:message:metrics:results_table_name::VARCHAR) results_table_name
+  ,MAX(MSG:message:metrics:results_record_count::NUMBER(38,0)) results_record_count
+  ,MAX(MSG:message:metrics:results_record_count_distinct::NUMBER(38,0)) results_record_count_distinct
+  ,MIN(MSG:status::VARCHAR) status
+  ,MAX(MSG:message:metrics:comments::VARCHAR) comments
+  ,MAX(MSG:message:metrics:submitted_ts::VARCHAR) submitted_ts
+  ,MAX(MSG:message:metrics:completed_ts::VARCHAR) completed_ts
+FROM APP.METRICS
+WHERE LOWER(MSG:entry_type) = 'metric'
+AND LOWER(MSG:message:metric_type) = 'request_summary'
+GROUP BY 1,2,4
+ORDER BY 1,2,4;
+
+GRANT SELECT ON VIEW UTIL_APP.REQUEST_SUMMARY_C_V TO APPLICATION ROLE APP_ROLE;
+
+
+--create CONFIGURE_TRACKER procedure 
+CREATE OR REPLACE PROCEDURE UTIL_APP.CONFIGURE_TRACKER()
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"configure_tracker","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS 
+  $$
+
+  try {
+    //get consumer Snowflake Account Locator
+    var rset = snowflake.execute({sqlText:`SELECT CURRENT_ACCOUNT();`});
+    rset.next();
+    let account_locator = rset.getColumnValue(1);
+
+    //get local app key
+    var rset = snowflake.execute({sqlText: `SELECT app_key FROM APP.APP_KEY;`});
+    rset.next();
+    let app_key_local = rset.getColumnValue(1);
+
+    //check app_mode
+    var rset = snowflake.execute({sqlText: `SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'app_mode';`});
+    rset.next();
+    let app_mode = rset.getColumnValue(1);
+
+    let consumer_name = '';
+
+    if (app_mode.toLocaleLowerCase() == 'free') {
+      var rset = snowflake.execute({sqlText:`SELECT 'FREE_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+      rset.next();
+      consumer_name = rset.getColumnValue(1);
+    } 
+
+    if (app_mode.toLocaleLowerCase() == 'paid') {
+      var rset = snowflake.execute({sqlText:`SELECT 'PD_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+      rset.next();
+      consumer_name = rset.getColumnValue(1);
+    }
+    
+    //check for either enterprise or enterprise demo mode
+    let entRegex = new RegExp('enterprise*', 'gi');
+    if (entRegex.test(app_mode.toLocaleLowerCase())) {
+      var rset = snowflake.execute({sqlText:`SELECT consumer_name FROM UTIL_APP.METADATA_C_V;`});
+      rset.next();
+      consumer_name = rset.getColumnValue(1);
+    }
+
+    if (app_mode.toLocaleLowerCase() != 'free') {
+      //create serverless task to check every 15 mins whether to reset the the counters based on the specified interval
+      snowflake.execute({sqlText:`CREATE OR REPLACE TASK APP.COUNTER_RESET_TASK
+                                        SCHEDULE = '15 minute'
+                                        COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"local_counter_reset","type":"task"}}'
+                                        AS
+                                        EXECUTE IMMEDIATE
+                                        \$\$
+                                          DECLARE
+                                            update_stmt VARCHAR;
+                                            log_reset VARCHAR;
+                                            current_timestamp TIMESTAMP_NTZ;
+                                            next_timestamp TIMESTAMP_NTZ;
+                                            res RESULTSET;
+                                            interval VARCHAR;
+                                            account_locator VARCHAR;
+                                            consumer_name VARCHAR;
+                                            app_key VARCHAR;
+                                            app_mode VARCHAR;
+                                            c_current_timestamp CURSOR FOR SELECT SYSDATE();
+                                            c_interval CURSOR FOR SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'limit_interval';
+                                            c_account_locator CURSOR FOR SELECT account_locator FROM UTIL_APP.METADATA_C_V LIMIT 1; 
+                                            c_consumer_name CURSOR FOR SELECT consumer_name FROM UTIL_APP.METADATA_C_V LIMIT 1; 
+                                            c_app_key CURSOR FOR SELECT app_key FROM APP.APP_KEY;
+                                            c_app_mode CURSOR FOR SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'app_mode';
+                                          BEGIN
+                                            OPEN c_current_timestamp;
+                                            FETCH c_current_timestamp INTO current_timestamp;
+
+                                            OPEN c_interval;
+                                            FETCH c_interval INTO interval;
+
+                                            OPEN c_account_locator;
+                                            FETCH c_account_locator INTO account_locator;
+
+                                            OPEN c_consumer_name;
+                                            FETCH c_consumer_name INTO consumer_name;
+
+                                            OPEN c_app_key;
+                                            FETCH c_app_key INTO app_key;
+
+                                            OPEN c_app_mode;
+                                            FETCH c_app_mode INTO app_mode;
+
+                                            LET next_stmt VARCHAR := 'SELECT value::timestamp_ntz + INTERVAL \\\'' || interval ||  '\\\' FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = \\\'limit_reset_timestamp\\\'';
+                                            res := (EXECUTE IMMEDIATE :next_stmt);
+                                            
+                                            LET c_next_timestamp CURSOR FOR res;
+                                            OPEN c_next_timestamp;
+                                            FETCH c_next_timestamp INTO next_timestamp;
+                                            
+                                            IF(current_timestamp >= next_timestamp) THEN
+                                              update_stmt := 'UPDATE APP.LIMIT_TRACKER SET value = \\\'0\\\' WHERE LOWER(key) IN (\\\'input_records_this_interval\\\',\\\'requests_processed_this_interval\\\', \\\'records_processed_this_interval\\\',\\\'matches_this_interval\\\')';
+                                              EXECUTE IMMEDIATE :update_stmt;
+
+                                              log_reset := 'CALL UTIL_APP.APP_LOGGER(\\\'' || account_locator || '\\\', \\\'' || consumer_name || '\\\', \\\'' || app_key || '\\\', \\\'' || app_mode || '\\\', \\\'log\\\', \\\'reset_counters\\\', \\\'""\\\', SYSDATE(), \\\'COMPLETE\\\', \\\'"Please reset counters for this consumer."\\\')';
+                                              EXECUTE IMMEDIATE :log_reset;    
+                                            END IF;
+
+                                            RETURN 'done';
+                                          END;
+                                        \$\$;`});
+
+      //start task
+      snowflake.execute({sqlText:`ALTER TASK APP.COUNTER_RESET_TASK RESUME;`});
+    }
+
+    //create serverless task send a heartbeat message once a day to keep the event streams alive
+    snowflake.execute({sqlText:`CREATE OR REPLACE TASK APP.HEARTBEAT_TASK
+                                SCHEDULE = '1440 minute'
+                                COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"heartbeat_task","type":"task"}}'
+                                AS
+                                  CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'heartbeat', '""', SYSDATE(), 'COMPLETE', '"heartbeat sent"');`});
+
+    //start task
+    snowflake.execute({sqlText:`ALTER TASK APP.HEARTBEAT_TASK RESUME;`});
+
+    //update tracker_configured flag
+    snowflake.execute({sqlText: `UPDATE APP.APP_MODE SET value = 'y' WHERE LOWER(key) = 'tracker_configured';`});
+
+    return `Tracker configured.`;
+      
+  } catch (err) {
+    var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+
+    return `Error: ${result}`;
+  }
+  $$;
+
+
+--grant access to configure_tracker
+GRANT USAGE ON PROCEDURE UTIL_APP.CONFIGURE_TRACKER() TO APPLICATION ROLE APP_ROLE;
+
+
+--create register_callback function
+CREATE OR REPLACE PROCEDURE UTIL_APP.REGISTER_SINGLE_CALLBACK(ref_name string, operation string, ref_or_alias string)
+RETURNS STRING
+LANGUAGE SQL
+COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"register_single_callback","type":"procedure"}}'
+AS 
+$$
+  BEGIN
+  CASE (operation)
+   WHEN 'ADD' THEN
+      SELECT SYSTEM$ADD_REFERENCE(:ref_name, :ref_or_alias);
+   WHEN 'REMOVE' THEN
+      SELECT SYSTEM$REMOVE_REFERENCE(:ref_name, :ref_or_alias);
+   WHEN 'CLEAR' THEN
+      SELECT SYSTEM$REMOVE_REFERENCE(:ref_name, :ref_or_alias);
+   ELSE
+      RETURN 'unknown operation: ' || operation;
+  END CASE;
+  RETURN 'operation: ' || operation || ' for alias: ' || ref_or_alias || ' complete.';
+  END;
+$$;
+
+GRANT USAGE ON PROCEDURE UTIL_APP.REGISTER_SINGLE_CALLBACK(STRING,STRING,STRING) TO APPLICATION ROLE APP_ROLE;
+
+-- create streamlit
+CREATE OR REPLACE STREAMLIT util_app.streamlit
+  FROM 'streamlit/'
+  MAIN_FILE = 'main.py'
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"native_app_streamlit_ui","type":"streamlit"}}';
+
+GRANT USAGE ON STREAMLIT util_app.streamlit TO APPLICATION ROLE APP_ROLE;
+
+--create app_logger procedure to log messages to the event table
+CREATE OR REPLACE PROCEDURE UTIL_APP.APP_LOGGER(account_locator VARCHAR, consumer_name VARCHAR, app_key VARCHAR, app_mode VARCHAR, entry_type VARCHAR, event_type VARCHAR, event_attributes VARCHAR, timestamp TIMESTAMP_NTZ, status VARCHAR, message VARCHAR)
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"app_logger","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS 
+  $$
+  
+  try {
+      //construct log msg
+      var rset = snowflake.execute({sqlText: `SELECT PARSE_JSON(
+                                        '{
+                                            "account":"${ACCOUNT_LOCATOR}",
+                                            "app_code":"[[APP_CODE]]",
+                                            "consumer_name":"${CONSUMER_NAME}",
+                                            "app_key":"${APP_KEY}",
+                                            "app_mode":"${APP_MODE}",
+                                            "entry_type":"${ENTRY_TYPE}",
+                                            "event_type":"${EVENT_TYPE}",
+                                            "event_attributes":${EVENT_ATTRIBUTES.replace(/\'/g, "\\'")},
+                                            "timestamp":"'||SYSDATE()||'",
+                                            "status":"${STATUS}",
+                                            "message":'||TRIM(\$\$ ${MESSAGE}\$\$)||'
+                                        }');`});
+      rset.next()
+      var msg = rset.getColumnValue(1);
+      
+      //add new msg to events table
+      snowflake.log('info', msg);
+
+      return `Logged: ${MESSAGE}`;
+  } catch (err) {
+    var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+
+    //log error
+    snowflake.log('error', `${result}`);
+ 
+    return `Error: ${result}`;
+  }
+  $$
+;
+
+--create metrics_logger procedure to log stats to the metrics table
+CREATE OR REPLACE PROCEDURE UTIL_APP.METRICS_LOGGER(account_locator VARCHAR, consumer_name VARCHAR, app_key VARCHAR, app_mode VARCHAR, entry_type VARCHAR, event_type VARCHAR, event_attributes VARCHAR, timestamp TIMESTAMP_NTZ, status VARCHAR, message VARCHAR)
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"metrics_logger","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS 
+  $$
+  
+  try {
+      //add new msg to metrics table
+      snowflake.execute({sqlText: `INSERT INTO APP.METRICS(msg) SELECT PARSE_JSON(
+                                        '{
+                                            "account":"${ACCOUNT_LOCATOR}",
+                                            "app_code":"[[APP_CODE]]",
+                                            "consumer_name":"${CONSUMER_NAME}",
+                                            "app_key":"${APP_KEY}",
+                                            "app_mode":"${APP_MODE}",
+                                            "entry_type":"${ENTRY_TYPE}",
+                                            "event_type":"${EVENT_TYPE}",
+                                            "event_attributes":${EVENT_ATTRIBUTES.replace(/\'/g, "\\'")},
+                                            "timestamp":"'||SYSDATE()||'",
+                                            "status":"${STATUS}",
+                                            "message":'||TRIM(\$\$ ${MESSAGE}\$\$)||'
+                                        }')`});
+
+      return `Logged: ${MESSAGE}`;
+  } catch (err) {
+    var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+
+    //log error
+    snowflake.log('error', `${result}`);
+ 
+    return `Error: ${result}`;
+  }
+  $$
+;
+
+CREATE OR REPLACE PROCEDURE UTIL_APP.CUSTOM_EVENT_BILLING(class_name VARCHAR, subclass_name VARCHAR, start_timestamp FLOAT, timestamp FLOAT, base_charge FLOAT, objects VARCHAR, additional_info VARCHAR)
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"event_billing","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS
+  $$
+    /**
+      * Format timestamps as Unix timestamps in milliseconds
+    */
+
+    try {
+      var rset = snowflake.execute({sqlText: `SELECT SYSTEM$CREATE_BILLING_EVENT('${CLASS_NAME}',
+                                                    '${SUBCLASS_NAME}',
+                                                    ${START_TIMESTAMP},
+                                                    ${TIMESTAMP},
+                                                    ${BASE_CHARGE},
+                                                    '${OBJECTS}',
+                                                    '${ADDITIONAL_INFO}');`});
+      rset.next()
+      var msg = rset.getColumnValue(1);
+
+      return msg;
+
+      } catch(err) {
+          var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+
+          //log error
+          snowflake.log('error', `${result}`);
+      
+          return `Error: ${result}`;
+      }
+  $$
+  ;
+
+--create log_form procedure
+CREATE OR REPLACE PROCEDURE UTIL_APP.LOG_FORM(first_name string, last_name string, title string, business_email string, industry string, contact_reason string, contact_reason_text string)
+RETURNS VARIANT
+LANGUAGE PYTHON
+PACKAGES=('snowflake-snowpark-python', 'snowflake-telemetry-python')
+RUNTIME_VERSION=3.11
+HANDLER='run'
+COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"log_form","type":"procedure"}}'
+EXECUTE AS OWNER
+AS
+$$
+from snowflake import telemetry
+def run(session,first_name,last_name,title,business_email,industry,contact_reason,contact_reason_text):
+  telemetry.set_span_attribute("example.proc.do_tracing", "begin")
+  telemetry.add_event("CUSTOMER_OUTREACH_FORM",{"first_name":first_name,"last_name":last_name,"title":title,"business_email":business_email,"industry":industry,"contact_reason":contact_reason,"contact_reason_text":contact_reason_text })
+  return "SUCCESS"
+$$
+;
+
+--create results_app schema 
+CREATE SCHEMA IF NOT EXISTS results_app;
+GRANT CREATE TABLE, USAGE ON SCHEMA results_app TO APPLICATION ROLE APP_ROLE; 
+
+--create funcs_app schema
+CREATE OR ALTER VERSIONED SCHEMA funcs_app;
+GRANT USAGE ON SCHEMA funcs_app TO APPLICATION ROLE APP_ROLE;
+
+--create procs_app schema
+CREATE OR ALTER VERSIONED SCHEMA procs_app;
+GRANT USAGE ON SCHEMA procs_app TO APPLICATION ROLE APP_ROLE; 
+
+--create LOG_SHARE_INSERT procedure
+CREATE OR REPLACE SECURE PROCEDURE PROCS_APP.LOG_SHARE_INSERT()
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"consumer_log_share","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS     
+  $$
+
+  //function to insert logs into log table
+  function log_insert() {
+    //log all previous application installation events
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"app_role application role created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app schema created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.app_key table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.app_mode table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.trust_center_check table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.metrics table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.limit_tracker table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.run_tracker table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app schema created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.all_procs table created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.allowed_procs_v view created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.metadata_c_v view created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.scanners_c_v view created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.app.heartbeat_task task created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.request_summary_c_v view created."');`});
+    if (app_mode.toLocaleLowerCase() != 'free') {
+      snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.configure_tracker procedure created."');`});
+    }
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.register_single_callback procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.streamlit streamlit created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.app_logger procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.metrics_logger procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.custom_event_billing procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.util_app.log_form procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.results_app schema created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.funcs_app schema created"');`});
+    [[LOG_FUNCS]]
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.procs_app schema created"');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.procs_app.log_share_insert procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.procs_app.request procedure created."');`});
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'PROCESSING', '"${current_db.toLocaleLowerCase()}.procs_app.trust_center_access procedure created."');`});
+    [[LOG_PROCS]]
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'COMPLETE', '"install successful. app key generated: ${app_key_local}"');`});
+  }
+  
+  //get application database
+  var rset = snowflake.execute({sqlText:`SELECT CURRENT_DATABASE();`});
+  rset.next();
+  var current_db = rset.getColumnValue(1);
+
+  //get consumer Snowflake Account Locator
+  var rset = snowflake.execute({sqlText:`SELECT CURRENT_ACCOUNT();`});
+  rset.next();
+  let account_locator = rset.getColumnValue(1);
+
+  //get local app key
+  var rset = snowflake.execute({sqlText: `SELECT app_key FROM APP.APP_KEY;`});
+  rset.next();
+  let app_key_local = rset.getColumnValue(1);
+
+  //check app_mode
+  var rset = snowflake.execute({sqlText: `SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'app_mode';`});
+  rset.next();
+  let app_mode = rset.getColumnValue(1);
+
+  //get consumer_name
+  let consumer_name = '';
+
+  if (app_mode.toLocaleLowerCase() == 'free') {
+    var rset = snowflake.execute({sqlText:`SELECT 'FREE_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  } 
+
+  if (app_mode.toLocaleLowerCase() == 'paid') {
+    var rset = snowflake.execute({sqlText:`SELECT 'PD_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  }
+  
+  //check for either enterprise or an optional demo mode (if adding a demo app_mode type, it is recommended to copy the ENTERPRISE app mode)
+  let entRegex = new RegExp('enterprise*', 'gi');
+  if (entRegex.test(app_mode.toLocaleLowerCase())) {
+    var rset = snowflake.execute({sqlText:`SELECT consumer_name FROM UTIL_APP.METADATA_C_V;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  }
+   
+  try {
+    var rset = snowflake.execute({sqlText: `SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'events_shared';`});
+    rset.next();
+    events_shared = rset.getColumnValue(1);
+
+    //call log_insert if value set to no
+    if(events_shared.toLocaleLowerCase() == 'n') {
+      log_insert();
+
+      //update app_mode table to set events_shared to yes
+      snowflake.execute({sqlText: `UPDATE APP.APP_MODE SET value = 'y' WHERE LOWER(key) = 'events_shared';`});
+
+      //log that events have been added to event table.
+      snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'install', '""', SYSDATE(), 'COMPLETE', '"Install events added to event table."');`});
+
+      return `Install events added to event table.`;
+
+    } else {
+      return `No action taken. Install events are already added to event table`;
+    }
+  } catch (err) {
+    var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+
+    return `Error: ${result}`;
+  }
+  $$
+;
+
+//grant USAGE on LOG_SHARE_INSERT to APP_ROLE
+GRANT USAGE ON PROCEDURE PROCS_APP.LOG_SHARE_INSERT() TO APPLICATION ROLE APP_ROLE;
+
+
+--create REQUEST procedure
+CREATE OR REPLACE SECURE PROCEDURE PROCS_APP.REQUEST(parameters VARCHAR)
+  RETURNS VARCHAR
+  LANGUAGE JAVASCRIPT
+  COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"app_request","type":"procedure"}}'
+  EXECUTE AS OWNER
+  AS     
+  $$
+
+  function comparison_eval(target, comparison, value) {
+    var flag;
+
+    switch(comparison){
+      case '=':
+        if(value == target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '==':
+        if(value == target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '===':
+        if(value === target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '!=':
+        if(value != target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '!==':
+        if(value !== target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '>':
+        if(value > target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '>=':
+        if(value >= target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '<':
+        if(value < target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '<=':
+        if(value <= target){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      default:
+        flag = false;
+    }
+    return flag;
+  }
+
+  function logical_eval(bool_1, logical, bool_2) {
+    var flag;
+
+    switch(logical.toLocaleLowerCase()){
+      case 'and':
+        if(bool_1 && bool_2){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case 'or':
+        if(bool_1 || bool_2){
+            flag = true;
+        } else {
+            flag = false;
+        }
+        break;
+      case '!':
+        if(!bool_1){
+            flag = false;
+        } else {
+            flag = true;
+        }
+        break;
+      default:
+        flag = false;
+    }
+    return flag;
+  }
+
+  var timeout = 300000; //milliseconds - 5 min timeout
+
+  //current date
+  const date = Date.now();
+  var currentDate = null;
+
+  //check app_mode
+  var rset = snowflake.execute({sqlText: `SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'app_mode';`});
+  rset.next();
+  var app_mode = rset.getColumnValue(1);
+
+  //get consumer_name
+  let consumer_name = '';
+
+  if (app_mode.toLocaleLowerCase() == 'free') {
+    var rset = snowflake.execute({sqlText:`SELECT 'FREE_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  } 
+
+  if (app_mode.toLocaleLowerCase() == 'paid') {
+    var rset = snowflake.execute({sqlText:`SELECT 'PD_' || CURRENT_ACCOUNT_NAME() as acct_name;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  }
+  
+  //check for either enterprise or an optional demo mode (if adding a demo app_mode type, it is recommended to copy the ENTERPRISE app mode)
+  let entRegex = new RegExp('enterprise*', 'gi');
+  if (entRegex.test(app_mode.toLocaleLowerCase())) {
+    var rset = snowflake.execute({sqlText:`SELECT consumer_name FROM UTIL_APP.METADATA_C_V;`});
+    rset.next();
+    consumer_name = rset.getColumnValue(1);
+  }
+
+try {
+    //generate new request id
+    var rset = snowflake.execute({sqlText:`SELECT UUID_STRING();`});
+    rset.next();
+    var request_id = rset.getColumnValue(1);
+
+    //add request_id to temp table in case it needs to be accessed by other procs
+    snowflake.execute({sqlText:`CREATE OR REPLACE TABLE UTIL_APP.REQUEST_ID_TEMP (request_id VARCHAR) AS SELECT '${request_id}';`});
+
+    //get consumer Snowflake Account Locator
+    var rset = snowflake.execute({sqlText:`SELECT CURRENT_ACCOUNT();`});
+    rset.next();
+    var account_locator = rset.getColumnValue(1);
+
+    //get app key from local app
+    var rset = snowflake.execute({sqlText: `SELECT app_key FROM APP.APP_KEY;`});
+    rset.next();
+    var app_key_local = rset.getColumnValue(1);
+
+    var limit = '';
+    var limit_type = '';
+    var limit_enforced = '';
+    var limit_check_logic = '';
+
+    var results_record_count = 0;
+    var results_record_count_distinct = 0;
+
+    //get input table
+    var rset = snowflake.execute({sqlText: `SELECT PARSE_JSON('${PARAMETERS}'):input_table;`});
+    rset.next();
+    var input_table = rset.getColumnValue(1);
+    input_table = input_table.replace(/"/g, "");  
+
+    //get input table details, if applicable
+    var input_record_count = 0;
+    if(input_table) {
+      //get input record count
+      var rset = snowflake.execute({sqlText:`SELECT COUNT(*) FROM ${input_table};`});
+      rset.next();
+      input_record_count = rset.getColumnValue(1);
+    }  
+    
+    //get proc name
+    var rset = snowflake.execute({sqlText: `SELECT PARSE_JSON('${PARAMETERS}'):proc_name;`});
+    rset.next();
+    var proc_name = rset.getColumnValue(1);
+    proc_name = proc_name.replace(/"/g, "");
+
+    //get proc parameters
+    var rset = snowflake.execute({sqlText: `SELECT PARSE_JSON('${PARAMETERS}'):proc_parameters::varchar;`});
+    rset.next();
+    var proc_parameters = rset.getColumnValue(1);
+    //proc_parameters = proc_parameters.replace(/[\[\]]+/g,'').replace(/\'/g, "\\'").replace(/"/g, "'");
+    //removes opening and closing brackets, preserving array brackets, when present
+    proc_parameters = proc_parameters.replace(/\'/g, "\\'").replace(/"/g, "'").slice(1,-1); 
+
+    //escape single quotes
+    var proc_parameters_esc = proc_parameters.replace(/\'/g, "\\'").replace(/\\\\\'/g, "\\'");
+
+    //get results table
+    var rset = snowflake.execute({sqlText: `SELECT PARSE_JSON('${PARAMETERS}'):results_table;`});
+    rset.next();
+    var results_table = rset.getColumnValue(1);
+
+    //get require_input_table flag from ALLOWED_PROCS_V
+    var rset = snowflake.execute({sqlText: `SELECT require_input_table FROM UTIL_APP.ALLOWED_PROCS_V WHERE LOWER(proc_name) = LOWER('${proc_name}');`});
+    rset.next();
+    var require_input_table = rset.getColumnValue(1);
+    
+    //check if enabled
+    var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'enabled';`});
+    rset.next();
+    var enabled = rset.getColumnValue(1);
+  
+    if(enabled.toLocaleLowerCase() == 'n') {
+      //log requests disabled
+      snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"requests disabled."');`});
+
+      return `ERROR:  Requests are disabled. Please contact the app's UTIL_APP.METADATA_C_V view for more details.`;
+    } else {
+      //check if the app_key from METADATA_V matches the local app_key.
+      //if they do not match, then the provider has not processed the new install yet and the consumer cannot use the app until the new install has been processed.
+
+      //get app key from provider metadata (METADATA_V)
+      var rset = snowflake.execute({sqlText: `SELECT value FROM METADATA.METADATA_V 
+                                              WHERE LOWER(account_locator) = LOWER('${account_locator}')
+                                              AND LOWER(consumer_name) = LOWER('${consumer_name}') 
+                                              AND LOWER(key) = 'app_key';`});
+      
+      if(rset.next()) {
+        var app_key_metadata = rset.getColumnValue(1);
+
+        if(app_key_metadata.toLocaleLowerCase() != app_key_local.toLocaleLowerCase()) {
+          //log error
+          snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"This app key does not match the key the app Provider expects. If this is a new install or reinstall, please wait until the app Provider has processed the install or reinstall. Please contact the app Provider for more details."');`});
+
+          //return error
+          return `ERROR:  This app key does not match the key the app Provider expects. If this is a new install or reinstall, please wait until the app Provider has processed the install or reinstall. Please contact the app Provider for more details.`; 
+        } else {
+          //get limit from METADATA_C_V
+          var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'limit';`});
+          rset.next();
+          limit = parseInt(rset.getColumnValue(1));
+
+          //get limit type METADATA_C_V
+          var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'limit_type';`});
+          rset.next();
+          limit_type = rset.getColumnValue(1);
+
+          //get limit_interval
+          var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'limit_interval';`});
+          rset.next();
+          var limit_interval = rset.getColumnValue(1);
+
+          //get limit_enforced flag
+          var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'limit_enforced';`});                                        
+          rset.next();
+          limit_enforced = rset.getColumnValue(1);
+          
+          //get current request counter within in interval
+          var rset = snowflake.execute({sqlText: `SELECT value FROM APP.LIMIT_TRACKER WHERE LOWER(key) = 'requests_processed_this_interval';`});                                        
+          rset.next();
+          var requests_processed_this_interval = parseInt(rset.getColumnValue(1));
+
+          //get current record counter within in interval
+          var rset = snowflake.execute({sqlText: `SELECT value FROM APP.LIMIT_TRACKER WHERE LOWER(key) = 'records_processed_this_interval';`});                                        
+          rset.next();
+          var records_processed_this_interval = parseInt(rset.getColumnValue(1));
+
+          //get limit check logic
+          if(limit_type.toLocaleLowerCase() == 'requests') {
+            limit_check_logic = ((requests_processed_this_interval + 1) <= limit);
+          }
+          
+          if(limit_type.toLocaleLowerCase() == 'records') {
+            limit_check_logic = ((limit - records_processed_this_interval) > 0);
+          }
+
+          //if there are limits on records processed, checks the input table count to ensure the request does not go over the limit
+          //also ensures that a valid input table is supplied, when required, to avoid circumventing the limit check
+          if ((require_input_table.toLocaleLowerCase() == 'n') || ((input_record_count > 0) && limit_check_logic) || limit_enforced.toLocaleLowerCase() == 'n') {
+            var tc_risk_count = 0
+
+            //check if trust center enforcement is enabled
+            var rset = snowflake.execute({sqlText: `SELECT value FROM METADATA.METADATA_V 
+                                                    WHERE LOWER(ACCOUNT_LOCATOR) = 'global'
+                                                    AND LOWER(key) = 'trust_center_enforcement';`});
+            rset.next();
+            var tc_enforcement = rset.getColumnValue(1);
+            
+            if (tc_enforcement.toLocaleLowerCase() == 'y') {
+              //check trust center findings for any security violations
+              var rset = snowflake.execute({sqlText: `SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'trust_center_access'`});
+              rset.next();
+              var tc_access = rset.getColumnValue(1);
+
+              if (tc_access.toLocaleLowerCase() == 'y') {
+                //check if trust center enforcement is enabled
+                var rset = snowflake.execute({sqlText: `SELECT value FROM METADATA.METADATA_V 
+                                                        WHERE LOWER(ACCOUNT_LOCATOR) = 'global'
+                                                        AND LOWER(key) = 'trust_center_lookback_in_days';`});
+                rset.next();
+                var tc_lookback = rset.getColumnValue(1);
+
+                if (Number.isInteger(Number(tc_lookback)) && Number(tc_lookback) >= 0) {
+                  tc_lookback = parseInt(tc_lookback);
+                } else {
+                  snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"Invalid trust_center_lookback_in_days value (${tc_lookback}). Please contact the app Provider for more details. Request failed."');`});
+
+                  return `ERROR:  Invalid trust_center_lookback_in_days value (${tc_lookback}). Please contact the app Provider for more details. Request failed.`;
+                }
+
+                //check Trust Center for violations
+                var rset = snowflake.execute({sqlText: `SELECT COUNT(*) AS TC_RISK_COUNT, LISTAGG(DISTINCT scanner_id, ',') AS TC_AFFECTED_SCANNERS
+                                                        FROM SNOWFLAKE.TRUST_CENTER.FINDINGS 
+                                                        WHERE LOWER(scanner_id) IN (SELECT LOWER(scanner_id) FROM UTIL_APP.SCANNERS_C_V)
+                                                        AND LOWER(completion_status) = 'succeeded'
+                                                        AND end_timestamp >= dateadd(day, -${tc_lookback}, CURRENT_DATE()) 
+                                                        AND total_at_risk_count > 0 
+                                                        ORDER BY end_timestamp DESC;`});
+                rset.next();
+                tc_risk_count = parseInt(rset.getColumnValue(1));
+                var tc_affected_scanners  = rset.getColumnValue(2);
+
+                //update TRUST_CENTER_CHECK
+                snowflake.execute({sqlText:`UPDATE APP.TRUST_CENTER_CHECK SET value = '${tc_risk_count}' WHERE LOWER(key) = 'risk_count';`});
+                snowflake.execute({sqlText:`UPDATE APP.TRUST_CENTER_CHECK SET value = '${tc_affected_scanners}' WHERE LOWER(key) = 'affected_scanners';`});
+                snowflake.execute({sqlText:`UPDATE APP.TRUST_CENTER_CHECK SET value = SYSDATE() WHERE LOWER(key) = 'last_check_timestamp';`});
+
+                //log trust center check completed
+                snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'trust_center_check', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'COMPLETE', '"Trust Center check (last ${tc_lookback}) complete. Risk Count: ${tc_risk_count}. Affected Scanners: ${tc_affected_scanners}."');`});
+
+                //log trust center risks exist if tc_risk_count > 0
+                if (tc_risk_count > 0){
+                  snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"Trust Center has found ${tc_risk_count} risk(s) over the last ${tc_lookback}, affecting the following Trust Center scanners: ${tc_affected_scanners}. Check the Trust Center for more details. Request failed."');`});
+
+                  return `ERROR:  Trust Center has found ${tc_risk_count} risk(s) over the last ${tc_lookback} days, affecting the following Trust Center scanners: ${tc_affected_scanners}. Check the Trust Center for more details. Request failed.`;
+                }
+              } else {
+                //log trust center access has not been granted
+                snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"Trust Center access has not been granted, please refer to the native app README file for details on how enable access. Request failed."');`});
+                
+                return `ERROR:  Trust Center access has not been granted, please refer to the native app README file for details on how enable access. Request failed.`;
+              }
+            }
+              
+            if(tc_enforcement.toLocaleLowerCase() == 'n' || tc_risk_count == 0) {
+              var custom_rules;
+              var rule_bool;
+              var group_bool;
+              var group_logical;
+              
+              //check for custom rule to enforce
+              var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = 'custom_rules';`});                                        
+              
+              if(rset.next()) {
+                custom_rules = rset.getColumnValue(1);
+
+                //check for corresponding rule from RULES_DICTIONARY_V
+                var rset = snowflake.execute({sqlText: `SELECT rule, controls_used FROM METADATA.RULES_DICTIONARY_V 
+                                                        WHERE LOWER(rule_name) = LOWER('${custom_rules}')
+                                                        AND LOWER(rule_type) = 'custom';`});
+
+                
+                if(!rset.next() && custom_rules != '') {
+                  //log custom rule is not found or invalid
+                  snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"Invalid Custom Rule. Please ensure Consumer is assigned valid Custom Rule."');`});
+
+                  return `ERROR:  Invalid Custom Rule. Please ensure Consumer is assigned valid Custom Rule.`;
+                } else {
+                  if(custom_rules != '') {
+                    //get rule and metadata used
+                    var rule = rset.getColumnValue(1);
+                    var controls_used = rset.getColumnValue(2);
+
+                    var controls_used_arr = controls_used.toLocaleLowerCase().split(",");
+
+                    //convert rule to JSON object
+                    var rule_json = JSON.parse(rule);
+                    var groups_arr = rule_json.groups;
+
+                    for (i=0; i < groups_arr.length; i++) {
+                      var group = groups_arr[i];
+
+                      for(j=0; j < group.length; j++) {
+                        var cond = group[j];
+
+                        var field;
+                        var comparison;
+                        var target;
+                        var value;
+                        var logical  = cond.logical;
+                        
+                        if (cond.field && cond.field != '') {
+                          field = cond.field;
+                          comparison = cond.comparison;
+                          comparison = comparison.toString().replace('&gt;', '>').replace('&lt;', '<');
+                          target = cond.target;
+
+                          if (controls_used_arr.includes(field.toString().toLocaleLowerCase())) {
+                            var rset = snowflake.execute({sqlText: `SELECT value FROM UTIL_APP.METADATA_C_V WHERE LOWER(key) = LOWER('${field}')`});
+                            rset.next();
+                            value = rset.getColumnValue(1);
+                          } else {
+                            value = field
+                          }
+                          
+                          if (j == 0) {
+                            group_bool = comparison_eval(target, comparison, value);
+                          } 
+                          
+                          if (j > 0) {
+                            group_bool = logical_eval(group_bool, logical, comparison_eval(target, comparison, value));
+                          }
+                        }
+                        
+                        if (i > 0) {
+                          group_logical = logical;
+                        }
+                      }
+                      
+                      if (i == 0){
+                        rule_bool = group_bool;
+                      } 
+                      
+                      if(i > 0) {
+                        rule_bool = logical_eval(rule_bool, group_logical, group_bool);
+                      }
+                      
+                    }
+                  }
+                }
+              }
+
+              if (rule_bool || custom_rules == '') {
+                //parse out parameters
+                if (PARAMETERS) {
+                  PARAMETERS = PARAMETERS.replace(/[^a-zA-Z0-9_{}:"$\\s.\\,<>=\\+\\%\\-\\[\\]]/g, "");
+                }
+
+                //check if requested proc is allowed
+                var rset = snowflake.execute({sqlText: `SELECT value FROM METADATA.METADATA_V 
+                                          WHERE LOWER(account_locator) = LOWER('${account_locator}')
+                                          AND LOWER(consumer_name) = LOWER('${consumer_name}') 
+                                          AND LOWER(key) = 'allowed_procs';`});
+                rset.next();
+                var allowed_procs = rset.getColumnValue(1);
+
+                var allowed_procs_arr = allowed_procs.split(",");
+
+                if(allowed_procs_arr.includes(proc_name)) {
+                  //log new request
+                  snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'PROCESSING', '"New request: ${request_id}."');`});
+
+                  //add process start to events and metrics tables
+                  snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}'
+                                                                ,'${consumer_name}'
+                                                                ,'${app_key_local}'
+                                                                ,'${app_mode}'
+                                                                ,'metric'
+                                                                ,'request'
+                                                                ,'[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]'
+                                                                ,SYSDATE()
+                                                                ,'PROCESSING'
+                                                                ,'{
+                                                                    "metric_type":"request_summary",
+                                                                    "metrics":{
+                                                                      "input_table_name":"${input_table}",
+                                                                      "input_record_count":${input_record_count},
+                                                                      "results_table_name":"",
+                                                                      "results_record_count":${results_record_count},
+                                                                      "results_record_count_distinct":${results_record_count_distinct},
+                                                                      "comments":"",
+                                                                      "submitted_ts":"'||SYSDATE()||'",
+                                                                      "completed_ts":""
+                                                                    }
+                                                                  }'
+                                                              );`});
+
+                  snowflake.execute({sqlText:`CALL UTIL_APP.METRICS_LOGGER('${account_locator}'
+                                                                ,'${consumer_name}'
+                                                                ,'${app_key_local}'
+                                                                ,'${app_mode}'
+                                                                ,'metric'
+                                                                ,'request'
+                                                                ,'[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]'
+                                                                ,SYSDATE()
+                                                                ,'PROCESSING'
+                                                                ,'{
+                                                                    "metric_type":"request_summary",
+                                                                    "metrics":{
+                                                                      "input_table_name":"${input_table}",
+                                                                      "input_record_count":${input_record_count},
+                                                                      "results_table_name":"",
+                                                                      "results_record_count":${results_record_count},
+                                                                      "results_record_count_distinct":${results_record_count_distinct},
+                                                                      "comments":"",
+                                                                      "submitted_ts":"'||SYSDATE()||'",
+                                                                      "completed_ts":""
+                                                                    }
+                                                                  }'
+                                                              );`});
+                  
+                  //call passed-in stored procedure
+                  var rset = snowflake.execute({sqlText:`CALL PROCS_APP.${proc_name}(${proc_parameters});`});
+                  rset.next();
+                  let proc_call_msg = rset.getColumnValue(1);
+
+                  //if proc_call_msg does not generate an error
+                  if (proc_call_msg.toLocaleLowerCase().includes("error")) {
+                    //log error
+                    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"${proc_call_msg}"');`});
+
+                    //return error
+                    return `ERROR: ${proc_call_msg}`;
+                  } else {
+                    if(results_table) {
+                      snowflake.execute({sqlText:`GRANT SELECT ON TABLE ${results_table} TO APPLICATION ROLE APP_ROLE;`});
+
+                      //get count of results records
+                      var rset = snowflake.execute({sqlText:`SELECT COUNT(*) FROM ${results_table};`});
+                      rset.next();
+                      results_record_count = rset.getColumnValue(1);
+
+                      //get distinct count of results records
+                      var rset = snowflake.execute({sqlText:`SELECT COUNT(DISTINCT r.*) FROM ${results_table} r;`});
+                      rset.next();
+                      results_record_count_distinct = rset.getColumnValue(1);
+                    }
+
+                    //log complete status to events and metrics tables
+                    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}'
+                                                                ,'${consumer_name}'
+                                                                ,'${app_key_local}'
+                                                                ,'${app_mode}'
+                                                                ,'metric'
+                                                                ,'request'
+                                                                ,'[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]'
+                                                                ,SYSDATE()
+                                                                ,'COMPLETE'
+                                                                ,'{
+                                                                    "metric_type":"request_summary",
+                                                                    "metrics":{
+                                                                      "input_table_name":"${input_table}",
+                                                                      "input_record_count":${input_record_count},
+                                                                      "results_table_name":"${results_table}",
+                                                                      "results_record_count":${results_record_count},
+                                                                      "results_record_count_distinct":${results_record_count_distinct},
+                                                                      "comments":"",
+                                                                      "submitted_ts":"",
+                                                                      "completed_ts":"'||SYSDATE()||'"
+                                                                    }
+                                                                  }'
+                                                              );`});
+                    
+                    snowflake.execute({sqlText:`CALL UTIL_APP.METRICS_LOGGER('${account_locator}'
+                                                                ,'${consumer_name}'
+                                                                ,'${app_key_local}'
+                                                                ,'${app_mode}'
+                                                                ,'metric'
+                                                                ,'request'
+                                                                ,'[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]'
+                                                                ,SYSDATE()
+                                                                ,'COMPLETE'
+                                                                ,'{
+                                                                    "metric_type":"request_summary",
+                                                                    "metrics":{
+                                                                      "input_table_name":"${input_table}",
+                                                                      "input_record_count":${input_record_count},
+                                                                      "results_table_name":"${results_table}",
+                                                                      "results_record_count":${results_record_count},
+                                                                      "results_record_count_distinct":${results_record_count_distinct},
+                                                                      "comments":"",
+                                                                      "submitted_ts":"",
+                                                                      "completed_ts":"'||SYSDATE()||'"
+                                                                    }
+                                                                  }'
+                                                              );`});
+                    //log input and results counts
+                    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'COMPLETE', '"Request complete. Counts available (if applicable):  Input record count: ${input_record_count}, results record count: ${results_record_count}, results record count (distinct): ${results_record_count_distinct}."');`});
+
+                    //update LIMIT_TRACKER
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + ${input_record_count} WHERE LOWER(key) = 'input_records';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + ${input_record_count} WHERE LOWER(key) = 'input_records_this_interval';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + 1 WHERE LOWER(key) = 'total_requests';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + 1 WHERE LOWER(key) = 'requests_processed_this_interval';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + ${results_record_count} WHERE LOWER(key) = 'total_records_processed';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = TO_NUMBER(value) + ${results_record_count} WHERE LOWER(key) = 'records_processed_this_interval';`});
+                    snowflake.execute({sqlText:`UPDATE APP.LIMIT_TRACKER SET value = SYSDATE() WHERE LOWER(key) = 'last_request_timestamp';`});       
+
+                    return `Request: ${request_id} is complete. Results table (if applicable) is created in: ${results_table}. Input record count: ${input_record_count}, Results record count: ${results_record_count}`;
+                  }
+                  
+
+                } else {
+                  return `Access to stored procedure ${proc_name} is not alloed for Consumer: ${consumer_name}. Please contact the app Provider for more details.`;
+                }
+              } else {
+                //log custom rule failed validation            
+                snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"Custom Rule failed validation. Request failed."');`});
+
+                return `ERROR:  Custom Rule failed validation. Request failed.`;
+              }
+            }
+          } else {
+            //set limit interval text
+            let limit_interval_text = '';
+
+            if (limit_interval.toLocaleLowerCase() != 'n/a') {
+              limit_interval_text = `over the past ${limit_interval}(s)`;
+            }
+
+            //log request limit reached
+            snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"The ${limit} ${limit} ${limit_type} ${limit_interval_text} limit has been reached. Please contact the app Provider for more details."');`});
+
+            return `ERROR:  The ${limit} ${limit_type} ${limit_interval_text} limit has been reached. Please contact the app Provider for more details.`;                  
+          }
+        }
+      } else {
+        //log error
+        snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"The app Provider has not registered the app key. If this is a new install or reinstall, please wait until the app Provider has processed the install or reinstall. Please contact the app Provider for more details."');`});
+
+        //return error
+        return `ERROR:  The app Provider has not registered the app key. If this is a new install or reinstall, please wait until the app Provider has processed the install or reinstall. Please contact the app Provider for more details.`; 
+      }
+    }                       
+  } catch (err) {
+    var result = `Failed: Code: `+err.code + ` State: `+err.state+` Message: `+err.message.replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ")+` Stack Trace:`+ err.stack.toString().replace(/\'|\"/gm, "").replace(/\r|\n|\r\n|\n\r/gm, " ");
+  
+    snowflake.execute({sqlText:`CALL UTIL_APP.APP_LOGGER('${account_locator}', '${consumer_name}', '${app_key_local}', '${app_mode}', 'log', 'request', '[{"request_id":"${request_id}"}, {"proc_name":"${proc_name}"}, {"proc_parameters":"${proc_parameters_esc}"}]', SYSDATE(), 'ERROR', '"${result}"');`});
+  
+    return `Error: ${result}`;
+  }
+  $$
+;
+
+GRANT USAGE ON PROCEDURE PROCS_APP.REQUEST(VARCHAR) TO APPLICATION ROLE APP_ROLE;
+
+--create TRUST_CENTER_ACCESS procedure
+CREATE OR REPLACE PROCEDURE PROCS_APP.TRUST_CENTER_ACCESS()
+RETURNS VARCHAR(16777216)
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.11'
+PACKAGES = ('snowflake-snowpark-python')
+HANDLER = 'trust_center_access'
+COMMENT = '{"origin":"sf_sit","name":"acf","version":{"major":1, "minor":7},"attributes":{"env":"native_app","component":"trust_center_access","type":"procedure"}}'
+EXECUTE AS OWNER
+AS 
+$$
+import pandas as pd
+
+def trust_center_access(session):
+    try:
+        #set trust_center_access flag to y, if it hasn't been set already
+        tc_access_flag = pd.DataFrame(session.sql(f"SELECT value FROM APP.APP_MODE WHERE LOWER(key) = 'trust_center_access'").collect()).iloc[0,0]
+
+        if tc_access_flag.lower() == 'n':
+          #update trust_center_access flag to 'y'
+          session.sql("UPDATE APP.APP_MODE SET value = 'y' WHERE LOWER(key) = 'trust_center_access'").collect()
+          
+          return 'Trust Center access has been granted.'
+        else:
+          return 'Trust Center access has already been granted.'
+
+    except Exception as e:
+        session.sql("rollback").collect()
+
+        #remove unwanted characters from error msg
+        error_eraw = str(e).replace("'","").replace("\r"," ").replace("\n"," ").replace("\r\n"," ").replace("\n\r"," ")
+
+        msg_return = "Failed: " + error_eraw
+
+        raise Exception(msg_return)
+$$
+;
+
+GRANT USAGE ON PROCEDURE PROCS_APP.TRUST_CENTER_ACCESS() TO APPLICATION ROLE APP_ROLE;
+
+///////////////////////////////////////////////////// BEGIN: PROVIDER FUNCTIONS/PROCEDURES /////////////////////////////////////////////////////
+
+
+[[FUNCTIONS]]
+
+
+
+[[PROCEDURES]]
+
+////////////////////////////////////////////////////// END: PROVIDER FUNCTIONS/PROCEDURES //////////////////////////////////////////////////////

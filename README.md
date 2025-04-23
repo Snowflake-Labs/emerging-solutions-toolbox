@@ -7,7 +7,7 @@ The Emerging Solutions Toolbox is a collection of solutions created by Snowflake
 ## Support Notice
 All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 The purpose of the code is to provide customers with easy access to innovative ideas that have been built to accelerate customers' adoption of key Snowflake features.  We certainly look for customers' feedback on these solutions and will be updating features, fixing bugs, and releasing new solutions on a regular basis.
 
@@ -35,7 +35,6 @@ A solution can represent one of three types:
 | [API Enrichment Framework](https://github.com/Snowflake-Labs/sfguide-getting-started-with-api-enrichment-framework/) | FRAMEWORK | A Native App designed to quick start API-driven data enrichment. |
 | [Data Quality Manager](https://github.com/Snowflake-Labs/sfguide-getting-started-with-data-quality-manager/) | FRAMEWORK | An application designed to implement data quality checks, using both Snowflake data metric functions (DMFs) and custom checks. |
 | [ML (Machine Learning) Sidekick](https://github.com/Snowflake-Labs/sfguide-build-and-deploy-snowpark-ml-models-using-streamlit-snowflake-notebooks/) | FRAMEWORK | A no-code app built using Streamlit in Snowflake, designed for building and deploying machine learning models in Snowflake. |
-| [Semantic Model Generator](https://github.com/Snowflake-Labs/semantic-model-generator/) | FRAMEWORK | A semantic model generator for use with Snowflake's Cortex Analyst, including support for migrating other semantic models including dbt and Looker. |
 | [Data Model Mapper](https://github.com/Snowflake-Labs/sfguide-data-model-mapper/) | FRAMEWORK | A native app solution with no-code UI that helps consumers model, map, and share provider-standardized data to providers. |
 | [Migrate Tasks to Dynamic Tables Notebook](/helper-tasks-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible Tasks that can be migrated to Dynamic Tables (DTs), with the option to examine the DT DDL and/or migrate. |
 | [Migrate Non-Tasks to Dynamic Tables Notebook](/helper-non_tasks-to-dynamic-tables) | HELPER | A notebook that helps users identify eligible repetitive commands, that are executed not using tasks, that can be migrated to Dynamic Tables (DTs), with the option to examine the DT DDL and/or migrate. |
@@ -49,3 +48,4 @@ A solution can represent one of three types:
 | [Forecast Model Builder](/framework-forecast-model-builder) | FRAMEWORK | A toolkit for building robust ML forecasts on Snowflake, covering EDA/Modeling/Inference. |
 | [Convert2Iceberg](/helper-convert2iceberg) | HELPER | A utility that converts a Snowflake table (FDN-based) to a Snowflake-managed Iceberg table. |
 | [orchestration-framework](/orchestration-framework) | FRAMEWORK | A framework and application that executes various Cortex services. |
+| [PDF Contracts Solution](/sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake) | FRAMEWORK | A framework and application that executes various Cortex services. |

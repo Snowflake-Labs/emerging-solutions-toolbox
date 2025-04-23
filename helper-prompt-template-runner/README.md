@@ -1,13 +1,9 @@
 # Cortex Prompt Template Runner
-Created by Jason Summer, *Senior Architect - AI/ML*
 
-All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
-
-Please see TAGGING.md for details on object comments.
-
-# Overview
 The Prompt Template Runner enables Snowflake users to create and manage Cortex Complete calls against tables/views using a simple configuration file.
 The Prompt Template Runner takes inspiration from LangChain [prompt templates](https://python.langchain.com/docs/concepts/prompt_templates/) and [YAML prompts](https://www.restack.io/docs/langchain-knowledge-langchain-yaml-prompt-guide), but is purpose-built to be operationalized against Snowflake table records.
 Here, the key difference is that prompt variables may be imputed by literal constants (similar to Langchain) OR column values from the underlying table.
@@ -16,6 +12,17 @@ The helper provides 2 utilities to operationalize templated prompts against Snow
 
 1) **PROMPT_TEMPLATE_PARSER**: User Defined Table Function (UDTF) to create a multi-message prompt from every record in a table, replacing variables with literal and/or table values.
 2) **PROMPT_TEMPLATE_RUNNER**: Stored Procedure to run a prompt template through the PROMPT_TEMPLATE_PARSER and prompt an LLM.
+
+## Support Notice
+
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 # Specifications
 The configuration file currently supports the below elements in the top-level `prompt` key.
@@ -239,3 +246,7 @@ The below metadata elements from the prompt template (or explicitly passed) are 
 
 # Feedback
 Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).
+
+## Tagging
+
+Please see `TAGGING.md` for details on object comments.

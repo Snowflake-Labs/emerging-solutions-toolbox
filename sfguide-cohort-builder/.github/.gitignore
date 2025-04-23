@@ -1,0 +1,13 @@
+# Ignore virtual environment directories
+env/
+venv/
+.env/
+.venv/
+cohort-builder-env/
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore Streamlit secrets file
+.streamlit/secrets.toml
