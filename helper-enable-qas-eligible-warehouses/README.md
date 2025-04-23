@@ -15,14 +15,30 @@ This app will:
     - The user can toggle the minimum number of eligible queries to check for, along with the threshold of average execution time is eligible for the service
 - enable QAS for each selected warehouse (optional)
 
+## Setup
+
+Adjust the database and schema in the following snippets to match your environment.
+
+1. Upload the Streamlit application to an internal stage.
+```sql
+CREATE DATABASE IF NOT EXISTS SIT_SOLUTIONS;
+CREATE OR REPLACE SCHEMA SIT_SOLUTIONS.QAS;
+CREATE OR REPLACE STAGE SIT_SOLUTIONS.QAS.CODE_STAGE;
+PUT query_acc_warehouses.py @SIT_SOLUTIONS.QAS.CODE_STAGE AUTO_COMPRESS=FALSE FORCE=TRUE;
+```
+2. Create the Streamlit application from the uploaded file.
+```sql
+CREATE OR REPLACE STREAMLIT SIT_SOLUTIONS.QAS.QAS_STREAMLIT
+ROOT_LOCATION = '@sit_solutions.qas.code_stage'
+MAIN_FILE = 'query_acc_warehouses.py'
+QUERY_WAREHOUSE = SLINGSHOT_WH
+COMMENT='{"origin":"sf_sit","name":"qas_eligible_warehouses","version":{"major":1, "minor":0},"attributes":"session_tag"}';
+```
+
 ## Support Notice
 
-All sample code is provided for reference purposes only. Please note that this code is
-provided `as is` and without warranty. Snowflake will not offer any support for the use
-of the sample code. The purpose of the code is to provide customers with easy access to
-innovative ideas that have been built to accelerate customers' adoption of key
-Snowflake features. We certainly look for customers' feedback on these solutions and
-will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
+
 
 Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
