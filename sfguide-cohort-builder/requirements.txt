@@ -90,7 +90,7 @@ Send2Trash==1.8.3
 six==1.16.0
 smmap==5.0.1
 sniffio==1.3.1
-snowflake-connector-python==3.11.0
+snowflake-connector-python==3.13.1
 snowflake-snowpark-python==1.19.0
 sortedcontainers==2.4.0
 soupsieve==2.5
