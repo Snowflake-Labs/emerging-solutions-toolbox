@@ -96,4 +96,4 @@ if submit_button:
     except:
         st.warning("Error updating table")
     #display success message for 5 seconds and update the table to reflect what is in Snowflake
-    st.experimental_rerun()
+    st.rerun()
