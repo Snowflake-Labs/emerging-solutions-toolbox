@@ -1,0 +1,62 @@
+manifest_version: 1
+version:
+ name: v1.0
+ label: "v1.0"
+ comment: "NA 101"
+
+artifacts:
+# setup script name
+ setup_script: setup_hello.sql
+# allow usage of python
+ extension_code: true
+ default_streamlit: src.streamlit
+
+configuration:
+# for logging
+ log_level: DEBUG
+ trace_level: ON_EVENT
+# speccify path to streamlit
+
+
+privileges:
+  - EXECUTE TASK:
+      description: "Run ingestion tasks for replicating Redshift data"
+  - EXECUTE MANAGED TASK:
+      description: "To run serverless ingestion tasks for replicating Redshift data"
+  - CREATE WAREHOUSE:
+      description: "To create warehouses for executing tasks"
+  - MANAGE WAREHOUSES:
+      description: "To manage warehouses for optimizing the efficiency of your accounts"
+  - CREATE DATABASE:
+      description: "To create sink databases for replicating Redshift data"
+  - IMPORTED PRIVILEGES ON SNOWFLAKE DB:
+      description: "To access account_usage views"
+
+references:
+# references for the python SDK
+  - enrichment_table:
+      label: "Enrichment Table"
+      description: "Select the table you wish to tokenize to request grants"
+      privileges: 
+        - SELECT
+      object_type: Table
+      multi_valued: true
+      register_callback: src.update_reference
+
+  - consumer_secret:
+      label: "Consumer's Secret"
+      description: "Needed to authenticate with xyz.com"
+      privileges:
+        - READ
+      object_type: SECRET
+      register_callback: src.update_reference
+      configuration_callback: src.GET_CONFIGURATION_FOR_REFERENCE
+  
+  - my_external_access:
+      label: "Default External Access Integration"
+      description: "This is required to access the enrichment api"
+      privileges:
+        - USAGE
+      object_type: EXTERNAL ACCESS INTEGRATION
+      register_callback: src.update_reference
+      configuration_callback: src.GET_CONFIGURATION_FOR_REFERENCE
