@@ -1,6 +1,6 @@
-# Contributing to ml-forecasting-incubator
+# Contributing to forecast-model-builder
 
-Thanks for taking the time to contribute to ml-forecasting-incubator!
+Thanks for taking the time to contribute to forecast-model-builder!
 
 ## Setting up a development environment
 

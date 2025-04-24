@@ -83,7 +83,7 @@ def predict_baseline(
 
     Examples
     --------
-    >>> from ml_forecasting_incubator.utils import predict_baseline
+    >>> from forecast_model_builder.utils import predict_baseline
     >>> from snowflake.snowpark import Session
     >>> from snowflake.snowpark import types as T
     >>> session = Session.builder.getOrCreate()
