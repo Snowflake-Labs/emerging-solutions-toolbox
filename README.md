@@ -1,4 +1,3 @@
-![Emerging Solutions Toolbox Banner](banner_emerging_solutions_toolbox.png)
 <a href="https://emerging-solutions-toolbox.streamlit.app/">
     <img src="https://github.com/Snowflake-Labs/emerging-solutions-toolbox/banner_emerging_solutions_toolbox.png" alt="image" width="150" align="right";">
 </a>
