@@ -1,6 +1,6 @@
 ![Emerging Solutions Toolbox Banner](banner_emerging_solutions_toolbox.png)
 <a href="https://emerging-solutions-toolbox.streamlit.app/">
-    <img src="https://github.com/user-attachments/assets/banner_emerging_solutions_toolbox.png" alt="image" width="150" align="right";">
+    <img src="https://github.com/Snowflake-Labs/emerging-solutions-toolbox/banner_emerging_solutions_toolbox.png" alt="image" width="150" align="right";">
 </a>
 # Emerging Solutions Toolbox
 #### Brought to you by Snowflake's Solution Innovation Team (SIT)
