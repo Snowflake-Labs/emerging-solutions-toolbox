@@ -1,6 +1,7 @@
 <a href="https://emerging-solutions-toolbox.streamlit.app/">
     <img src="https://github.com/Snowflake-Labs/emerging-solutions-toolbox/banner_emerging_solutions_toolbox.png" alt="image" width="150" align="right";">
 </a>
+
 # Emerging Solutions Toolbox
 #### Brought to you by Snowflake's Solution Innovation Team (SIT)
 The Emerging Solutions Toolbox is a collection of solutions created by Snowflake's Solution Innovation Team (SIT).  Each folder represents a separate solution, and solutions can range anywhere between helpful administrative notebooks to fully-fledged frameworks and native applications.  Each solution contains its own licensing agreement, telemetry tagging information, and details on the solution.  Check back frequently, as we'll continually be adding new solutions.
