@@ -1,5 +1,5 @@
 <a href="https://emerging-solutions-toolbox.streamlit.app/">
-    <img src="https://raw.githubusercontent.com/Snowflake-Labs/emerging-solutions-toolbox/main/banner_emerging_solutions_toolbox.png" alt="image" width="150" align="right";">
+    <img src="https://raw.githubusercontent.com/Snowflake-Labs/emerging-solutions-toolbox/main/banner_emerging_solutions_toolbox.png" alt="image" align="center";">
 </a>
 
 # Emerging Solutions Toolbox
