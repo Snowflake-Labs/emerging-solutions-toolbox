@@ -22,6 +22,14 @@ Snowparser accepts 2 arguments:
 
 The `tableau_data_source_file` should be a path to a .tds file in Snowflake stage, e.g. `@JSUMMER.PUBLIC.DROPBOX/TPCDS_Model_REVISED.tds`. `view_name` can be a fully qualified name with database and schema or the current database and schema will be used. The utility will replace any semantic view of the same name if a name is re-used.
 
+## Prerequisites
+To utilize Snowparser, please take note of the following requirements.
+
+- Your Snowflake account must be enabled for [Semantic Views](https://docs.snowflake.com/user-guide/views-semantic/overview).
+- The Tableau data source must not have nor reference any extracts. To remove extracts completely, first switch the data source to a live connection. Then remove references to the extract(s) as described in the 'Remove the extract from the workbook' section in [Tableau documentation](https://help.tableau.com/current/pro/desktop/en-us/extracting_data.htm).
+- Semantic View relationships currently support many-to-1 relationships. It is recommended to denote unique keys in Tableau using [Performance Options](https://help.tableau.com/current/pro/desktop/en-us/datasource_relationships_perfoptions.htm) in Tableau Desktop.
+- A [Tableau Data Source file (.tds)]((https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm)) must be obtained from Tableau Desktop and uploaded to Snowflake stage.
+
 ## Setup
 > Note: Deployment requires `ACCOUNTADMIN` to create API integrations.
 Snowparser as a Stored Procedure can be registered directly by using Snowflake's git integration. Below are a couple options to do so.
