@@ -529,9 +529,22 @@ class TableauRelationship:
         expression_node = self.relationship_block.find('expression')
         join_pairs = self.parse_expression_pairs(expression_node)
 
-        # Get tables
-        left_table = self.relationship_block.find('first-end-point').attrib.get('object-id')
-        right_table = self.relationship_block.find('second-end-point').attrib.get('object-id')
+        # Get tables nodes
+        table_one = self.relationship_block.find('first-end-point')
+        table_two = self.relationship_block.find('second-end-point')
+
+        # Determine which table has PK designated by unique attribution
+        # View supports many-to-1 in that specific order
+        if table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False):
+            right_table = table_one.attrib.get('object-id')
+            left_table = table_two.attrib.get('object-id')
+        elif table_two.attrib.get('unique_key', False) or table_two.attrib.get('is-db-set-unique-key', False):
+            right_table = table_two.attrib.get('object-id')
+            left_table = table_one.attrib.get('object-id')
+        else:
+            left_table = table_one.attrib.get('object-id')
+            right_table = table_two.attrib.get('object-id')
+            logger.warning("Warning: Relationship between %s and %s does not designate a relationship as many-to-1.", right_table, left_table)
 
         self.left_table = next((rel.alias for rel in self.relations if rel.id == left_table), None)
         self.right_table = next((rel.alias for rel in self.relations if rel.id == right_table), None)
