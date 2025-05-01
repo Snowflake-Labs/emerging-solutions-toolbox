@@ -2,6 +2,7 @@ import json
 import os
 import re
 from typing import Optional, Self
+import textwrap
 import logging
 import html
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -280,6 +281,20 @@ class TableauCalculations:
             else:
                 return []
 
+    def output_orphans(self) -> dict[str, str]:
+        """
+        Extracts key elements from Calculation for final orphan rendering.
+
+        :returns: A dictionary of key elements
+        """
+
+        return {
+            'alias': getattr(self, 'alias', 'not found'),
+            'formula': getattr(self, 'formula', 'not found'),
+            'translated_formula': getattr(self, 'translated_formula', 'not found'),
+            'explanation': getattr(self, 'explanation', 'not found'),
+            }
+
     def get_sf_section(self) -> str:
         """Categorizes the column as a fact/dimension/metric based on Tableau metadata.
 
@@ -493,9 +508,13 @@ class TableauRelationship:
         self.columns = columns
         self.translated_relationship = {}
         self.left_table = ''
+        self.left_unique = False
+        self.right_unique = False
         self.right_table = ''
         self.left_columns = []
         self.right_columns = []
+        self.supported = True # Will be used to exclude relationships that are not supported
+        self.explanation = None
         self.parse_relationship_flat()
 
 
@@ -533,18 +552,33 @@ class TableauRelationship:
         table_one = self.relationship_block.find('first-end-point')
         table_two = self.relationship_block.find('second-end-point')
 
-        # Determine which table has PK designated by unique attribution
+        # Determine which table has UNIQUE column designated by unique attribution
         # View supports many-to-1 in that specific order
-        if table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False):
+        if (table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False)) and \
+            (table_two.attrib.get('unique_key', False) or table_two.attrib.get('is-db-set-unique-key', False)):
+            self.left_unique = True
+            self.right_unique = True
+            left_table = table_one.attrib.get('object-id')
+            right_table = table_two.attrib.get('object-id')
+            logger.warning("Warning: Relationship between %s and %s designates a relationship as 1-to-1, which is not supported.", right_table, left_table)
+            self.supported = False
+            self.explanation = """Semantic View relationships currently support many-to-1 relationships. This is a 1-to-1 relationship.
+            Denote unique keys in Tableau using [Performance Options](https://help.tableau.com/current/pro/desktop/en-us/datasource_relationships_perfoptions.htm) in Tableau Desktop."""
+        elif table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False):
+            self.right_unique = True # View requires many-to-1 to be in this order
             right_table = table_one.attrib.get('object-id')
             left_table = table_two.attrib.get('object-id')
         elif table_two.attrib.get('unique_key', False) or table_two.attrib.get('is-db-set-unique-key', False):
+            self.right_unique = True # View requires many-to-1 to be in this order
             right_table = table_two.attrib.get('object-id')
             left_table = table_one.attrib.get('object-id')
         else:
             left_table = table_one.attrib.get('object-id')
             right_table = table_two.attrib.get('object-id')
-            logger.warning("Warning: Relationship between %s and %s does not designate a relationship as many-to-1.", right_table, left_table)
+            logger.warning("Warning: Relationship between %s and %s designates a relationship as many-to-many, which is not supported.", right_table, left_table)
+            self.supported = False
+            self.explanation = """Semantic View relationships currently support many-to-1 relationships. This is a many-to-many relationship.
+            Denote unique keys in Tableau using [Performance Options](https://help.tableau.com/current/pro/desktop/en-us/datasource_relationships_perfoptions.htm) in Tableau Desktop."""
 
         self.left_table = next((rel.alias for rel in self.relations if rel.id == left_table), None)
         self.right_table = next((rel.alias for rel in self.relations if rel.id == right_table), None)
@@ -560,6 +594,25 @@ class TableauRelationship:
         self.right_columns = right_columns
 
 
+    def output_orphans(self) -> dict[str, str]:
+        """
+        Extracts key elements from Relationship for final orphan rendering.
+
+        :returns: A dictionary of key elements
+        """
+
+        return {
+            'left_table': getattr(self, 'left_table', 'not found'),
+            'right_table': getattr(self, 'right_table', 'not found'),
+            'left_columns': ','.join(getattr(self, 'left_columns', ['not found'])),
+            'right_columns': ','.join(getattr(self, 'right_columns', ['not found'])),
+            'supported': getattr(self, 'supported', 'not found'),
+            'explanation': getattr(self, 'explanation', 'not found'),
+            'left_unique': getattr(self, 'left_unique', 'not found'),
+            'right_unique': getattr(self, 'right_unique', 'not found'),
+            }
+
+
     def get_ddl(self) -> str:
         """
         Returns the DDL for the relationship as a relationship in Semantic View.
@@ -573,7 +626,8 @@ class TableauRelationship:
 {name} AS
 {left_table} ({', '.join([f'{prep_for_sql_names(c)}' for c in self.left_columns])}) REFERENCES {right_table} ({', '.join([f'{prep_for_sql_names(c)}' for c in self.right_columns])})
 """
-        return query
+        if self.supported:
+            return query
 
 
 class TableauTDS:
@@ -592,7 +646,7 @@ class TableauTDS:
         self.columnar_metadata = []
         self.calculations = []
         self.relationships = []
-        self.orphans = [] # Captures elements that could not be translated to Semantic View equivalent
+        self.orphans = {} # Captures elements that could not be translated to Semantic View equivalent
         self.parse_tds()
         self.add_view_pks() # Extract relationship primary keys to assign to new custom VIEWs
         self.gather_orphans() # Gather elements that could not be translated to Semantic View equivalent
@@ -782,10 +836,10 @@ class TableauTDS:
         if len(self.relationships) > 0:
             for rel in self.relations:
                 for relationship in self.relationships:
-                    if relationship.left_table == rel.alias:
+                    if relationship.left_table == rel.alias and relationship.left_unique: # Only add if column is designated as unique
                         if relationship.left_columns not in rel.unique_key:
                             rel.unique_key.append(relationship.left_columns)
-                    if relationship.right_table == rel.alias:
+                    if relationship.right_table == rel.alias and relationship.right_unique: # Only add if column is designated as unique
                         if relationship.right_columns not in rel.unique_key:
                             rel.unique_key.append(relationship.right_columns)
 
@@ -794,7 +848,7 @@ class TableauTDS:
     def get_list_ddl(lst) -> str:
         """Unrolls class get_ddl() method from each Semantic View component into DDL string."""
 
-        return ', '.join([i.get_ddl() for i in lst if i is not None and i.get_ddl() != ''])
+        return ', '.join([i.get_ddl() for i in lst if i is not None and i.get_ddl() != '' and i.get_ddl() is not None])
 
     def deduplicate_calculations(self) -> list[TableauCalculations]:
         """
@@ -822,9 +876,19 @@ class TableauTDS:
         Gathers all elements that are not supported in Semantic View in orphans attribute for user.
         """
 
+        # Gather unsupported calculations
+        unsupported_calculations = []
         for item in self.calculations:
             if item.sf_section == 'exclusions':
-                self.orphans.append(item)
+                unsupported_calculations.append(item)
+        self.orphans['calculations'] = unsupported_calculations
+
+        # Gather unsupported relationships
+        unsupported_relationships = []
+        for item in self.relationships:
+            if not item.supported:
+                unsupported_relationships.append(item)
+        self.orphans['relationships'] = unsupported_relationships
 
 
     def get_view_ddl(self, name: str) -> dict[str, str|list]:
@@ -837,7 +901,7 @@ class TableauTDS:
 
         :returns:
             The DDL for the Semantic View
-            A list of orphans (elements that could not be translated to Semantic View equivalent)
+            A dictionary of orphans (elements that could not be translated to Semantic View equivalent)
         """
 
         # De-dupe calculations but don't override the original list so we can still report back to the user
@@ -864,7 +928,9 @@ class TableauTDS:
         query = f"""
 CREATE OR REPLACE SEMANTIC VIEW {name}
 tables (
-    {self.get_list_ddl(self.relations)})
+    {self.get_list_ddl(self.relations)})"""
+        if sum([i.supported for i in self.relationships]) > 0:
+            query += f"""
 relationships (
     {self.get_list_ddl(self.relationships)})"""
 
@@ -885,14 +951,14 @@ metrics (
 
         query = clean_snowflake_ddl(query, ddl_patterns)
 
+        orphans = {
+            key: [item.output_orphans() for item in value_list]
+            for key, value_list in self.orphans.items()
+        }
+
         return {
             'ddl': os.linesep.join([s for s in query.splitlines() if s]), # Remove extra line breaks
-            'orphans': [{
-                        'alias': getattr(item, 'alias', 'not found'),
-                        'formula': getattr(item, 'formula', 'not found'),
-                        'translated_formula': getattr(item, 'translated_formula', 'not found'),
-                        'explanation': getattr(item, 'explanation', 'not found'),
-                        } for item in self.orphans],
+            'orphans': orphans,
         }
 
     def create_view(self, name: str) -> str:

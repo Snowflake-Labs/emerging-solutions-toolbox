@@ -61,7 +61,7 @@ CALL GENAI_UTILITIES.UTILITIES.SNOWPARSER_SEMANTIC_DDL(
     view_name => 'MY_SEMANTIC_VIEW'
     );
 ```
-This will return an OBJECT response with keys `ddl` that contains the DDL for the semantic view and `orphans` which contains calculations that were not successfully translated in the semantic view. Each orphan record will have an explanation.
+**This will return an OBJECT response with keys `ddl` that contains the DDL for the semantic view and `orphans` which contains elements that were not successfully translated in the semantic view. Each orphaned element will have an explanation.**
 
 The below example Python implementation shows how Snowparser source can be used outside of a Snowflake Stored Procedure.
 
@@ -86,7 +86,7 @@ tableau_model.create_view('MY_SEMANTIC_VIEW')
 
 ## Supported Components
 We continue to add support for additional capabilities in the Snowflake Semantic View.
-Below is a mapping of the supported and explicitly not supported aspects of Tableau features in the Semantic View.
+Below is a mapping of the supported and explicitly not supported aspects of Tableau features in the Semantic View. Any orphaned elements will be included in the returned object with explanations.
 ![Supported Features](images/supported.png)
 
 ## Feedback
