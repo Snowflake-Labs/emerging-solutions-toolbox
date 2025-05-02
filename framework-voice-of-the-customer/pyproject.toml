@@ -1,0 +1,20 @@
+[project]
+name = "sln-voice-of-the-customer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "snowflake-snowpark-python>=1.30.0",
+    "snowflake>=1.2.0",
+    "langdetect>=1.0.9",
+]
+
+[dependency-groups]
+dev = [
+    "codespell>=2.4.1",
+    "ipykernel>=6.29.5",
+    "ipython>=9.1.0",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.4",
+]
