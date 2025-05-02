@@ -101,6 +101,7 @@ class TableauRelation:
             rel_type: None|str,
             full_table_name: None|str = None,
             sql: None|str = None,
+            create_view: bool = True, # Determines if a custom SQL view should be created in process
             ):
         self.session = session
         self.alias = alias
@@ -112,6 +113,7 @@ class TableauRelation:
         self.comment = None
         self.db, self.schema, self.table = (None, None, None)
         self.sql = sql
+        self.create_view = create_view
         self.create_custom_view() # Run to create view for custom SQL before pulling metadata from it
         self.get_table_context()
         self.get_primary_key()
@@ -160,10 +162,14 @@ class TableauRelation:
         if self.sql is not None:
             try:
                 alias = prep_for_sql_names(self.alias)
-                self.session.sql(f'CREATE OR REPLACE VIEW {alias} AS {self.sql}').collect()
                 # Will require having a current db and schema set which may introduce issues later
                 self.full_table_name = f'{self.session.get_current_database()}.{self.session.get_current_schema()}.{alias}'
-                logger.info("Successfully created custom Snowflake view %s", self.full_table_name)
+                if self.create_view:
+                    self.session.sql(f'CREATE OR REPLACE VIEW {alias} AS {self.sql}').collect()
+                    logger.info("Successfully created custom Snowflake view %s", self.full_table_name)
+                else:
+                    logger.warning("Warning: Custom SQL source %s not created as a view", self.full_table_name)
+
             except Exception as e:
                 logger.error("An error occurred at CREATE VIEW: %s", e)
                 raise e
@@ -631,25 +637,34 @@ class TableauRelationship:
 
 
 class TableauTDS:
-    def __init__(self, file_path: str, session: Session):
+    def __init__(self, file_path: str, session: Session, create_views: bool = True, defer_conversion: bool = False):
         """
         Initializes the Tableau TDS object.
 
         :param file_path: Path to the TDS file
         :param session: Snowflake Snowpark session
+        :param create_views: Flag to determine if custom SQL views should be created if Tableau source uses custom SQL SELECT statements
+        :param defer_conversion: Flag to determine if the TDS file should be parsed and converted to Semantic View DDL
+                                 If set to True, minimal parsing will be done to extract the list of physical tables and columns.
         """
 
         self.session = session
         self.file_path = file_path
+        self.create_views = create_views
         self.connections = []
         self.relations = []
         self.columnar_metadata = []
         self.calculations = []
         self.relationships = []
         self.orphans = {} # Captures elements that could not be translated to Semantic View equivalent
+        self.root = self.read_file() # Read the file once and reuse the root element
         self.parse_tds()
-        self.add_view_pks() # Extract relationship primary keys to assign to new custom VIEWs
-        self.gather_orphans() # Gather elements that could not be translated to Semantic View equivalent
+
+        if not defer_conversion:
+            self.parse_calculations()
+            self.parse_relationships()
+            self.add_view_pks() # Extract relationship primary keys to assign to new custom VIEWs
+            self.gather_orphans() # Gather elements that could not be translated to Semantic View equivalent
 
     def read_file(self) -> etree._Element:
         """
@@ -729,12 +744,11 @@ class TableauTDS:
         Parses the Tableau TDS file to extract all TDS metadata as Semantic View component attributes.
         """
 
-        root = self.read_file()
         logger.info('Parsing file')
 
         # Check if extracts are found in file.
         # We cannot reverse engineer extracts so abort early
-        if root.find(".//extract") is not None:
+        if self.root.find(".//extract") is not None:
             logger.error("Extract node found in the root.")
             msg = """Extract node found in the root.
             Only live Snowflake connection sources can be translated.
@@ -744,7 +758,7 @@ class TableauTDS:
             return msg
 
         # Parse connections
-        for conn in root.findall(".//connection[@class='snowflake']"):
+        for conn in self.root.findall(".//connection[@class='snowflake']"):
             self.connections.append(
                 TableauConnection(
                     conn_class = conn.get("class"),
@@ -757,7 +771,7 @@ class TableauTDS:
             )
 
         # Parse relations (tables) from object tags
-        for object in root.findall(".//object"):
+        for object in self.root.findall(".//object"):
             caption = object.get("caption")
             id = object.get("id") # Unique ID to help with table relationships
             for relation in object.findall(".//relation"):
@@ -770,18 +784,19 @@ class TableauTDS:
                         rel_type = relation.get("type"),
                         full_table_name = relation.get("table", None), # Only used if source is live table connection
                         sql = html.unescape(relation.text) if relation.get("type") == "text" else None, # Custom SQL sourcing
+                        create_view = self.create_views, # Determines if a custom SQL view should be created in process
                       )
                 )
 
         # Parse columnar metadata
-        for meta in root.findall(".//metadata-record[@class='column']"):
+        for meta in self.root.findall(".//metadata-record[@class='column']"):
             key_name = meta.find("local-name").text if meta.find("local-name") is not None else None
             if key_name is not None:
                 # Columns referencing custom SQL sources cite the parent name as Custom SQL Query X
                 # We must map this to the caption/alias of the source as this is the logical and physical name of the View source
                 column_parent_name = meta.find("parent-name").text.replace("[", "").replace("]", "")
                 parent_name = next((rel.alias for rel in self.relations if rel.name == column_parent_name), None)
-                column_element = root.find(f".//column[@name='{key_name}']")
+                column_element = self.root.find(f".//column[@name='{key_name}']")
 
                 self.columnar_metadata.append(
                     TableauColumnarMetadata(
@@ -794,8 +809,13 @@ class TableauTDS:
                     )
                 )
 
-        # Parse calculations
-        for column in root.findall(f".//calculation"):
+    # Parse calculations
+    def parse_calculations(self) -> None:
+        """
+        Parses the calculations from the Tableau TDS file.
+        """
+
+        for column in self.root.findall(f".//calculation"):
             parent_column = column.getparent()
             formula = column.get("formula")
 
@@ -816,8 +836,12 @@ class TableauTDS:
         # Run calculation evaluation helper function
         self.extract_calculations()
 
-        # Parse relationships
-        for relationship in root.findall(".//relationship"):
+    def parse_relationships(self) -> None:
+        """
+        Parses the relationships from the Tableau TDS file.
+        """
+
+        for relationship in self.root.findall(".//relationship"):
             self.relationships.append(
                 TableauRelationship(
                     session = self.session,
@@ -961,7 +985,7 @@ metrics (
             'orphans': orphans,
         }
 
-    def create_view(self, name: str) -> str:
+    def create_semantic_view(self, name: str) -> str:
         """
         Creates the Semantic View in Snowflake.
 
@@ -976,3 +1000,40 @@ metrics (
         except Exception as e:
             logger.error("An error occurred at CREATE SEMANTIC VIEW: %s", e)
             return f"An error occurred at CREATE SEMANTIC VIEW: {e}"
+
+    def get_table_names(self) -> list[str]:
+        """
+        Returns a list of table/view names from the TDS file.
+
+        :returns: A list of table names
+        """
+        return [rel.full_table_name.replace('[','').replace(']','') for rel in self.relations]
+
+    def get_column_names(self) -> list[str]:
+        """
+        Returns a list of table/view names from the TDS file.
+
+        :returns: A list of table names
+        """
+
+        return [f'{col.table}.{col.column_name}' for col in self.columnar_metadata]
+
+    def get_object_names(self) -> dict[str, list[str]]:
+        """
+        Returns a dictionary of table/view and column names the TDS file.
+
+        :returns: A dictionary of table and column names
+        """
+
+        tables = self.get_table_names()
+        columns = self.get_column_names()
+
+        return {
+            "tables": [
+                {
+                    "name": table,
+                    "columns": [col for col in columns if col.split('.')[0].lower() == table.split('.')[-1].lower()]
+                }
+                for table in tables
+            ]
+        }
