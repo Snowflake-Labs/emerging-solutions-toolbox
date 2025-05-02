@@ -2,7 +2,7 @@ SET db_name = 'GENAI_UTILITIES';
 SET schema_name = 'UTILITIES';
 
 SET major = 1;
-SET minor = 1;
+SET minor = 2;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "snowparser",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -41,7 +41,8 @@ COPY FILES
 
 CREATE OR REPLACE PROCEDURE SNOWPARSER_SEMANTIC_DDL(
     tableau_data_source_file varchar,
-    view_name varchar DEFAULT 'MY_SEMANTIC_VIEW'
+    view_name varchar DEFAULT 'MY_SEMANTIC_VIEW',
+    create_views boolean DEFAULT TRUE
 )
 RETURNS OBJECT
 LANGUAGE PYTHON
@@ -58,15 +59,16 @@ EXECUTE AS CALLER
 AS $$
 from tableau import *
 
-def get_ddl(session, tableau_data_source_file, view_name):
-    tableau_model = TableauTDS(tableau_data_source_file, session)
+def get_ddl(session, tableau_data_source_file, view_name, create_views):
+    tableau_model = TableauTDS(tableau_data_source_file, session, create_views)
 
     return tableau_model.get_view_ddl(view_name)
   $$;
 
 CREATE OR REPLACE PROCEDURE SNOWPARSER_CREATE_SEMANTIC(
     tableau_data_source_file varchar,
-    view_name varchar DEFAULT 'MY_SEMANTIC_VIEW'
+    view_name varchar DEFAULT 'MY_SEMANTIC_VIEW',
+    create_views boolean DEFAULT TRUE
 )
 RETURNS STRING
 LANGUAGE PYTHON
@@ -83,8 +85,34 @@ EXECUTE AS CALLER
 AS $$
 from tableau import *
 
-def get_ddl(session, tableau_data_source_file, view_name):
-    tableau_model = TableauTDS(tableau_data_source_file, session)
+def get_ddl(session, tableau_data_source_file, view_name, create_views):
+    tableau_model = TableauTDS(tableau_data_source_file, session, create_views)
 
-    return tableau_model.create_view(view_name)
+    return tableau_model.create_semantic_view(view_name)
+  $$;
+
+CREATE OR REPLACE PROCEDURE SNOWPARSER_GET_OBJECTS(
+    tableau_data_source_file varchar,
+    create_views boolean DEFAULT FALSE,
+    defer_conversion boolean DEFAULT TRUE
+)
+RETURNS OBJECT
+LANGUAGE PYTHON
+RUNTIME_VERSION=3.11
+IMPORTS = ('@DROPBOX/prompts.py',
+        '@DROPBOX/tableau.py')
+PACKAGES = (
+'snowflake-snowpark-python==1.28.0',
+'snowflake-ml-python==1.8.0',
+'lxml==5.3.0')
+HANDLER = 'get_objects'
+COMMENT = $COMMENT
+EXECUTE AS CALLER
+AS $$
+from tableau import *
+
+def get_objects(session, tableau_data_source_file, create_views, defer_conversion):
+    tableau_model = TableauTDS(tableau_data_source_file, session, create_views, defer_conversion)
+
+    return tableau_model.get_object_names()
   $$;

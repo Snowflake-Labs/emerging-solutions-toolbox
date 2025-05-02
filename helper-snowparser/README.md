@@ -49,7 +49,8 @@ Below is an example of creating a Semantic View directly from the Tableau data s
 -- Runs CREATE OR REPLACE DDL for create Semantic View
 CALL GENAI_UTILITIES.UTILITIES.SNOWPARSER_CREATE_SEMANTIC(
     tableau_data_source_file => '@JSUMMER.PUBLIC.DROPBOX/TPCDS_Model_REVISED.tds',
-    view_name => 'MY_SEMANTIC_VIEW'
+    view_name => 'MY_SEMANTIC_VIEW',
+    create_views => TRUE -- Default is True so can omit
     );
 ```
 
@@ -58,10 +59,24 @@ There is an additional helper Stored Procedure to generate the DDL for the seman
 -- Returns DDL to create Semantic View
 CALL GENAI_UTILITIES.UTILITIES.SNOWPARSER_SEMANTIC_DDL(
     tableau_data_source_file => '@JSUMMER.PUBLIC.DROPBOX/TPCDS_Model_REVISED.tds',
-    view_name => 'MY_SEMANTIC_VIEW'
+    view_name => 'MY_SEMANTIC_VIEW',
+    create_views => TRUE -- Default is True so can omit
     );
 ```
 **This will return an OBJECT response with keys `ddl` that contains the DDL for the semantic view and `orphans` which contains elements that were not successfully translated in the semantic view. Each orphaned element will have an explanation.**
+
+If you prefer to not create views for custom SQL Tableau sources, set create_views to False.
+
+There is also a utility function to simply extract the Snowflake tables and columns referenced in a Tableau data source.
+
+```sql
+-- Returns JSON of tables and columns
+CALL GENAI_UTILITIES.UTILITIES.SNOWPARSER_GET_OBJECTS(
+    tableau_data_source_file => '@JSUMMER.PUBLIC.DROPBOX/TPCDS_Model_REVISED.tds',
+    create_views => False, -- Default is False so can omit
+    defer_conversion => True -- Skips rest of processing beyond object extraction
+    );
+```
 
 The below example Python implementation shows how Snowparser source can be used outside of a Snowflake Stored Procedure.
 
@@ -80,6 +95,7 @@ print(result['ddl'])
 
 tableau_model.create_view('MY_SEMANTIC_VIEW')
 ```
+
 
 ## Reference Architecture
 ![Reference Architecture](images/architecture.png)
