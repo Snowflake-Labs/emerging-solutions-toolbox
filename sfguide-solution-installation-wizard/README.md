@@ -1,4 +1,9 @@
 # Solution Installation Wizard
+
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
 The Solution Installation Wizard facilitates the deployment of code products (native apps, Streamlits, and more) securely and safely into consumer environments with full consumer consent.  It is currently designed to be used by known consumers.
 
 All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
