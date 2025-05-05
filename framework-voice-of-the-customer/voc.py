@@ -350,11 +350,18 @@ class VOC(BasePage):
                     "result_df" in st.session_state
                     and st.session_state.result_df is not None
                 ):
+                    st.session_state.result_df = (
+                        st.session_state.result_df.cache_result()
+                    )
                     st.dataframe(
                         st.session_state.result_df,
                         hide_index=True,
                         use_container_width=True,
                     )
+                    # Prompt user to save the results
+                    if st.button("Save Results", key="save_results"):
+                        pass
+                        # TODO
 
     def print_sidebar(self):
         super().print_sidebar()
