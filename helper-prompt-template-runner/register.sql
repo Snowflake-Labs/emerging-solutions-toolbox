@@ -2,7 +2,7 @@ SET db_name = 'GENAI_UTILITIES';
 SET schema_name = 'UTILITIES';
 
 SET major = 1;
-SET minor = 3;
+SET minor = 4;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "prompt_template_runner",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -79,4 +79,3 @@ CREATE OR REPLACE PROCEDURE PROMPT_TEMPLATE_RUNNER(
             'snowflake-ml-python==1.7.2')
   COMMENT = $COMMENT
   EXECUTE AS CALLER;
-
