@@ -6,7 +6,7 @@ import snowflake.snowpark.functions as F
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark import Session
 
-major, minor = 1, 2
+major, minor = 1, 4
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "prompt_template_runner",
@@ -18,7 +18,7 @@ def set_query_tag(session: Session) -> None:
     Sets the query tag for the Snowflake session.
     Args:
         session (Session): The Snowflake session object.
-        
+
     Returns:
         None
     """
@@ -26,7 +26,7 @@ def set_query_tag(session: Session) -> None:
         session.query_tag = QUERY_TAG
     except Exception:
         return
-    
+
 class PromptParser:
     def __init__(self):
         self.configuration_loaded = False
@@ -38,24 +38,24 @@ class PromptParser:
                 self.prompt_config = extract_prompt(prompt_template_file)
             else:
                 self.prompt_config = prompt_config
- 
+
             if not self.prompt_config:
                 raise ValueError(f"Error: prompt_config is required in configuration file or explicitly.")
             self.configuration_loaded = True
-        
+
         messages = self.prompt_config.get('messages', [])
         literal_vars = self.prompt_config.get('literal_variables', {})
         column_vars = self.prompt_config.get('column_variables', {})
         prompt_name = self.prompt_config.get('name', str(datetime.date.today()))
         prompt_version = self.prompt_config.get('version', str(datetime.datetime.now().time()))
-            
+
         # Replace column names with column values in column_variables
         mapped_column_vals = {} # Make new mapping in case we need to exlude missing row data
         if column_vars:
             for var_name, col_name in column_vars.items():
                 if col_name in row_data:
                     mapped_column_vals[var_name] = row_data.get(col_name, '')
-    
+
         replace_dict = {**(literal_vars or {}), **(mapped_column_vals or {})} # Combine dictionaries if not empty
 
         # Process messages
@@ -69,30 +69,30 @@ class PromptParser:
                         mapped_value = mapped_value.replace(f'{{{source_value}}}', target_value)
                     updated_message[key] = mapped_value
                 updated_messages.append(updated_message)
-    
+
         # Yield as a tuple, since UDTFs must return tuples
         if include_metadata:
-            yield ({'messages': updated_messages, 
-                    'prompt_name': prompt_name, 
+            yield ({'messages': updated_messages,
+                    'prompt_name': prompt_name,
                     'prompt_version': prompt_version},)
         else:
             yield (updated_messages,)
 
-    
+
 def test_model(
-        session: Session, 
-        model: str, 
+        session: Session,
+        model: str,
         prompt = "Repeat the word hello once and only once. Do not say anything else."
         ) -> bool:
     from snowflake.cortex import Complete
     from snowflake.snowpark.exceptions import SnowparkSQLException
 
     """Returns True if selected model is supported in region and returns False otherwise.
-    
+
     Args:
         session (Session): The Snowflake session object.
         model (str): The model to use for the SNOWFLAKE.CORTEX.COMPLETE function.
-        prompt (str): The prompt to test the model with. 
+        prompt (str): The prompt to test the model with.
             Defaults to "Repeat the word hello once and only once. Do not say anything else."
     """
     try:
@@ -116,7 +116,7 @@ def run_complete_options(
         session (Session): The Snowflake session object.
         source_table (str): The name of the source table to query.
         model (str): The model to use for the SNOWFLAKE.CORTEX.COMPLETE function.
-        model_options (Optional[dict[str, Union[str, float, int]]]): Options for the model in a dictionary format. 
+        model_options (Optional[dict[str, Union[str, float, int]]]): Options for the model in a dictionary format.
             Defaults to an empty dictionary.
         prompt_column (Optional[str]): The name of the column containing the prompts. Defaults to 'PROMPT'.
         response_column (Optional[str]): The name of the column to store the responses. Defaults to 'RESPONSE'.
@@ -127,16 +127,16 @@ def run_complete_options(
     """
 
     import json
-    
+
     query = f"""
-        SELECT * EXCLUDE ({prompt_column}), 
-        SNOWFLAKE.CORTEX.COMPLETE(
+        SELECT * EXCLUDE ({prompt_column}),
+        SNOWFLAKE.CORTEX.TRY_COMPLETE(
         ?,
             {prompt_column}, PARSE_JSON(?)
-            ) as {response_column}          
+            ) as {response_column}
         FROM {source_table}
         """
-    
+
     # If error occurs, immediately raise exception as error may be across multiple records
     try:
         return session.sql(
@@ -144,7 +144,7 @@ def run_complete_options(
                 prompt_column = prompt_column,
                 response_column = response_column,
                 source_table = source_table
-                    ), 
+                    ),
             params = [
                 model,
                 json.dumps(model_options),
@@ -171,7 +171,7 @@ def parse_prompt_template(
         output_table_name (Optional[str]): The name of the output table. Defaults to 'TEMP'.
         table_type (Optional[str]): The type of the output table (temporary, transient, or permanent).
             Defaults to 'temporary'.
-        table_write_mode (Optional[str]): The mode to write the table (append, overwrite, truncate, errorifexists, ignore). 
+        table_write_mode (Optional[str]): The mode to write the table (append, overwrite, truncate, errorifexists, ignore).
             Defaults to 'errorifexists'.
         prompt_column (Optional[str]): The column name for the prompt. Defaults to 'PROMPT'.
     Returns:
@@ -185,7 +185,7 @@ def parse_prompt_template(
     # Final check for required parameters
     if origin_table is None:
         raise ValueError(f"Error: origin_table is required in configuration file or explicitly.")
-    
+
     # Must first create object construct column as separate request to avoid selection error
     df = session.table(origin_table).with_column('ROW_DATA', F.object_construct('*'))
 
@@ -199,7 +199,7 @@ def parse_prompt_template(
             F.lit(''),
             F.to_variant(F.lit(prompt_config)),
             F.lit(False))).drop('ROW_DATA')
-    
+
     # Save results to table
     if output_table_name is None:
         output_table_name = prompt_config['name'].replace(' ', '_').upper()
@@ -223,7 +223,7 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
     """
 
     import yaml
-    
+
     if prompt_template_file.startswith('https://'): # BUILD_SCOPED_FILE_URL returns URL
         from snowflake.snowpark.files import SnowflakeFile
         open_file = SnowflakeFile.open(prompt_template_file)
@@ -232,7 +232,7 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
         open_file = SnowflakeFile.open(prompt_template_file, require_scoped_url = False)
     else:
         open_file = open(prompt_template_file, 'r')
-        
+
     with open_file as file:
         try:
             return yaml.safe_load(file)['prompt']
@@ -240,13 +240,13 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
             raise KeyError(f"Error parsing YAML file {prompt_template_file}. Ensure that the file contains a 'prompt' key.")
         except yaml.YAMLError as e:
             raise yaml.YAMLError(f"Error parsing YAML file {prompt_template_file}. Error: {e}")
-        
+
 def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFrame:
     """
-    Adds metadata to a specified column in the DataFrame. 
-    
+    Adds metadata to a specified column in the DataFrame.
+
     If the metadata contains nested dictionaries, they are unnested and added as separate keys.
-    
+
     Args:
         df (DataFrame): The DataFrame to which metadata will be added.
         column (str): The name of the column to which metadata will be added.
@@ -254,10 +254,10 @@ def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFr
     Returns:
         DataFrame: The DataFrame with the added metadata.
     """
-    
+
     try:
         for key, value in metadata.items():
-                
+
                 if value is None:
                     continue
                 elif key == 'model_options':
@@ -290,12 +290,12 @@ def run_prompt_template(
         table_write_mode: str = 'overwrite',
         prompt_column: str = 'PROMPT'
         ) -> DataFrame:
-    
+
     """
-    Executes a prompt template by extracting the prompt configuration, 
-        preparing the prompt table, running the model with the specified options, 
+    Executes a prompt template by extracting the prompt configuration,
+        preparing the prompt table, running the model with the specified options,
         and adding metadata to the response.
-    
+
     Args:
         session (Session): The Snowflake session object.
         prompt_template_file (str): The file path to the prompt template configuration.
@@ -306,11 +306,11 @@ def run_prompt_template(
         messages (Optional[list]): The list of messages to use in the prompt template.
         literal_variables (Optional[dict]): The dictionary of literal variables to use in the prompt template.
         column_variables (Optional[dict]): The dictionary of column variables to use in the prompt template.
-        origin_table (Optional[str]): The name of the origin table containing the prompts. 
+        origin_table (Optional[str]): The name of the origin table containing the prompts.
             If None, it will be extracted from the prompt configuration.
-        model (Optional[str]): The model to use for generating responses. 
+        model (Optional[str]): The model to use for generating responses.
             If None, it will be extracted from the prompt configuration.
-        model_options (Optional[dict]): Additional options to pass to the model. 
+        model_options (Optional[dict]): Additional options to pass to the model.
             If None or empty, it will be extracted from the prompt configuration.
             model_options are optional in Cortex calls.
         response_column (str): The name of the column to store the model responses. Default is 'RESPONSE'.
@@ -318,9 +318,9 @@ def run_prompt_template(
         table_type (Optional[str]): The type of the table to create (e.g., 'temporary'). Default is 'temporary'.
         table_write_mode (str): The mode to use when writing the output_table_name table (e.g., 'overwrite'). Default is 'overwrite'.
         prompt_column (str): The name of the column to write prepared prompts to in output_table_name. Default is 'PROMPT'.
-            Column will not be included in output table. 
+            Column will not be included in output table.
             Column name should not conflict wiht existing columns in origin_table.
-    
+
     Returns:
         DataFrame: The DataFrame containing the model responses with added metadata.
     Raises:
@@ -340,10 +340,10 @@ def run_prompt_template(
 
     if name:
         prompt_config['name'] = name
-    
+
     if version:
         prompt_config['version'] = version
-    
+
     if isinstance(messages, list) and len(messages) > 0:
         prompt_config['messages'] = messages
     elif prompt_config.get('messages', None) is not None:
@@ -351,17 +351,17 @@ def run_prompt_template(
     else:
         logger.warning("No messages provided in prompt_config or signature.")
         raise ValueError("Error: No messages provided in prompt_config or signature.") # messages are required
-    
+
     if isinstance(literal_variables, dict) and len(literal_variables) > 0:
         prompt_config['literal_variables'] = literal_variables
     else:
         prompt_config['literal_variables'] = prompt_config.get('literal_variables', {})
-    
+
     if isinstance(column_variables, dict) and len(column_variables) > 0:
         prompt_config['column_variables'] = column_variables
     else:
         prompt_config['column_variables'] = prompt_config.get('column_variables', {})
-    
+
     if origin_table is None: # If origin_table is passed in signature, it will take priority
         origin_table = prompt_config.get('origin_table', None)
         if origin_table is None:
@@ -371,7 +371,7 @@ def run_prompt_template(
             # Create empty temporary table for non-tabular generation
             session.range(1).write.mode('overwrite').save_as_table('temp_placeholder_tbl', table_type='temporary')
             origin_table = 'temp_placeholder_tbl' # Set origin_table to empty temporary table
-    
+
     if model is None:
         model = prompt_config.get('model', None)
         if model is None:
@@ -389,7 +389,7 @@ def run_prompt_template(
         model_options = model_options
     else:
         model_options = prompt_config.get('model_options', {})
-    
+
     # Creates table with prompt column so we can use SQL complete with options against prepped prompt
     parse_prompt_template(
         session,
@@ -410,7 +410,7 @@ def run_prompt_template(
         prompt_column,
         response_column
     )
-    
+
     metadata = {
         'prompt_name': prompt_config.get('name', ''),
         'prompt_version': prompt_config.get('version', ''),

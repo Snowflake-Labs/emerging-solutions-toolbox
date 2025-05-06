@@ -11,7 +11,7 @@ Here, the key difference is that prompt variables may be imputed by literal cons
 The helper provides 2 utilities to operationalize templated prompts against Snowflake tables:
 
 1) **PROMPT_TEMPLATE_PARSER**: User Defined Table Function (UDTF) to create a multi-message prompt from every record in a table, replacing variables with literal and/or table values.
-2) **PROMPT_TEMPLATE_RUNNER**: Stored Procedure to run a prompt template through the PROMPT_TEMPLATE_PARSER and prompt an LLM.
+2) **PROMPT_TEMPLATE_RUNNER**: Stored Procedure to run a prompt template through the PROMPT_TEMPLATE_PARSER and prompt an LLM. This stored procedure is the primary utility.
 
 ## Support Notice
 
@@ -113,9 +113,41 @@ See [Snowflake Extension for Visual Studio Code installation documentation](http
 The configuration file is passed as a parameter when invoking the utilities.
 The file should be in Snowflake Stage.
 
+## PROMPT_TEMPLATE_RUNNER
+
+The PROMPT_TEMPLATE_RUNNER is a Stored Procedure that can be executed standalone with all necessary components driven from a configuration file.
+The below arguments can be passed explicitly to the utility in addition to the configuration file.
+Arguments passed explicitly will be prioritized over those in the configuration file.
+- `name`
+- `version`
+- `messages`
+- `literal_variables`
+- `column_variables`
+- `origin_table`
+- `model`
+- `model_options`
+
+### Examples
+
+Calling the stored procedure relying on the configuration file for all arguments.
+```sql
+CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER('@JSUMMER.PUBLIC.DROPBOX/prompt_template.yaml');
+```
+
+Calling the stored procedure and passing explicit arguments to override those in the configuration file.
+```sql
+CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER(
+    prompt_template_file => '@JSUMMER.PUBLIC.DROPBOX/prompt_template.yaml',
+    origin_table => 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED',
+    model => 'llama3.2-1b',
+    model_options => {'temperature': 0.1,
+                      'max_tokens': 90}
+    );
+```
+
 ## PROMPT_TEMPLATE_PARSER
 
-The PROMPT_TEMPLATE_PARSER is a UDTF and should be called against a Snowflake table.
+The PROMPT_TEMPLATE_PARSER is a UDTF and should be called against a Snowflake table. Its intended to create a prompt for each table record and is used as part of the PROMPT_TEMPLATE_RUNNER stored prodedure. Here, we expose it as its own utility as well.
 A configuration file in Snowflake stage can be passed to the UDTF OR an explicit object containing the same arguments can be passed.
 
 ### Examples
@@ -127,7 +159,7 @@ AS (
     SELECT
         *,
         OBJECT_CONSTRUCT(*) AS ROW_DICT, -- Necessary to pass row values to prompt
-        BUILD_SCOPED_FILE_URL('@JSUMMER.PUBLIC.DROPBOX','prompt_template.yaml') AS CONFIG_FILE -- Always used BUILD_SCOPED_FILE_URL
+        '@JSUMMER.PUBLIC.DROPBOX/prompt_template.yaml' AS CONFIG_FILE
     FROM JSUMMER.SAMPLE_DATA.MOVIES_LIMITED -- Sample table
 )
 SELECT
@@ -153,7 +185,7 @@ df = session.table(origin_table).with_column('ROW_DATA', F.object_construct('*')
 df = df.with_column(prompt_column, F.call_table_function(
         'GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_PARSER',
         F.col('ROW_DATA'),
-        F.call_builtin('BUILD_SCOPED_FILE_URL','@JSUMMER.PUBLIC.DROPBOX','prompt_template.yaml'),
+        '@JSUMMER.PUBLIC.DROPBOX/prompt_template.yaml',
         F.parse_json(F.lit(None)), # Can omit if using a configuration file
         F.lit(True) # Can omit and will default to False
         )).drop('ROW_DATA')
@@ -205,38 +237,6 @@ df = df.with_column(prompt_column, F.call_table_function(
         F.lit(False))).drop('ROW_DATA')
 df.show()
 ```
-## PROMPT_TEMPLATE_RUNNER
-
-The PROMPT_TEMPLATE_RUNNER is a Stored Procedure that can be executed standalone with all necessary components driven from a configuration file.
-The below arguments can be passed explicitly to the utility in addition to the configuration file.
-Arguments passed explicitly will be prioritized over those in the configuration file.
-- `name`
-- `version`
-- `messages`
-- `literal_variables`
-- `column_variables`
-- `origin_table`
-- `model`
-- `model_options`
-
-### Examples
-
-Calling the stored procedure relying on the configuration file for all arguments.
-```sql
-CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER(BUILD_SCOPED_FILE_URL('@JSUMMER.PUBLIC.DROPBOX', 'prompt_template.yaml'));
-```
-
-Calling the stored procedure and passing explicit arguments to override those in the configuration file.
-```sql
-CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER(
-    prompt_template_file => BUILD_SCOPED_FILE_URL('@JSUMMER.PUBLIC.DROPBOX', 'prompt_template.yaml'),
-    origin_table => 'JSUMMER.SAMPLE_DATA.MOVIES_LIMITED',
-    model => 'llama3.2-1b',
-    model_options => {'temperature': 0.1,
-                      'max_tokens': 90}
-    );
-```
-
 
 # Metadata Tracking
 The below metadata elements from the prompt template (or explicitly passed) are added to the Cortex Complete response object:
@@ -246,7 +246,3 @@ The below metadata elements from the prompt template (or explicitly passed) are 
 
 # Feedback
 Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).
-
-## Tagging
-
-Please see `TAGGING.md` for details on object comments.
