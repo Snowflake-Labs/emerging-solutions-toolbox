@@ -1,13 +1,13 @@
 {
   "__accountComment_": "enter your 'account' copied from Snowsight: https://docs.snowflake.com/en/user-guide/admin-account-identifier#finding-the-organization-and-account-name-for-an-account",
   "__accountComment2_": "then replace '.' with '-' ",
-  "account": "",
+  "account": "1",
   "__userComment_": "enter your user name",
   "user": "",
   "__credComment_": "enter your password",
   "password": "",
   "role": "",
   "warehouse": "",
-  "database": "dmm_test_db",
+  "database": "DATA_MODEL_MAPPER_TEST_DB",
   "schema": "code"
 }

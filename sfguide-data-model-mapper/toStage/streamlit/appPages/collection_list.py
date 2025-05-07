@@ -79,7 +79,8 @@ class CollectionList(BasePage):
 
             target_collection_name = collection_entity_list_pd.loc[i, "TARGET_COLLECTION_NAME"]
 
-            with st.expander("", expanded=True):
+            with st.container(border=True):
+            # with st.expander("", expanded=True):
             
                 collection_entity_name = collection_entity_list_pd.loc[i, "TARGET_ENTITY_NAME"]
 
