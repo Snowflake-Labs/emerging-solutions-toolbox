@@ -1,4 +1,8 @@
 # Data Model Mapper
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
 The Data Model Mapper native app helps providers get conformed data from partners at scale, from any cloud/region.  It provides a Streamlit UI that enables business users to model, map, and share their data to a provider's data specification, all without SQL and without needing to be a data engineer.
 
 ## Overview
@@ -36,6 +40,6 @@ There is a blog posting  [here](https://medium.com/snowflake/data-model-mapper-a
 ## Support Notice
 All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
 
-Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 Please see TAGGING.md for details on object comments.
