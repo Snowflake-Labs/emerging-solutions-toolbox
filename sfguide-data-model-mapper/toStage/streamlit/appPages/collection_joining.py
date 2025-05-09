@@ -313,7 +313,10 @@ def preview_click(add_condition_filter, page_change):
 
             tablename = 'sorted_df' + str(int(time.time() * 1000.0))
 
-            source_df = session.write_pandas(unique_sorted_df, tablename, auto_create_table=True)
+            try:
+                source_df = session.write_pandas(unique_sorted_df, tablename, auto_create_table=True)
+            except Exception as e:
+                st.info(e)
 
             try:
                 target_df.merge(
@@ -340,7 +343,10 @@ def preview_click(add_condition_filter, page_change):
             except Exception as e:
                 st.info(e)
 
-            source_df.drop_table()
+            try:
+                source_df.drop_table()
+            except Exception as e:
+                st.info(e)
 
             if st.session_state["streamlit_mode"] == "NativeApp":
                 target_join_table = st.session_state.native_database_name + ".configuration.SOURCE_ENTITY_JOIN_CONDITION"
@@ -388,6 +394,7 @@ def add_derived_attribute():
     derived_upper_quotes = sanitize(derived_upper, 'add_single_quotes')
     # sanitize(upper_derived)
 
+
     if st.session_state.derivation_type == "EXPRESSION":
 
         source_df = (session.create_dataframe(
@@ -395,7 +402,7 @@ def add_derived_attribute():
                 [
                     collection_name,
                     st.session_state.force_entity_name,
-                    derived_upper,
+                    derived_upper_quotes, 
                     "null",
                     True,
                     st.session_state.expression_value_input,
@@ -543,7 +550,10 @@ def insert_attribute_selections():
                     "AGGREGATION_FUNCTION": row['AGGREGATION FUNCTION']
                 })
 
-    initial_data_df = session.create_dataframe(attr_data)
+    try:
+        initial_data_df = session.create_dataframe(attr_data)
+    except Exception as e:
+        st.info(e)
 
     if st.session_state.is_debug:
         if st.session_state.is_debug:
@@ -1341,7 +1351,7 @@ class CollectionJoining(BasePage):
                                       ''')
                         else:
                             st.subheader("Preview Existing Table Records: ")
-                            st.dataframe(preview_table_df)
+                            st.dataframe(preview_table_df, hide_index=True)
 
                     bttn1, filler1, filler2, bttn2 = st.columns((3, 4, 4, 1.5))
                     with bttn1:
@@ -1395,7 +1405,8 @@ class CollectionJoining(BasePage):
                                         key="literal_value_input"
                                     )
                                 with derive_col4:
-                                    st.title('')
+                                    # st.title('')
+                                    st.text('')
                                     add_derived_button = st.button(
                                         ":floppy_disk:",
                                         key="add_derived_attribute",
@@ -1404,7 +1415,8 @@ class CollectionJoining(BasePage):
                                     )
                             if st.session_state.derivation_type == "EXPRESSION":
                                 with derive_col3:
-                                    st.title('')
+                                    # st.title('')
+                                    st.text('')
                                     add_derived_button = st.button(
                                         ":floppy_disk:",
                                         key="add_derived_attribute",
@@ -1439,8 +1451,11 @@ class CollectionJoining(BasePage):
                         qualified_table_name = st.session_state.native_database_name + ".MODELED." + st.session_state.collection_name
                     else:
                         qualified_table_name = "MAPPING." + st.session_state.collection_name
+                    try:
+                        dynamic_table = session.table(qualified_table_name).to_pandas()
+                    except Exception as e:
+                        st.info(e)
 
-                    dynamic_table = session.table(qualified_table_name).to_pandas()
                     dynamic_table_columns = pd.DataFrame(dynamic_table.columns)
 
                     add_new_row = pd.DataFrame({0: 'Please Select'}, index=[0])
@@ -1457,7 +1472,7 @@ class CollectionJoining(BasePage):
                                 Once finished click Continue to Mapping to go ahead and start mapping your Source to Target attributes
                                   ''')
                     st.write('#')
-                    st.dataframe(dynamic_table)
+                    st.dataframe(dynamic_table,hide_index=True)
 
                     if 'filter_conditions' in st.session_state:
                         filter_conditions_pd = pd.DataFrame(st.session_state.filter_conditions)
@@ -1922,10 +1937,10 @@ class CollectionJoining(BasePage):
                             key="operation_" + str(i) + str(idx))
 
                     elif current_join_column_condition in ("INNER", "LEFT", "RIGHT"):
+                        st.subheader('')
                         st.text('')
-                        st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+
                         join_to = st.selectbox(
                             "Join To",
                             st.session_state.source_entity,
@@ -1958,19 +1973,17 @@ class CollectionJoining(BasePage):
                                                  key="operation_" + str(i) + str(idx))
                 with sub_col3:
                     if idx == 0:
+                        st.subheader('')
                         st.text('')
-                        st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+
                     elif current_join_column_condition in ("INNER", "LEFT", "RIGHT"):
-                        st.text('')
-                        st.subheader('')
-                        st.subheader('')
                         st.subheader('')
                         st.text('')
+                        st.text('')
                         st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+                        st.text('')
                     else:
                         st.text('')
                         st.subheader('')
@@ -1988,11 +2001,11 @@ class CollectionJoining(BasePage):
 
                 with sub_col4:
                     if idx == 0:
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
                     elif current_join_column_condition in ("OR", "AND"):
                         st.write("####")
                         st.subheader("")
@@ -2001,15 +2014,14 @@ class CollectionJoining(BasePage):
                         st.subheader("")
 
                     else:
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
                         st.text('')
                         st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
 
                     if idx == wizard_counter - 2:
                         remove_relationship_button = st.button(
@@ -2022,11 +2034,11 @@ class CollectionJoining(BasePage):
 
                 with sub_col5:
                     if idx == 0:
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
                     elif current_join_column_condition in ("OR", "AND"):
                         st.write("####")
                         st.subheader("")
@@ -2034,15 +2046,14 @@ class CollectionJoining(BasePage):
                         st.subheader("")
                         st.subheader("")
                     else:
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
                         st.text('')
                         st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
 
                     if idx == wizard_counter - 2:
                         add_relationship_button = st.button(
@@ -2056,11 +2067,11 @@ class CollectionJoining(BasePage):
                 with sub_col6:
                     if idx == 0:
                         st.session_state.divider = True
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
                     elif current_join_column_condition in ("OR", "AND"):
                         st.session_state.divider = False
                         st.write("####")
@@ -2072,15 +2083,14 @@ class CollectionJoining(BasePage):
                     else:
                         st.session_state.divider = True
 
-                        st.write("####")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
-                        st.subheader("")
+                        st.subheader('')
+                        st.text('')
                         st.text('')
                         st.subheader('')
-                        st.subheader('')
-                        st.subheader('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
+                        st.text('')
 
                     if idx == wizard_counter - 2:
                         preview_button = st.button(

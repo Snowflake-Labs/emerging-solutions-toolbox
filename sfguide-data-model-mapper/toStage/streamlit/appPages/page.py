@@ -167,7 +167,7 @@ class BasePage(Page):
 
                 st.write("Target Entity: " + '**' + st.session_state.collection_entity_name + '**')
 
-                st.dataframe(data_type_pd)
+                st.dataframe(data_type_pd,hide_index=True)
 
                 st.session_state.data_type_pd = data_type_pd
 
