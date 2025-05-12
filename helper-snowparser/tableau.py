@@ -560,8 +560,8 @@ class TableauRelationship:
 
         # Determine which table has UNIQUE column designated by unique attribution
         # View supports many-to-1 in that specific order
-        if (table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False)) and \
-            (table_two.attrib.get('unique_key', False) or table_two.attrib.get('is-db-set-unique-key', False)):
+        if (table_one.attrib.get('unique-key', False) or table_one.attrib.get('is-db-set-unique-key', False)) and \
+            (table_two.attrib.get('unique-key', False) or table_two.attrib.get('is-db-set-unique-key', False)):
             self.left_unique = True
             self.right_unique = True
             left_table = table_one.attrib.get('object-id')
@@ -570,11 +570,13 @@ class TableauRelationship:
             self.supported = False
             self.explanation = """Semantic View relationships currently support many-to-1 relationships. This is a 1-to-1 relationship.
             Denote unique keys in Tableau using [Performance Options](https://help.tableau.com/current/pro/desktop/en-us/datasource_relationships_perfoptions.htm) in Tableau Desktop."""
-        elif table_one.attrib.get('unique_key', False) or table_one.attrib.get('is-db-set-unique-key', False):
+        elif table_one.attrib.get('unique-key', False) or table_one.attrib.get('is-db-set-unique-key', False):
             self.right_unique = True # View requires many-to-1 to be in this order
             right_table = table_one.attrib.get('object-id')
             left_table = table_two.attrib.get('object-id')
-        elif table_two.attrib.get('unique_key', False) or table_two.attrib.get('is-db-set-unique-key', False):
+            # We need to switch left and right columns to  match the order of the tables
+            join_pairs = [(right, left) for left, right in join_pairs]
+        elif table_two.attrib.get('unique-key', False) or table_two.attrib.get('is-db-set-unique-key', False):
             self.right_unique = True # View requires many-to-1 to be in this order
             right_table = table_two.attrib.get('object-id')
             left_table = table_one.attrib.get('object-id')
