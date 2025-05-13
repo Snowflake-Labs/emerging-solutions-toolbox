@@ -8,6 +8,7 @@ class InitialSetupPage(BasePage):
     def print_page(self):
         session = st.session_state.session
 
+        # If implementing subscription
         collection_names_pd = (
             session.table("ADMIN.SUBSCRIPTION")
             .select(col("CUSTOMER_NAME"), col("TARGET_COLLECTION_NAME"))
@@ -15,7 +16,10 @@ class InitialSetupPage(BasePage):
             .to_pandas()
         )
 
-        customer_name = collection_names_pd.loc[0, "CUSTOMER_NAME"]
+        if len(collection_names_pd) > 0:
+            customer_name = collection_names_pd.loc[0, "CUSTOMER_NAME"]
+        else:
+            customer_name = "CustomerName"
 
         st.header("Initial Setup")
         st.markdown("")
