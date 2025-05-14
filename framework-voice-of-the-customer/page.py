@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import streamlit as st
 import base64
 from PIL import Image
-import pandas as pd
 
 if "session" in st.session_state:
     session = st.session_state.session
@@ -48,13 +47,16 @@ class BasePage(Page):
                         image_name_string = (
                             f"data:image/{mime_type};base64,{content_b64encoded}"
                         )
-                        # st.image(image_name_string, width=400)
                         st.logo(image_name_string, size="large")
                 else:
                     dataimage = Image.open("snow.png")
                     st.logo(dataimage, size="large")
-            st.header("Voice of the Customer")
-            st.subheader("")
+            st.markdown(
+                """
+                <p style="font-size:24px; font-family:'Source Sans Pro Semibold', sans-serif;"> Voice of the Customer</p>
+                """,
+                unsafe_allow_html=True,
+            )
             css = """
                 <style>
                     .st-key-voc_bttn button {
