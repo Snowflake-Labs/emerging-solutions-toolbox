@@ -89,7 +89,7 @@ def add_new_metric():
     )
     model = select_model("custom_metric_model", default="llama3.1-8b")
     st.caption(
-        """Variables should be enclosed in brackets { } like f-strings. 
+        """Variables should be enclosed in brackets { } like f-strings.
                For example, '{question}'. These variables will be filled with column values.
                We suggest prompts that return an integer score, such as 1 - 5.
                True/False results should be returned as 1 or 0."""

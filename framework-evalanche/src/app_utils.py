@@ -12,10 +12,10 @@ from src.snowflake_utils import (
 )
 
 ABOUT = """
-Evalanche is a Streamlit in Snowflake (SiS) app that provides a single location to evaluate and compare LLM use case outputs in a streamlined, on demand, and automated fashion. 
+Evalanche is a Streamlit in Snowflake (SiS) app that provides a single location to evaluate and compare LLM use case outputs in a streamlined, on demand, and automated fashion.
 
-Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. 
-Together, Metrics and Data Sources can be combined to make an Evaluation. 
+Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources.
+Together, Metrics and Data Sources can be combined to make an Evaluation.
 In other words, an Evaluation will calculate 1 or more Metrics for every record in a Data Source.
 
 ### Metrics
@@ -25,7 +25,7 @@ A Metric mostly consists of required input(s) and a prompt asking the LLM to ass
 
 ### Data Sources
 
-Data Sources provide the values to Metrics’ required inputs. Data Sources can be a Snowflake table or a SQL SELECT statement. 
+Data Sources provide the values to Metrics’ required inputs. Data Sources can be a Snowflake table or a SQL SELECT statement.
 
 ### Example
 
@@ -89,7 +89,7 @@ def test_complete(session, model, prompt = "Repeat the word hello once and only 
     except SnowparkSQLException as e:
         if 'unknown model' in str(e):
             return False
-        
+
 def upload_staged_pickle(session: Session, instance: Any, file_name: str, stage_name: str) -> None:
     """Pickles object and uploads to Snowflake stage."""
     import cloudpickle as pickle
@@ -101,10 +101,10 @@ def upload_staged_pickle(session: Session, instance: Any, file_name: str, stage_
     # Upload the pickled instance to the stage
     session.file.put(file_name, f"@{stage_name}", auto_compress=False, overwrite=True)
     os.remove(file_name)
-        
+
 def load_staged_pickle(session: Session, staged_file_path: str) -> Any:
     """Loads pickled object from Snowflake stage.
-    
+
     LS @stage results do not include database and schema so we have to create the full path to the file manually.
     """
     import cloudpickle as pickle
@@ -115,8 +115,8 @@ def load_staged_pickle(session: Session, staged_file_path: str) -> Any:
     with open(local_file, "rb") as f:
         loaded_instance = pickle.load(f)
         return loaded_instance
-        
-    
+
+
 def delete_metric(session: Session, metric: Metric, stage_name: str):
     """Deletes metric pickle file from Snowflake stage."""
     file_name = type(metric).__name__ + ".pkl"
@@ -130,7 +130,7 @@ def delete_metric(session: Session, metric: Metric, stage_name: str):
                 metric if metric.name != metric.name else metric
                 for metric in st.session_state['all_metrics']
             ]
-    
+
 
 def add_metric_to_table(session: Session,
                         metric_name: str,
@@ -140,12 +140,12 @@ def add_metric_to_table(session: Session,
     """Adds metric to CUSTOM_METRICS table in Snowflake."""
     import datetime
     from snowflake.snowpark.functions import current_timestamp, when_matched, when_not_matched
-    
+
     metric_table = session.table(table_name)
     metric_columns = metric_table.columns
     key_col = 'METRIC_NAME'
     other_cols = [col for col in metric_columns if col != key_col]
-    
+
     if session.get_current_user() is None:
         username = st.experimental_user.user_name
     else:
@@ -156,7 +156,7 @@ def add_metric_to_table(session: Session,
                                                datetime.datetime.now(),
                                                True,
                                                username.replace('"', '')]]).to_df(*metric_columns)
-    
+
     update_dict = {col: new_record_df[col] for col in other_cols}
     insert_dict = {col: new_record_df[col] for col in metric_columns}
 
@@ -165,7 +165,7 @@ def add_metric_to_table(session: Session,
             when_not_matched().insert(insert_dict)])
 
 
-    
+
 
 def get_custom_metrics_table_results(session: Session,
                                      table_name: str = CUSTOM_METRIC_TABLE
@@ -186,7 +186,7 @@ def fetch_custom_metrics_from_stage(session: Session,
 
     # Get metric list from table
     metrics_to_show = get_custom_metrics_table_results(session, metrics_table)
-    
+
     query = f"ls @{stage_name} pattern='.*\\pkl'"
     result = session.sql(query)
     files = [file[0] for file in result.collect()]
@@ -225,7 +225,7 @@ def fetch_metric_display() -> List[Dict[str, Any]]:
     from src.metrics import provided_metrics
 
 
-    custom_metrics = [metric for metric in st.session_state['all_metrics'] 
+    custom_metrics = [metric for metric in st.session_state['all_metrics']
                       if metric.name not in [provided_metric.name for provided_metric in provided_metrics]]
 
     if len(custom_metrics) > 0:
@@ -533,7 +533,7 @@ def fetch_evals(
 
 def render_sidebar():
     """Renders the sidebar of selected metrics for the application across all pages."""
-    
+
     if st.session_state.get("selected_metrics", None) is not None:
         with st.sidebar:
             for metric in st.session_state["selected_metrics"]:

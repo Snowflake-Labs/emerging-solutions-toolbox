@@ -57,7 +57,7 @@ After updating this file, you will need to re-compress the src directory and re-
 #     ):
 #         import re
 
-#         model_to_use = model if model else self.model  
+#         model_to_use = model if model else self.model
 
 #         prompt = self.get_prompt(question, ai_response)
 

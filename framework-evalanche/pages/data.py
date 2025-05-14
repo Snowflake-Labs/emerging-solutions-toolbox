@@ -62,7 +62,7 @@ BESPOKE_INSTRUCTIONS = """Before you start, your LLM pipeline must be encapsulat
             Please see [Snowflake Stored Procedure documentation](https://docs.snowflake.com/en/developer-guide/stored-procedure/stored-procedures-overview)
             for details on stored procedures and these [specific instructions](https://github.com/sfc-gh-jsummer/evalanche#crafting-a-llm-pipeline-stored-procedure) on crafting these stored procedures."""
 
-CORTEX_ANALYST_INSTRUCTIONS = """Have reference questions to run through Cortex Analyst? 
+CORTEX_ANALYST_INSTRUCTIONS = """Have reference questions to run through Cortex Analyst?
         Select the Semantic Model in stage, table containing the reference questions, and a destination table.
         We will do the rest. Take note of the table name as it will be used in the next step to evaluate the results."""
 

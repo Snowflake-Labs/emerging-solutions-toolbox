@@ -25,13 +25,13 @@ class Metric(ABC):
         self, **kwargs,
     ) -> Union[str, None]:
         if self.prompt is not None:
-            try:    
+            try:
                 return self.prompt.format(**kwargs)
             except ValueError as e:
                 return f"Keyword argument missing in prompt: {e}"
         else:
             return None
-            
+
     def evaluate(
         self,
         model: Optional[str] = None,
@@ -39,7 +39,7 @@ class Metric(ABC):
     ):
         import re
 
-        model_to_use = model if model else self.model 
+        model_to_use = model if model else self.model
         try:
             prompt = self.get_prompt(**kwargs)
 
@@ -51,7 +51,7 @@ class Metric(ABC):
             return None
         else:
             return None
-        
+
     def get_column(self):
         return self.name.replace(" ", "_").upper()
 
@@ -110,8 +110,8 @@ Questions are best designed when expected results have less than 100 rows.""",
         model: Optional[str] = None,
         **kwargs,
     ):
-        
-        model_to_use = model if model else self.model  
+
+        model_to_use = model if model else self.model
         try:
             prompt = self.get_prompt(**kwargs)
 
@@ -142,7 +142,7 @@ Evaluates the correctness of a response compared to a reference answer on a scal
                 "ai_response": "LLM-generated response to the question",
             },
         )
-        
+
         self.model = model
 
 
@@ -203,7 +203,7 @@ Evaluates the cohesivenss and adherence to topics of AI responses in conversatio
             },
         )
         self.model = model
-    
+
 
 class AnswerRelevancy(Metric):
     def __init__(
@@ -223,7 +223,7 @@ Evaluates the relevance of a response to a user question on a scale of 1-5.
         )
         self.model = model
 
-    
+
 class ContextualRelevancy(Metric):
     def __init__(
         self,
