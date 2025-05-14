@@ -22,10 +22,14 @@ will be updating features, fixing bugs, and releasing new solutions on a regular
 
 Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
-## Setup
+## Setup (Streamlit in Snowflake)
 
-1. Run the install.sql script.
-2. Run the put.sql script to upload the necessary files for the Streamlit application.
+Using [Snowflake CLI](https://docs.snowflake.com/developer-guide/snowflake-cli/index),
+you can run the following command to install the Streamlit app in your Snowflake account.
+
+```sh
+cat install.sql put.sql | snow sql -i
+```
 
 ## Tagging
 

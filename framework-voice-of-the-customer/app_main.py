@@ -1,6 +1,7 @@
 from page import st
 from voc import VOC
 from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark import Session
 
 
 def set_session():
@@ -14,9 +15,7 @@ def set_session():
 
             st.session_state["streamlit_mode"] = "SiS"
         except Exception:
-            import snowflake_conn as sfc
-
-            session = sfc.init_snowpark_session("account_1")
+            session = Session.builder.create()
 
             st.session_state["streamlit_mode"] = "OSS"
 
@@ -32,7 +31,12 @@ pages = [VOC()]
 
 
 def main():
-    st.set_page_config(layout="wide")
+    st.set_page_config(
+        page_title="Voice of the Customer",
+        page_icon=":speech_balloon:",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     if "session" not in st.session_state:
         st.session_state.session = set_session()
     for page in pages:

@@ -11,15 +11,16 @@ if st.secrets["local_key_path"] != "":
     with open(st.secrets["local_key_path"], "rb") as key:
         p_key = serialization.load_pem_private_key(
             key.read(),
-            password=os.environ['PRIVATE_KEY_PASSPHRASE'].encode(),
-            backend=default_backend()
+            password=os.environ["PRIVATE_KEY_PASSPHRASE"].encode(),
+            backend=default_backend(),
         )
 
     # Stores private key
     pkb = p_key.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption())
+        encryption_algorithm=serialization.NoEncryption(),
+    )
 
 
 # Create Snowpark Session

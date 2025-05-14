@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "snowflake-snowpark-python>=1.30.0",
+    "snowflake-snowpark-python[pandas]>=1.30.0",
     "snowflake>=1.2.0",
     "langdetect>=1.0.9",
+    "streamlit>=1.45.0",
+    "pyarrow<20",
 ]
 
 [dependency-groups]
@@ -17,4 +19,5 @@ dev = [
     "ipython>=9.1.0",
     "pre-commit>=4.2.0",
     "ruff>=0.11.4",
+    "uv>=0.7.3",
 ]
