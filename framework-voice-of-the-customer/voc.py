@@ -57,19 +57,19 @@ def set_state():
     return None
 
 
-@st.cache_resource
 def fetch_warehouses(_session: Session) -> None:
-    st.session_state.warehouses = [
-        w["name"].lower() for w in _session.sql("SHOW TERSE WAREHOUSES").collect()
-    ]
+    if "warehouses" not in st.session_state:
+        st.session_state.warehouses = [
+            w["name"].lower() for w in _session.sql("SHOW TERSE WAREHOUSES").collect()
+        ]
     return None
 
 
-@st.cache_resource
 def fetch_databases(_session: Session) -> None:
-    st.session_state.databases = [
-        d["name"].lower() for d in _session.sql("SHOW TERSE DATABASES").collect()
-    ]
+    if "databases" not in st.session_state:
+        st.session_state.databases = [
+            d["name"].lower() for d in _session.sql("SHOW TERSE DATABASES").collect()
+        ]
     return None
 
 
@@ -299,6 +299,9 @@ def run_selections(cache_result: bool = False):
 
 def step_one(session):
     st.markdown("**Step 1: Select your Table/View/Stream**")
+    st.write(
+        "Please select a table with a column containing text you would like to analyze."
+    )
     st.selectbox(
         "Databases:",
         st.session_state.databases,
@@ -363,6 +366,7 @@ def step_one(session):
 
 def step_two(session):
     st.markdown("**Step 2: Select your column**")
+    st.write("Please select the column you would like to analyze.")
     if "qualified_selected_table" in st.session_state:
         st.session_state.df = session.table(st.session_state.qualified_selected_table)
         st.dataframe(
@@ -385,6 +389,10 @@ def step_two(session):
 
 def step_three(session):
     st.markdown("**Step 3: Additional Configuration (Optional)**")
+    st.write("Translate the orginal text to English if another language is detected.")
+    st.write(
+        "Choose a column to group the topics by. This is optional. If not selected, the topics will generated from the entire table."
+    )
     if (
         "qualified_selected_table" in st.session_state
         and "selected_column" in st.session_state
@@ -415,7 +423,9 @@ def step_three(session):
 
 
 def step_four(session):
-    st.markdown("**Step 4: Review**")
+    st.markdown("**Step 4: Review (Optional)**")
+    st.write("Review the generated topics and the output.")
+    st.info("The previews may take a moment to complete.")
     if (
         "qualified_selected_table" in st.session_state
         and "selected_column" in st.session_state
@@ -437,14 +447,15 @@ def step_four(session):
                     use_container_width=True,
                 )
         with output_tab:
-            st.button(
-                label="Preview Output",
-                key="primary-button-run-output",
-                help="Run selections",
-                on_click=run_selections,
-                args=(True,),
-                use_container_width=True,
-            )
+            if "result_df" not in st.session_state:
+                st.button(
+                    label="Preview Output",
+                    key="primary-button-run-output",
+                    help="Run selections",
+                    on_click=run_selections,
+                    args=(True,),
+                    use_container_width=True,
+                )
             if st.session_state.get("result_df"):
                 st.dataframe(
                     st.session_state.result_df,
@@ -455,6 +466,8 @@ def step_four(session):
 
 
 def step_five(session: Session):
+    st.markdown("**Step 5: Save the results (Optional)**")
+    st.write("Persist the results to a table.")
     run_selections()
     if "result_df" in st.session_state:
         if "grouping_column" in st.session_state:
@@ -470,7 +483,7 @@ def step_five(session: Session):
             st.code(query, language="sql")
         st.selectbox(
             "Choose a database:",
-            st.session_state.databases,
+            st.session_state.get("databases"),
             index=(
                 None
                 if st.session_state.get("database") is None
