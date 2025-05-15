@@ -308,7 +308,7 @@ def show_metric() -> None:
         != st.session_state.get("metrics_in_results", [])
     ):
         st.error(
-            """Oops! Looks like you have may have selected new metrics from the homepage. 
+            """Oops! Looks like you have may have selected new metrics from the homepage.
                  Please create a new evaluation or select an existing one from the homepage."""
         )
         st.stop()

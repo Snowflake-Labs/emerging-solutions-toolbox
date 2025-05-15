@@ -97,7 +97,7 @@ def run(session, metric_name):
     TABLE = "GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS"
     file_path = f"{STAGE}/{metric_name}.pkl"
     query = f"rm {file_path}"
-    
+
     try:
         session.sql(query).collect()
         metrics_tbl = session.table(TABLE)
@@ -120,7 +120,7 @@ import _snowflake
 import json
 def send_message(messages, database, schema, stage, semantic_file):
     """Calls the REST API and returns the response."""
-    
+
     request_body = {
         "messages": messages,
         "semantic_model_file": f"@{database}.{schema}.{stage}/{semantic_file}",

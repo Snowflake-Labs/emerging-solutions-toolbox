@@ -62,7 +62,7 @@ def run_metric(
 
     pandas_df = metric_result_data.to_pandas()
     # Parallel processing for each row in the dataframe
-    results = Parallel(multiprocessing.cpu_count(), 
+    results = Parallel(multiprocessing.cpu_count(),
                         backend="threading")(
         delayed(
             lambda row: {
@@ -621,7 +621,7 @@ def create_custom_metric(metric_name: str,
     """
 
     class_name = ''.join(t.title().replace(" ","") for t in metric_name.split())
-        
+
     CustomClass = type(
         class_name,
         (Metric,),

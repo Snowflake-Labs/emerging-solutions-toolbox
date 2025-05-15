@@ -221,7 +221,7 @@ def save_eval_to_table(df: Union[DataFrame, pd.DataFrame], table_name: str, sess
         string: Confirmation message.
     """
     from snowflake.snowpark.functions import current_timestamp
-    
+
     if isinstance(df, DataFrame):
 
         columns = df.columns
@@ -307,5 +307,3 @@ def run_async_sql_to_dataframe(session: Session, query: str) -> DataFrame:
     async_job = session.create_async_job(query_id)
 
     return async_job.to_df()
-
-
