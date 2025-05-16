@@ -1359,7 +1359,9 @@ class CollectionJoining(BasePage):
                             add_derived_column = st.button(
                                 "Add Derived Column/Literal Value",
                                 key="add_derived_column",
-                                on_click=add_derived
+                                on_click=add_derived,
+                                disabled=True,
+                                help="Currently disabled in this version of DMM"
                             )
 
                     with bttn2:
@@ -1639,7 +1641,7 @@ class CollectionJoining(BasePage):
                                             args=[True, False]
                                         )
 
-                    done_col1, done_col2, done_col3 = st.columns((5, .4, 1))
+                    done_col1, done_col2, done_col3 = st.columns((5, .75, 1))
                     if 'change_after_preview' in st.session_state:
                         if st.session_state.change_after_preview:
                             with done_col3:

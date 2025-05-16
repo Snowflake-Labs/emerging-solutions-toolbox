@@ -69,9 +69,13 @@ def save_mapping():
             )
 
             session.call("MAPPING.GENERATE_VIEW", st.session_state.collection_name)
+            st.info("Successfully generated mappings, redirecting to collections list in 5 seconds")
 
-        # set_page('collection_list')
-            set_page('validation')
+            with st.spinner('Save Successful, Redirecting back to Target list in 5 Seconds'):
+                time.sleep(5)
+            set_page('collection_list')
+            #Validations Not consistently executing properly in this version
+            #set_page('validation')
 
 
 class CollectionMapping(BasePage):
