@@ -2,5 +2,4 @@ name: sf_env
 channels:
   - snowflake
 dependencies:
-  - langdetect
   - streamlit=1.42.0

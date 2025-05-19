@@ -1,7 +1,7 @@
 [project]
 name = "sln-voice-of-the-customer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Use Snowflake's Cortex Functions to handle the summarization, categorization, translation, and sentiment analysis of large text objects."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

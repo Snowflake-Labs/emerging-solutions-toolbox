@@ -22,13 +22,33 @@ will be updating features, fixing bugs, and releasing new solutions on a regular
 
 Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
-## Setup (Streamlit in Snowflake)
+## Setup 
+
+### Streamlit in Snowflake
 
 Using [Snowflake CLI](https://docs.snowflake.com/developer-guide/snowflake-cli/index),
 you can run the following command to install the Streamlit app in your Snowflake account.
 
 ```sh
 cat install.sql put.sql | snow sql -i
+```
+
+### OSS Streamlit
+
+If you would like to run the Streamlit app locally, you can use the following command
+to install the required packages.
+
+```sh
+cd framework-voice-of-the-customer
+pip install -r requirements.txt
+```
+
+Then, you can run the Streamlit app using the following command with a default
+connection available in a [connections.toml](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect#connecting-using-the-connections-toml-file)
+file.
+
+```sh
+streamlit run app.py
 ```
 
 ## Tagging
