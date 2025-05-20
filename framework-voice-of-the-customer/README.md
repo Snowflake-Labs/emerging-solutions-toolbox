@@ -49,7 +49,7 @@ connection available in a [connections.toml](https://docs.snowflake.com/en/devel
 file.
 
 ```sh
-streamlit run app.py
+streamlit run app_main.py
 ```
 
 ## Tagging
