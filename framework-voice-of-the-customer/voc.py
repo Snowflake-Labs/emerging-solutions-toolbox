@@ -6,12 +6,6 @@ from template_style import sit_style
 from page import BasePage
 
 
-TOPIC_PROMPT = (
-    "[SYSTEM] You are assigned to review various conversations and text snippets. Be brief and to the point. Do not provide additional reasoning in the response. "
-    "[USER] What are the main topics discussed by the customers? Do not respond with any preamble. Your answer should be in an array format. Do not include any special characters or backticks."
-)
-
-
 def change_page(step: str) -> None:
     if step == "segmented_control":
         st.session_state.page_number = st.session_state.get(
@@ -54,6 +48,14 @@ def set_state():
         st.session_state.translate = st.session_state.get(
             "styled-segcontrols_translate"
         )
+    return None
+
+
+def reset_df_state():
+    if "result_df" in st.session_state:
+        del st.session_state.result_df
+    if "topic_df" in st.session_state:
+        del st.session_state.topic_df
     return None
 
 
@@ -276,17 +278,17 @@ def classify_topics(df, topics, column):
     return df.drop("TOPIC_ARRAY")
 
 
-def generate_topics(cache_result: bool = False):
+def generate_topics():
     topics = extract_topics(st.session_state.df, st.session_state.selected_column)
     st.session_state.topic_df = topics
 
 
-def run_selections(cache_result: bool = False):
+def run_selections():
     if "df" in st.session_state:
         df = st.session_state.df
         if st.session_state.get("translate", "No") == "Yes":
             df = translate_column(st.session_state.df, st.session_state.selected_column)
-        generate_topics(cache_result)
+        generate_topics()
         df = classify_topics(
             df,
             st.session_state.get("topic_df"),
@@ -358,9 +360,9 @@ def step_one(session):
         key="styled-sbox-selected_table",
         on_change=check_fully_qualified,
     )
-    next_button(
+    page_button(
         True if st.session_state.get("qualified_selected_table") else False,
-        "Step 2",
+        "Step 1",
     )
 
 
@@ -384,7 +386,10 @@ def step_two(session):
             st.session_state.selected_column = st.session_state["column"]["selection"][
                 "columns"
             ][0]
-        next_button(st.session_state.get("selected_column") is not None, "Step 3")
+        page_button(
+            True if st.session_state.get("qualified_selected_table") else False,
+            "Step 2",
+        )
 
 
 def step_three(session):
@@ -419,7 +424,10 @@ def step_three(session):
                 default=st.session_state.get("grouping_column", []),
                 on_change=set_state,
             )
-        next_button(st.session_state.get("selected_column") is not None, "Step 4")
+        page_button(
+            st.session_state.get("selected_column") is not None,
+            "Step 3",
+        )
 
 
 def step_four(session):
@@ -432,18 +440,19 @@ def step_four(session):
     ):
         topic_tab, output_tab = st.tabs(["Topics", "Output"])
         with topic_tab:
-            st.button(
-                label="Preview Topics",
-                key="primary-button-run-topics",
-                help="Run selections",
-                on_click=generate_topics,
-                args=(True,),
-                use_container_width=True,
-            )
             if st.session_state.get("topic_df"):
                 st.dataframe(
                     st.session_state.topic_df,
                     hide_index=True,
+                    use_container_width=True,
+                )
+                del st.session_state.topic_df
+            else:
+                st.button(
+                    label="Preview Topics",
+                    key="primary-button-run-topics",
+                    help="Run selections",
+                    on_click=generate_topics,
                     use_container_width=True,
                 )
         with output_tab:
@@ -453,7 +462,6 @@ def step_four(session):
                     key="primary-button-run-output",
                     help="Run selections",
                     on_click=run_selections,
-                    args=(True,),
                     use_container_width=True,
                 )
             if st.session_state.get("result_df"):
@@ -462,10 +470,17 @@ def step_four(session):
                     hide_index=True,
                     use_container_width=True,
                 )
-        next_button(st.session_state.get("selected_column") is not None, "Step 5")
+        page_button(
+            st.session_state.get("selected_column") is not None,
+            "Step 4",
+        )
 
 
 def step_five(session: Session):
+    if "topic_df" in st.session_state:
+        del st.session_state.topic_df
+    if "result_df" in st.session_state:
+        del st.session_state.result_df
     st.markdown("**Step 5: Save the results (Optional)**")
     st.write("Persist the results to a table.")
     run_selections()
@@ -522,19 +537,39 @@ def step_five(session: Session):
                     query,
                 ),
             )
+        page_button(st.session_state.get("selected_column") is not None, "Step 5")
+        if "result_df" in st.session_state:
+            del st.session_state.result_df
+        if "topic_df" in st.session_state:
+            del st.session_state.topic_df
 
 
-def next_button(is_enabled: bool, page_num: str) -> None:
-    _, _, column3 = st.columns((1, 2, 1))
-    with column3:
-        st.button(
-            label="Next",
-            key=f"primary-button_topage{page_num}",
-            on_click=change_page,
-            args=(page_num,),
-            use_container_width=True,
-            disabled=not is_enabled,
-        )
+def page_button(is_enabled: bool, current_page: str) -> None:
+    column1, _, column3 = st.columns((1, 2, 1))
+
+    page_sequence = ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"]
+    current_index = page_sequence.index(current_page)
+
+    if current_index > 0:
+        with column1:
+            st.button(
+                label="Previous",
+                key=f"primary-button_previous_page_{current_page}",
+                on_click=change_page,
+                args=(page_sequence[current_index - 1],),
+                use_container_width=True,
+            )
+
+    if current_index < len(page_sequence) - 1:
+        with column3:
+            st.button(
+                label="Next",
+                key=f"primary-button_next_page_{current_page}",
+                on_click=change_page,
+                args=(page_sequence[current_index + 1],),
+                use_container_width=True,
+                disabled=not is_enabled,
+            )
 
 
 class VOC(BasePage):

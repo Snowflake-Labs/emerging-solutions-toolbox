@@ -30,6 +30,7 @@ Using [Snowflake CLI](https://docs.snowflake.com/developer-guide/snowflake-cli/i
 you can run the following command to install the Streamlit app in your Snowflake account.
 
 ```sh
+cd framework-voice-of-the-customer
 cat install.sql put.sql | snow sql -i
 ```
 
