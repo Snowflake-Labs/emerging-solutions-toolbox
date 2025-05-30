@@ -34,3 +34,6 @@
 [submodule "sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake"]
 	path = sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake
 	url = https://github.com/Snowflake-Labs/sfguide-build-contracts-chatbot-using-documentai-cortex-search-in-snowflake.git
+[submodule "mcp"]
+	path = mcp
+	url = https://github.com/Snowflake-Labs/mcp.git
