@@ -38,30 +38,30 @@ Copyright (c) [Current Year] Snowflake Inc. All Rights Reserved.
     - Ability to create objects in the target databases and schemas (if not replacing existing Snowflake tables)
     - Ability to set permissions and change ownership of the newly created iceberg tables
 
-### Delta Lake Integration
+### Delta Lake Integration:
 
-    - **External:**
-        - Table Delta files stored in cloud storage (S3, AZURE, or GCS)
-    - **Snowflake:**
-        - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE EXTERNAL VOLUME` privilege..
-        - An existing Snowflake EXTERNAL VOLUME
-            - This tool can be used to create an EXTERNAL VOLUME. 
-            - Visit https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-external-volume for instructions for the cloud storage where the Delta files reside. 
-            -  **NOTE:** the External Volume's `STORAGE_BASE_URL` must contain directories for each table to migrate. Each table directory must contain that table's Delta files
-        - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE INTEGRATION` privilege.
-        - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE STORAGE INTEGRATION` privilege.
-    - **Role Permissions:**
-        - Ability to query and update all the object in the tool schema 
-        - Ability to query all the views in the tool schema 
-        - Ability to create and execute procedures in the tool schema
-        - Ability to use the warehouse for processing
-        - Ability to create, execute, monitor and drop tasks in the tool schema 
-        - Ability to create and drop stages in the staging schema 
-        - Ability to create and drop the Storage Integration
-        - Usage of the External Volume
-        - Usage of Storage Integration
-        - Ability to create and drop objects in the databases and schemas that contain table to be modified 
-        - Ability to create Iceberg Tables in the target databases and schemas 
+- External:
+    - Table Delta files stored in cloud storage (S3, AZURE, or GCS)
+- Snowflake:
+    - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE EXTERNAL VOLUME` privilege..
+    - An existing Snowflake EXTERNAL VOLUME
+        - This tool can be used to create an EXTERNAL VOLUME. 
+        - Visit https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-external-volume for instructions for the cloud storage where the Delta files reside. 
+        -  **NOTE:** the External Volume's `STORAGE_BASE_URL` must contain directories for each table to migrate. Each table directory must contain that table's Delta files
+    - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE INTEGRATION` privilege.
+    - Granted either the `ACCOUNTADMIN` role or a role with the `CREATE STORAGE INTEGRATION` privilege.
+- Role Permissions:
+    - Ability to query and update all the object in the tool schema 
+    - Ability to query all the views in the tool schema 
+    - Ability to create and execute procedures in the tool schema
+    - Ability to use the warehouse for processing
+    - Ability to create, execute, monitor and drop tasks in the tool schema 
+    - Ability to create and drop stages in the staging schema 
+    - Ability to create and drop the Storage Integration
+    - Usage of the External Volume
+    - Usage of Storage Integration
+    - Ability to create and drop objects in the databases and schemas that contain table to be modified 
+    - Ability to create Iceberg Tables in the target databases and schemas 
 
 ## Installation
 
