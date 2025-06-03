@@ -5,8 +5,8 @@
 </a>Iceberg Migrator is a solution created by Snowflake’s Solution Innovation Team (SIT). The solution allows a customer to perform bulk migrations of native Snowflake and Delta tables to Iceberg tables. 
 
 This tool is ideal for the following use cases:
-    - Migrating existing Snowflake tables to Iceberg files at a designated cloud storage location. This may be beneficial for customers who want to make their  Snowflake data available outside of Snowflake, but have Snowflake manage the Iceberg metadata and catalog.
-    - Delta Lake Integration. This may be beneficial for customers who want their Delta Lake tables directly integrated with Snowflake, for querying and managing Delta Lake data within the Snowflake ecosystem.
+- Migrating existing Snowflake tables to Iceberg files at a designated cloud storage location. This may be beneficial for customers who want to make their  Snowflake data available outside of Snowflake, but have Snowflake manage the Iceberg metadata and catalog.
+- Delta Lake Integration. This may be beneficial for customers who want their Delta Lake tables directly integrated with Snowflake, for querying and managing Delta Lake data within the Snowflake ecosystem.
 
 ## Support Notice
 
