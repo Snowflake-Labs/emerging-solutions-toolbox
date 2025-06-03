@@ -1,0 +1,74 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+'skinparam wrapWidth 200
+'skinparam maxMessageSize 200
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_LEFT_RIGHT()
+
+AddElementTag("dag", $fontColor="#262626", $bgColor="#71D3DC", $shape=EightSidedShape(), $legendText="DAG")
+AddElementTag("procedure", $fontColor="#262626", $bgColor="#FF9F36", $shape=(), $legendText="Procedure")
+AddElementTag("table", $fontColor="#262626", $bgColor="#29B5E8", $shape=$shape=RoundedBoxShape(), $legendText="Metadata Table")
+
+
+Person_Ext(user, "Migrator User", "Admin user running migrator")
+
+Boundary(snowflake, "Customer snowflake accout"){
+    Boundary(migrator_schema, "Migrator Schema"){
+
+            Container(snowflake_tool_config, "Migration tool configuration", "", "Configuration information",  $tags="table")
+            Container(migration_table, "Migration table list", "", "List of tables to migrate",  $tags="table")
+            Container(migration_run_log, "Run log", "", "Log of block of tables",  $tags="table")
+            Container(migration_table_log, "Table migration log", "", "Status of a table migration",  $tags="table")
+
+            Container(task_dag, "DAG of migration tasks", "", "Executes the processing of all the tables", $tags="dag")
+            Container(iceberg_migration_dispatcher, "Dispatcher", "","Dynamically creates the DAG of tasks", $tags="procedure" )
+            Container(migrate_table_to_iceberg, "Migrate single table", "", "Executes the processing of a single table", $tags="procedure")
+            Container(iceberg_migration_end_task, "End DAG cleanup", "", "Cleans up from run", $tags="procedure")
+
+    }
+    Boundary(customer_db_schema, "Customer databases and schemas"){
+        Container(standard_table, "Standard table", "", "Standard table to migrate",  $tags="table")
+        Container(iceberg_table, "Iceberg table", "","Migrated iceberg table",  $tags="table")
+    }
+    Container(external_volume, "External volume", "",  "Definition of an external volume")
+}
+
+Boundary(cloud_provider, "Cloud provider"){
+    System_Boundary(bucket, "Customer bucket"){
+        System(underlying_files, "", "Underlying files")
+    }
+}
+
+'Lay_R(migrator_metadata, migrator_processing)
+'Lay_R(migrator_schema, customer_db_schema)
+Lay_R(migrator_schema, external_volume)
+Lay_R(snowflake, cloud_provider)
+
+Rel_D(user, snowflake_tool_config, "One time configuration")
+Rel_D(user, migration_table, "Insert list of tables to migrate")
+Rel_D(user, iceberg_migration_dispatcher, "Kick off migration of tables")
+Rel(snowflake_tool_config, iceberg_migration_dispatcher, "Read configuration information")
+Rel(migration_table, iceberg_migration_dispatcher, "Get list of tables to process")
+Rel(iceberg_migration_dispatcher, migration_run_log, "Insert start processing")
+Rel(iceberg_migration_dispatcher, task_dag, "Add tasks to DAG")
+Rel(iceberg_migration_dispatcher, migration_table_log, "Set processing stated to queued")
+Rel(iceberg_migration_dispatcher, task_dag, "Kick off start task")
+Rel(task_dag, migrate_table_to_iceberg, "Call procedure")
+Rel(task_dag, iceberg_migration_end_task, "Call procedure")
+Rel(iceberg_migration_end_task, task_dag, "Delete")
+Rel(iceberg_migration_end_task, migration_run_log, "Update end of processing")
+
+Rel_Up(migrate_table_to_iceberg, iceberg_table, "Rename table")
+Rel_Up(migrate_table_to_iceberg, migration_table_log, "Insert state cahnge records")
+Rel_Up(migrate_table_to_iceberg, iceberg_table, "Create table")
+Rel_Up(migrate_table_to_iceberg, standard_table, "Drop table")
+Rel(standard_table, iceberg_table, "Copy into")
+
+Rel(external_volume, bucket, "References bucket")
+Rel(iceberg_table, underlying_files, "Underlying files")
+Rel(iceberg_table, external_volume, "References")
+
+
+@enduml
