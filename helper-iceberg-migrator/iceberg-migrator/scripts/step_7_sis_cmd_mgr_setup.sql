@@ -124,7 +124,7 @@ def execute_cmd(session):
                 #remove unwanted characters from error msg
                 error_eraw = str(e).replace("'","").replace("\r"," ").replace("\n"," ").replace("\r\n"," ").replace("\n\r"," ")
 
-                msg_return = f"Failed: ${error_eraw}"
+                msg_return = f"Failed: {error_eraw}"
 
                 #update COMMANDS table with ERROR
                 session.sql(f"""UPDATE CMD_MGR.COMMANDS SET 
@@ -143,7 +143,7 @@ def execute_cmd(session):
         #remove unwanted characters from error msg
         error_eraw = str(e).replace("'","").replace("\r"," ").replace("\n"," ").replace("\r\n"," ").replace("\n\r"," ")
 
-        msg_return = f"Failed: ${error_eraw}"
+        msg_return = f"Failed: {error_eraw}"
 
         #add ERROR to LOGS table
         session.sql(f"""INSERT INTO LOGGING.LOGS SELECT 
@@ -201,7 +201,7 @@ def generate_tasks(session, polling_interval_secs, task_wh):
         #remove unwanted characters from error msg
         error_eraw = str(e).replace("'","").replace("\r"," ").replace("\n"," ").replace("\r\n"," ").replace("\n\r"," ")
 
-        msg_return = f"Failed: ${error_eraw}"
+        msg_return = f"Failed: {error_eraw}"
 
         raise Exception(msg_return)
 $$

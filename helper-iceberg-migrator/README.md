@@ -116,7 +116,7 @@ This repo includes the `im_install` notebook, located in the `installer/` direct
 
 - Monitor process
 
-    The first thing to check would be the tasks.  You will either see tasks, meaning that tasks are running, or nothing will be returned meaning all teh migrations have completed. 
+    The first thing to check would be the tasks.  You will either see tasks, meaning that tasks are running, or nothing will be returned meaning all the migrations have completed. 
     ```
     show tasks like 'IM%';
     ```
