@@ -6,7 +6,7 @@ import snowflake.snowpark.functions as F
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark import Session
 
-major, minor = 1, 4
+major, minor = 1, 5
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "prompt_template_runner",
@@ -82,10 +82,9 @@ class PromptParser:
 def test_model(
         session: Session,
         model: str,
-        prompt = "Repeat the word hello once and only once. Do not say anything else."
+        prompt: str = "Repeat the word hello once and only once. Do not say anything else."
         ) -> bool:
-    from snowflake.cortex import Complete
-    from snowflake.snowpark.exceptions import SnowparkSQLException
+
 
     """Returns True if selected model is supported in region and returns False otherwise.
 
@@ -95,12 +94,17 @@ def test_model(
         prompt (str): The prompt to test the model with.
             Defaults to "Repeat the word hello once and only once. Do not say anything else."
     """
+
+    from snowflake.cortex import complete
+
     try:
-        response = Complete(model, prompt, session = session)
+        response = complete(model, prompt, session = session)
         return True
-    except SnowparkSQLException as e:
+    except ValueError as e:
         if 'unknown model' in str(e):
             return False
+    except Exception as e:
+        raise Exception(f"Error testing model: {e}")
 
 def run_complete_options(
         session: Session,

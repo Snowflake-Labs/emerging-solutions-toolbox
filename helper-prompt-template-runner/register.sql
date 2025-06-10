@@ -2,7 +2,7 @@ SET db_name = 'GENAI_UTILITIES';
 SET schema_name = 'UTILITIES';
 
 SET major = 1;
-SET minor = 4;
+SET minor = 5;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "prompt_template_runner",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -76,6 +76,6 @@ CREATE OR REPLACE PROCEDURE PROMPT_TEMPLATE_RUNNER(
   IMPORTS = ('@DROPBOX/prompt_parser.py')
   HANDLER = 'prompt_parser.run_prompt_template'
   PACKAGES = ('snowflake-snowpark-python==1.24.0',
-            'snowflake-ml-python==1.7.2')
+            'snowflake-ml-python==1.8.3')
   COMMENT = $COMMENT
   EXECUTE AS CALLER;
