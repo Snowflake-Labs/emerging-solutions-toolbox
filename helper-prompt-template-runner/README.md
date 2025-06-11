@@ -130,7 +130,10 @@ Arguments passed explicitly will be prioritized over those in the configuration 
 ### Examples
 
 Calling the stored procedure relying on the configuration file for all arguments.
+> **Important:** It is recommended to set the database and schema context to the home of the PROMPT_TEMPLATE_RUNNER stored procedure.
+
 ```sql
+USE GENAI_UTILITIES.UTILITIES;
 CALL GENAI_UTILITIES.UTILITIES.PROMPT_TEMPLATE_RUNNER('@JSUMMER.PUBLIC.DROPBOX/prompt_template.yaml');
 ```
 
