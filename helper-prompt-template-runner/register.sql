@@ -50,7 +50,9 @@ CREATE OR REPLACE FUNCTION PROMPT_TEMPLATE_PARSER(
   RUNTIME_VERSION = 3.9
   HANDLER = 'prompt_parser.PromptParser'
   IMPORTS = ('@DROPBOX/prompt_parser.py')
-  PACKAGES = ('pyyaml', 'snowflake-snowpark-python==1.24.0')
+  PACKAGES = ('pyyaml',
+              'snowflake-snowpark-python==1.24.0',
+              'snowflake-ml-python==1.8.3')
   COMMENT = $COMMENT;
 
 
@@ -76,6 +78,6 @@ CREATE OR REPLACE PROCEDURE PROMPT_TEMPLATE_RUNNER(
   IMPORTS = ('@DROPBOX/prompt_parser.py')
   HANDLER = 'prompt_parser.run_prompt_template'
   PACKAGES = ('snowflake-snowpark-python==1.24.0',
-            'snowflake-ml-python==1.8.3')
+              'snowflake-ml-python==1.8.3')
   COMMENT = $COMMENT
   EXECUTE AS CALLER;

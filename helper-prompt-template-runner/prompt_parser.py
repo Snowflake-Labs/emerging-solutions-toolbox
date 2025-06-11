@@ -1,10 +1,14 @@
 from typing import Optional, Union, Any
 import datetime
 import logging
+import yaml
+import json
 
 import snowflake.snowpark.functions as F
 from snowflake.snowpark import DataFrame
 from snowflake.snowpark import Session
+from snowflake.cortex import complete
+from snowflake.snowpark.files import SnowflakeFile
 
 major, minor = 1, 5
 QUERY_TAG = {
@@ -95,8 +99,6 @@ def test_model(
             Defaults to "Repeat the word hello once and only once. Do not say anything else."
     """
 
-    from snowflake.cortex import complete
-
     try:
         response = complete(model, prompt, session = session)
         return True
@@ -129,8 +131,6 @@ def run_complete_options(
     Raises:
         Exception: If there is an error executing the SQL query.
     """
-
-    import json
 
     query = f"""
         SELECT * EXCLUDE ({prompt_column}),
@@ -226,13 +226,9 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
         dict[str, Any]: The prompt dictionary.
     """
 
-    import yaml
-
     if prompt_template_file.startswith('https://'): # BUILD_SCOPED_FILE_URL returns URL
-        from snowflake.snowpark.files import SnowflakeFile
         open_file = SnowflakeFile.open(prompt_template_file)
     elif prompt_template_file.startswith('@'): # Absolute stage path sans scoped URL
-        from snowflake.snowpark.files import SnowflakeFile
         open_file = SnowflakeFile.open(prompt_template_file, require_scoped_url = False)
     else:
         open_file = open(prompt_template_file, 'r')
