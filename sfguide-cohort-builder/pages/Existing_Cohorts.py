@@ -5,6 +5,9 @@ import datetime
 import math
 import pandas as pd
 import sqlparse
+from functools import reduce
+from snowflake.snowpark import DataFrame
+
 
 def format_sql(sql_statement):
     """
@@ -45,10 +48,10 @@ def process_columns(session, df, where_clause=''):
         result_df = session.call('cohort_builder_for_snowflake.app.get_column_stats', column_name, data_type, filter_type, table_name, where_clause)
         
         # Convert the result to a pandas DataFrame and append to the list
-        result_dfs.append(result_df.to_pandas())
+        result_dfs.append(result_df)
 
     # Concatenate all the result DataFrames
-    combined_df = pd.concat(result_dfs, ignore_index=True)
+    combined_df = reduce(DataFrame.union_all, result_dfs).to_pandas()
 
     # Merge the result with the original dataframe
     combined_df = pd.merge(df, combined_df, on=['COLUMN_NAME', 'DATA_TYPE', 'FILTER_TYPE'], how='inner')
