@@ -5,7 +5,7 @@ description = "Use Snowflake's Cortex Functions to handle the summarization, cat
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "snowflake-snowpark-python[pandas]>=1.30.0",
+    "snowflake-snowpark-python[pandas]>=1.32.0",
     "snowflake>=1.2.0",
     "langdetect>=1.0.9",
     "streamlit>=1.45.0",
