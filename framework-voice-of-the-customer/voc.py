@@ -257,24 +257,14 @@ def extract_sentiment(df, column):
 def classify_topics(df, topics, column):
     if st.session_state.get("grouping_column"):
         df = df.join(topics, st.session_state.grouping_column)
-        df = df.with_column(
-            "TOPIC",
-            F.call_builtin(
-                "SNOWFLAKE.CORTEX.CLASSIFY_TEXT",
-                F.col(column),
-                F.col("TOPIC_ARRAY"),
-            )["label"].cast(T.StringType()),
-        )
     else:
         df = df.cross_join(topics)
-        df = df.with_column(
-            "TOPIC",
-            F.call_builtin(
-                "SNOWFLAKE.CORTEX.CLASSIFY_TEXT",
-                F.col(column),
-                F.col("TOPIC_ARRAY"),
-            )["label"].cast(T.StringType()),
-        )
+    df = df.with_column(
+        "TOPIC",
+        F.parse_json(F.ai_classify(F.col(column), F.col("TOPIC_ARRAY")))["labels"][
+            0
+        ].cast(T.StringType()),
+    )
     return df.drop("TOPIC_ARRAY")
 
 
