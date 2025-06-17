@@ -5,6 +5,7 @@ import time
 import json
 import sqlparse
 
+
 def read_sql(query, session, index):
     """
     Execute a SQL query and return a specific column from the result.
@@ -19,6 +20,7 @@ def read_sql(query, session, index):
     """
     result = session.sql(query).collect()
     return [row[index] for row in result]
+
 
 def check_has_data(variable):
     """
@@ -46,6 +48,7 @@ def read_table(query, session):
     """
     return session.sql(query).to_pandas()
 
+
 def get_databases(session):
     """
     Retrieve the list of databases from the session.
@@ -58,6 +61,7 @@ def get_databases(session):
     """
     query = "SHOW DATABASES"
     return read_sql(query, session, 1)
+
 
 def get_schemas(session, database):
     """
@@ -72,6 +76,7 @@ def get_schemas(session, database):
     """
     query = f"SHOW SCHEMAS IN DATABASE {database}"
     return read_sql(query, session, 1)
+
 
 def convert_to_k_m(value):
     """
@@ -95,7 +100,8 @@ def convert_to_k_m(value):
     else:
         # If the value is less than 1,000, return it as a string
         return str(value)
-    
+
+
 def get_tables(session, database, schema):
     """
     Retrieve the list of tables within a specific schema of a database.
@@ -116,6 +122,7 @@ def get_tables(session, database, schema):
     # Execute the query and return the list of table names (first column in the result)
     return read_sql(query, session, 0)
 
+
 def reset_session_state_on_selection_change():
     """
     Reset session state values when the selected table changes.
@@ -130,6 +137,7 @@ def reset_session_state_on_selection_change():
     
     for key in keys_to_reset:
         st.session_state.pop(key, None)
+
 
 def create_metadatacard_html(header="Header", value="Value", description="Description", card_bg_color="#ffffff", header_bg_color="#000000"):
     """
@@ -157,6 +165,7 @@ def create_metadatacard_html(header="Header", value="Value", description="Descri
     </div>
     """
 
+
 @st.cache_data
 def fetch_table_data(_session, table_name):
     """
@@ -170,6 +179,7 @@ def fetch_table_data(_session, table_name):
     pd.DataFrame: A pandas DataFrame containing the data from the specified table.
     """
     return load_table_data(_session, table_name)
+
 
 def load_table_data(session, table):
     """
@@ -192,6 +202,7 @@ def load_table_data(session, table):
     
     # Execute the queries and return the results as a tuple
     return read_table(query, session), read_sql(row_count_query, session, 0)
+
 
 def get_table_metadata(session, table_name):
     """
@@ -221,6 +232,7 @@ def get_table_metadata(session, table_name):
     
     # Execute the query and return the result as a pandas DataFrame
     return read_table(query, session)
+
 
 def fetch_table_size(session, database, schema, table):
     """
@@ -263,11 +275,12 @@ def fetch_table_size(session, database, schema, table):
         
         # Return the size in a human-readable format
         return f"{s} {size_units[i]}"
-    
+
     except:
 
         return f"0 MB"
-    
+
+
 def generate_columns_info_json(table_df, table_metadata_df, session, num_samples=3):
     """
     Generate a JSON representation of columns info using sample values from the dataset.
@@ -312,6 +325,7 @@ def generate_columns_info_json(table_df, table_metadata_df, session, num_samples
 
     # Merge LLM output with the original metadata
     return pd.merge(df, table_metadata_df[['COLUMN_NAME', 'DATA_TYPE']], on='COLUMN_NAME')
+
 
 def get_llm_data_dict(data_json, session):
     """
@@ -368,6 +382,7 @@ def get_llm_data_dict(data_json, session):
 
     return df
 
+
 def process_columns(session, df, where_clause=''):
     """
     Process columns to generate min, max, and distinct values for primary filters.
@@ -403,6 +418,7 @@ def process_columns(session, df, where_clause=''):
     combined_df = pd.merge(df, combined_df, on=['COLUMN_NAME', 'DATA_TYPE', 'FILTER_TYPE'], how='inner')
 
     return combined_df
+
 
 def render_header(title, description):
         """
@@ -449,6 +465,7 @@ def render_header(title, description):
                 {description}
             </p>
             """, unsafe_allow_html=True)
+
 
 def gen_where_clause_for_non_text_filters(df, filter_values):
     """
@@ -527,7 +544,6 @@ def gen_where_clause_for_non_text_filters(df, filter_values):
                     clauses.append(f"{column_name} = {val}")
 
     return " AND ".join(clauses)
-
 
 
 def gen_where_clause_for_text_filter(conditions):
@@ -612,6 +628,7 @@ def format_sql(sql_statement):
     """
     formatted_sql = sqlparse.format(sql_statement, reindent=True, keyword_case='upper')
     return formatted_sql
+
 
 class BuildCohort:
     def __init__(self):
@@ -949,7 +966,6 @@ class DataDictionary:
 
                         st.rerun()
 
-
     def reset_session_states(self):
         """
         Reset session states after saving changes and preparing for a new cohort build.
@@ -990,8 +1006,6 @@ class DataDictionary:
         # Remove session states that are no longer needed
         for state in removable_states:
             st.session_state.pop(state, None)  # Use pop with None to avoid KeyError if the state does not exist
-
-
 
     def run(self):
         # Ensure 'selected_table' and 'dataset' are set in session state
@@ -1059,7 +1073,6 @@ class FinalizeCohort:
         self.update_selected_filters()
         self.prepare_filter_data_frames(filter_type)
         filter_clause = self.generate_filter_clause(filter_type)
-    
 
         if filter_type == "Primary":
             if not st.session_state.secondary_filters_df.empty:
@@ -1278,7 +1291,6 @@ class FinalizeCohort:
                 date_string = selected_date.strftime('%Y-%m-%d')
                 st.session_state.selected_filters[column_name] = {"condition": condition, "value": date_string}
 
-
             elif filter_type == 'advanced numeric filter':
                 if min_value is None or max_value is None:
                     st.warning(f"Min or Max value not specified for {column_name}")
@@ -1393,7 +1405,6 @@ class FinalizeCohort:
                             create_schedule = CreateOneTimeTable()
                             
                             create_schedule.create_table(table_name, st.session_state.cohort_name)
-
 
                 if len(cohort_name) <= 2:
 

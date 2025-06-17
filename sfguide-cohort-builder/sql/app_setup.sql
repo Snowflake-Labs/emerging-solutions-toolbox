@@ -9,6 +9,7 @@ SUMMARY OF CHANGES
 Date(yyyy-mm-dd)    Author                              Comments
 ------------------- -------------------                 --------------------------------------------
 2024-07-29          Adithya Nanduri                           Initial Creation
+2025-02-24          Brandon Barker                      Warehouse size default size lowered
 *************************************************************************************************************/
 
 /* set up roles */
@@ -17,7 +18,7 @@ CALL SYSTEM$WAIT(10);
 
 /* create warehouse */
 CREATE OR REPLACE WAREHOUSE cohort_builder_load_wh
-    WAREHOUSE_SIZE = '2X-Large'
+    WAREHOUSE_SIZE = 'XSMALL'
     WAREHOUSE_TYPE = 'standard'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE

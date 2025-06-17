@@ -6,6 +6,7 @@ import math
 import pandas as pd
 import sqlparse
 
+
 def format_sql(sql_statement):
     """
     Formats a SQL statement using sqlparse and returns the formatted SQL.
@@ -18,6 +19,7 @@ def format_sql(sql_statement):
     """
     formatted_sql = sqlparse.format(sql_statement, reindent=True, keyword_case='upper')
     return formatted_sql
+
 
 def process_columns(session, df, where_clause=''):
     """
@@ -42,8 +44,9 @@ def process_columns(session, df, where_clause=''):
         filter_type = row['FILTER_TYPE']
 
         # Call the stored procedure for each column and get the result
-        result_df = session.call('cohort_builder_for_snowflake.app.get_column_stats', column_name, data_type, filter_type, table_name, where_clause)
-        
+        result_df = session.call('cohort_builder_for_snowflake.app.get_column_stats', column_name, data_type,
+                                 filter_type, table_name, where_clause)
+
         # Convert the result to a pandas DataFrame and append to the list
         result_dfs.append(result_df.to_pandas())
 
@@ -54,6 +57,7 @@ def process_columns(session, df, where_clause=''):
     combined_df = pd.merge(df, combined_df, on=['COLUMN_NAME', 'DATA_TYPE', 'FILTER_TYPE'], how='inner')
 
     return combined_df
+
 
 def read_sql(query, session, index):
     """
@@ -69,6 +73,7 @@ def read_sql(query, session, index):
     """
     result = session.sql(query).collect()
     return [row[index] for row in result]
+
 
 def check_has_data(variable):
     """
@@ -96,6 +101,7 @@ def read_table(query, session):
     """
     return session.sql(query).to_pandas()
 
+
 @st.cache_data
 def fetch_table_data(_session, table_name):
     """
@@ -109,6 +115,7 @@ def fetch_table_data(_session, table_name):
     pd.DataFrame: A pandas DataFrame containing the data from the specified table.
     """
     return load_table_data(_session, table_name)
+
 
 def load_table_data(session, table):
     """
@@ -125,12 +132,13 @@ def load_table_data(session, table):
     """
     # SQL query to fetch a sample of rows from the table
     query = f"SELECT * FROM {table} SAMPLE (10 ROWS)"
-    
+
     # SQL query to count the total number of rows in the table
     row_count_query = f"SELECT count(*) FROM {table}"
-    
+
     # Execute the queries and return the results as a tuple
     return read_table(query, session), read_sql(row_count_query, session, 0)
+
 
 def get_table_metadata(session, table_name):
     """
@@ -157,9 +165,10 @@ def get_table_metadata(session, table_name):
         FROM {database_name}.INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = '{table_name}' AND TABLE_SCHEMA = '{schema_name}'
     """
-    
+
     # Execute the query and return the result as a pandas DataFrame
     return read_table(query, session)
+
 
 def fetch_table_size(session, database, schema, table):
     """
@@ -184,29 +193,30 @@ def fetch_table_size(session, database, schema, table):
             AND table_schema = '{schema}'
             AND table_name = '{table}'
         """
-        
+
         # Execute the query and get the result
         result = read_sql(query, session, 0)[0]
 
         # If the result is 0, return "0B"
         if result == 0:
             return "0B"
-        
+
         # Define size units
         size_units = ("B", "KB", "MB", "GB", "TB")
-        
+
         # Calculate the appropriate unit
         i = int(math.floor(math.log(float(result), 1024)))
         p = math.pow(1024, i)
         s = round(float(result) / p, 0)
-        
+
         # Return the size in a human-readable format
         return f"{s} {size_units[i]}"
-    
+
     except:
 
         return f"0 MB"
-    
+
+
 def gen_where_clause_for_non_text_filters(df, filter_values):
     """
     Generate WHERE clause for non-text filters.
@@ -319,8 +329,8 @@ def gen_where_clause_for_text_filter(conditions):
         if clauses:
             where_clauses.append(f" ({f' {logical_operator} '.join(clauses)}) ")
 
-    where_clause =  " AND ".join(where_clauses) if where_clauses else ""
-    
+    where_clause = " AND ".join(where_clauses) if where_clauses else ""
+
     return where_clause if where_clause else "true"
 
 
@@ -330,7 +340,6 @@ class ExistingCohorts:
         self.card_bg_color = "#eceff1"
         self.setup_page()
 
-
     def setup_page(self):
         # Set page configuration
         st.set_page_config(
@@ -339,7 +348,6 @@ class ExistingCohorts:
             layout="wide",
             initial_sidebar_state="expanded"
         )
-
 
     def render_header(self):
         """
@@ -386,27 +394,30 @@ class ExistingCohorts:
                 
             </p>
             """, unsafe_allow_html=True)
-        
+
     def load_data_model(self):
 
         # # Split the table name by the period character
         parts = st.session_state.selected_table_full.split('.')
 
         # Assign the parts to variables
-        st.session_state.selected_database,st.session_state.selected_schema,st.session_state.selected_table = parts
+        st.session_state.selected_database, st.session_state.selected_schema, st.session_state.selected_table = parts
 
         st.session_state.prev_selected_database = st.session_state.selected_database
         st.session_state.prev_selected_schema = st.session_state.selected_schema
         st.session_state.prev_selected_table = st.session_state.selected_table
 
         st.session_state.table_data = fetch_table_data(st.session_state.session, st.session_state.selected_table_full)
-        st.session_state.metadata_raw = get_table_metadata(st.session_state.session, st.session_state.selected_table_full)
+        st.session_state.metadata_raw = get_table_metadata(st.session_state.session,
+                                                           st.session_state.selected_table_full)
         st.session_state.metadata_raw['IS_PRIMARY'] = False
-        st.session_state.metadata_raw['IS_SECONDARY'] = False          
+        st.session_state.metadata_raw['IS_SECONDARY'] = False
         st.session_state.dataset = st.session_state.table_data[0]
         st.session_state.col_list = st.session_state.dataset.columns
         st.session_state.row_count = st.session_state.table_data[1][0]
-        st.session_state.table_size_mb = fetch_table_size(st.session_state.session, st.session_state.selected_database, st.session_state.selected_schema, st.session_state.selected_table)
+        st.session_state.table_size_mb = fetch_table_size(st.session_state.session, st.session_state.selected_database,
+                                                          st.session_state.selected_schema,
+                                                          st.session_state.selected_table)
         st.session_state.dynamic_row_count = st.session_state.row_count
 
         st.session_state.metadata = st.session_state.metadata_raw
@@ -414,15 +425,16 @@ class ExistingCohorts:
     def load_data_dictionary(self):
 
         st.session_state.primary_filters_df = process_columns(
-            st.session_state.session, 
-            st.session_state.metadata[st.session_state.metadata["IS_PRIMARY"] == True][["COLUMN_NAME", "DATA_TYPE", "FILTER_TYPE"]]
+            st.session_state.session,
+            st.session_state.metadata[st.session_state.metadata["IS_PRIMARY"] == True][
+                ["COLUMN_NAME", "DATA_TYPE", "FILTER_TYPE"]]
         )
 
         st.session_state.primary_filters_df["IS_PRIMARY"] = True
 
         st.session_state.secondary_filters_df = st.session_state.metadata[
             (st.session_state.metadata["IS_SECONDARY"] == True) & (st.session_state.metadata["IS_PRIMARY"] == False)
-        ][["COLUMN_NAME", "DATA_TYPE", "FILTER_TYPE"]]
+            ][["COLUMN_NAME", "DATA_TYPE", "FILTER_TYPE"]]
 
         st.session_state.secondary_filters_df["IS_PRIMARY"] = False
         st.session_state.expander_open = False  # Close the expander
@@ -431,60 +443,62 @@ class ExistingCohorts:
 
         st.session_state.save_changes_pressed = True
 
-
     def load_build_cohort(self):
 
         test_filter = st.session_state.filter_values
 
         non_text_filters_clause = gen_where_clause_for_non_text_filters(
-            st.session_state.primary_filters_df, 
+            st.session_state.primary_filters_df,
             st.session_state.filter_values)
 
         text_filters_clause = gen_where_clause_for_text_filter(st.session_state.text_filter_conditions)
 
-        st.session_state.secondary_filters_df = process_columns(
-                        st.session_state.session, 
-                        st.session_state.secondary_filters_df,
-                        " AND " + non_text_filters_clause + " AND " + text_filters_clause
-                    )
-        
-        st.session_state.filter_df = pd.concat([st.session_state.secondary_filters_df, st.session_state.primary_filters_df], ignore_index=True)
-        
-        non_text_filters_clause = gen_where_clause_for_non_text_filters(
-            st.session_state.filter_df, 
-            st.session_state.filter_values)
-
-        text_filters_clause = gen_where_clause_for_text_filter(st.session_state.text_filter_conditions)
-
-        filter_clause = " AND " + non_text_filters_clause + " AND " + text_filters_clause
-
-        st.session_state.final_query = st.session_state.base_filter_query + filter_clause
-
-        selected_columns = st.session_state.selected_column_list
-
-        if len(selected_columns)>0:
-            final_query = str(st.session_state.final_query).replace(
-                'COUNT(*)',
-                ", ".join(map(str, selected_columns))
-            )
+        if st.session_state.secondary_filters_df.empty:
+            st.write("Missing secondary filter, please go add to cohort")
         else:
-            final_query = st.session_state.final_query.replace(
+            st.session_state.secondary_filters_df = process_columns(
+                st.session_state.session,
+                st.session_state.secondary_filters_df,
+                " AND " + non_text_filters_clause + " AND " + text_filters_clause
+            )
+
+            st.session_state.filter_df = pd.concat(
+                [st.session_state.secondary_filters_df, st.session_state.primary_filters_df], ignore_index=True)
+
+            non_text_filters_clause = gen_where_clause_for_non_text_filters(
+                st.session_state.filter_df,
+                st.session_state.filter_values)
+
+            text_filters_clause = gen_where_clause_for_text_filter(st.session_state.text_filter_conditions)
+
+            filter_clause = " AND " + non_text_filters_clause + " AND " + text_filters_clause
+
+            st.session_state.final_query = st.session_state.base_filter_query + filter_clause
+
+            selected_columns = st.session_state.selected_column_list
+
+            if len(selected_columns) > 0:
+                final_query = str(st.session_state.final_query).replace(
+                    'COUNT(*)',
+                    ", ".join(map(str, selected_columns))
+                )
+            else:
+                final_query = st.session_state.final_query.replace(
                     'COUNT(*)',
                     '*'
                 )
-        
-        st.code(format_sql(final_query))
 
-        st.session_state.cohort_row_count = read_sql(
-            st.session_state.final_query,
-            st.session_state.session,
-            0
-        )[0]
+            st.code(format_sql(final_query))
 
-        st.session_state.preview_dataset = read_table(final_query, st.session_state.session)
-        
-        st.session_state.is_cohort_saved = True
-        
+            st.session_state.cohort_row_count = read_sql(
+                st.session_state.final_query,
+                st.session_state.session,
+                0
+            )[0]
+
+            st.session_state.preview_dataset = read_table(final_query, st.session_state.session)
+
+            st.session_state.is_cohort_saved = True
 
     def render_main_content(self):
 
@@ -529,12 +543,11 @@ class ExistingCohorts:
                 st.session_state.selected_column_list = ast.literal_eval(selected_cohort_data["COLUMN_LIST"].iloc[0])
 
                 if len(st.session_state.col_list.to_list()) != len(st.session_state.selected_column_list):
-                    st.session_state.selected_column_list = ast.literal_eval(selected_cohort_data["COLUMN_LIST"].iloc[0])
+                    st.session_state.selected_column_list = ast.literal_eval(
+                        selected_cohort_data["COLUMN_LIST"].iloc[0])
 
                 else:
-                    st.session_state.selected_column_list =[]
-
-                
+                    st.session_state.selected_column_list = []
 
                 filter_values = json.loads(json.loads(selected_cohort_data["COHORT_SELECTIONS_JSON"].iloc[0]))
 
@@ -546,11 +559,14 @@ class ExistingCohorts:
                     # Check if the column exists in the DataFrame
                     if column_name in st.session_state.metadata['COLUMN_NAME'].values:
                         if is_primary is True:
-                            st.session_state.metadata.loc[st.session_state.metadata['COLUMN_NAME'] == column_name, 'IS_PRIMARY'] = True
+                            st.session_state.metadata.loc[
+                                st.session_state.metadata['COLUMN_NAME'] == column_name, 'IS_PRIMARY'] = True
                         else:
-                            st.session_state.metadata.loc[st.session_state.metadata['COLUMN_NAME'] == column_name, 'IS_SECONDARY'] = True
+                            st.session_state.metadata.loc[
+                                st.session_state.metadata['COLUMN_NAME'] == column_name, 'IS_SECONDARY'] = True
 
-                        st.session_state.metadata.loc[st.session_state.metadata['COLUMN_NAME'] == column_name, 'FILTER_TYPE'] = filter_type
+                        st.session_state.metadata.loc[
+                            st.session_state.metadata['COLUMN_NAME'] == column_name, 'FILTER_TYPE'] = filter_type
 
                 self.load_data_dictionary()
 
@@ -561,17 +577,18 @@ class ExistingCohorts:
                 filter_values_df['IS_PRIMARY'] = filter_values_df['IS_PRIMARY'].fillna(False)
                 for index, row in filter_values_df.iterrows():
                     if row["FILTER_TYPE"] == 'text filter':
-                        text_filter_conditions[row['COLUMN_NAME']] = convert_filter_values(row["FILTER_VALUES"], row["FILTER_TYPE"])
+                        text_filter_conditions[row['COLUMN_NAME']] = convert_filter_values(row["FILTER_VALUES"],
+                                                                                           row["FILTER_TYPE"])
                     else:
-                        filter_dict[row['COLUMN_NAME']] = convert_filter_values(row["FILTER_VALUES"], row["FILTER_TYPE"])
+                        filter_dict[row['COLUMN_NAME']] = convert_filter_values(row["FILTER_VALUES"],
+                                                                                row["FILTER_TYPE"])
 
                 st.session_state.filter_values = filter_dict
                 st.session_state.selected_filters = st.session_state.filter_values
                 st.session_state.text_filter_conditions = text_filter_conditions
 
-                self.load_build_cohort()        
+                self.load_build_cohort()
                 st.success("Metadata processed successfully.")
-
 
     def reset_session_states(self):
         """
@@ -601,6 +618,7 @@ class ExistingCohorts:
         """
         self.render_header()
         self.render_main_content()
+
 
 if __name__ == "__main__":
     app = ExistingCohorts()
