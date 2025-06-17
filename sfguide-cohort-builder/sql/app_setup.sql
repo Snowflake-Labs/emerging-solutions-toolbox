@@ -133,7 +133,7 @@ RETURNS TABLE (
     DISTINCT_VALUES ARRAY
 )
 LANGUAGE PYTHON
-RUNTIME_VERSION = '3.8'
+RUNTIME_VERSION = '3.10'
 PACKAGES = ('snowflake-snowpark-python')
 HANDLER = 'run'
 COMMENT = '{"origin":"sf_sit","name":"cohort-builder","version":{"major":1, "minor":1}}'
