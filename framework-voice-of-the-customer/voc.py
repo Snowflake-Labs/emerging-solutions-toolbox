@@ -40,10 +40,15 @@ def set_state():
         st.session_state.schema = st.session_state.get("styled-sbox-selected_schema")
     if st.session_state.get("styled-sbox-selected_table"):
         st.session_state.table = st.session_state.get("styled-sbox-selected_table")
-    if st.session_state.get("styled-pills-selected_grouping_column"):
-        st.session_state.grouping_column = st.session_state.get(
-            "styled-pills-selected_grouping_column"
-        )
+    
+    # Always sync grouping_column with the pills selection (including empty list)
+    if "styled-pills-selected_grouping_column" in st.session_state:
+        selected_columns = st.session_state.get("styled-pills-selected_grouping_column")
+        if selected_columns:
+            st.session_state.grouping_column = selected_columns
+        elif "grouping_column" in st.session_state:
+            del st.session_state.grouping_column
+    
     if st.session_state.get("styled-segcontrols_translate"):
         st.session_state.translate = st.session_state.get(
             "styled-segcontrols_translate"
