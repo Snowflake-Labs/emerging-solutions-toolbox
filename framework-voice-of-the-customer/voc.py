@@ -40,11 +40,15 @@ def set_state():
         st.session_state.schema = st.session_state.get("styled-sbox-selected_schema")
     if st.session_state.get("styled-sbox-selected_table"):
         st.session_state.table = st.session_state.get("styled-sbox-selected_table")
-    if st.session_state.get("styled-pills-selected_grouping_column"):
-        st.session_state.grouping_column = st.session_state.get(
-            "styled-pills-selected_grouping_column"
-        )
-    if st.session_state.get("styled-segcontrols_translate"):
+    
+    if "styled-pills-selected_grouping_column" in st.session_state:
+        selected_columns = st.session_state.get("styled-pills-selected_grouping_column")
+        if selected_columns:
+            st.session_state.grouping_column = selected_columns
+        elif "grouping_column" in st.session_state:
+            del st.session_state.grouping_column
+    
+    if "styled-segcontrols_translate" in st.session_state:
         st.session_state.translate = st.session_state.get(
             "styled-segcontrols_translate"
         )
@@ -269,15 +273,16 @@ def classify_topics(df, topics, column):
 
 
 def generate_topics():
-    topics = extract_topics(st.session_state.df, st.session_state.selected_column)
+    df = st.session_state.df
+    if st.session_state.get("translate", "No") == "Yes":
+        df = translate_column(df, st.session_state.selected_column)
+    topics = extract_topics(df, st.session_state.selected_column)
     st.session_state.topic_df = topics
 
 
 def run_selections():
     if "df" in st.session_state:
         df = st.session_state.df
-        if st.session_state.get("translate", "No") == "Yes":
-            df = translate_column(st.session_state.df, st.session_state.selected_column)
         generate_topics()
         df = classify_topics(
             df,
