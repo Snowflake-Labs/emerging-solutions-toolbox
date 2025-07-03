@@ -1,0 +1,12 @@
+name: licensing
+channels:
+- conda-forge
+- snowflake
+dependencies:
+- python=3.11
+- openssl=1.1.1t
+- streamlit>=1.40.0
+- snowflake-snowpark-python
+- plotly=5.9.0
+- python-dotenv
+- faker
