@@ -17,16 +17,16 @@ import time
 def get_active_licenses():
     try:
         session = st.session_state.session
-        active_sql = f""" 
-                               with 
+        active_sql = f"""
+                               with
                                     combined_logs as (
                                     select app_id, session_user from {LICENSING_DB}.{LICENSING_SCHEMA}.{TBL_APP_LOGS}
-                                    union 
+                                    union
                                     select app_id, session_user from {LICENSING_DB}.{LICENSING_SCHEMA}.{TBL_OKTA_USERS}
                                     ),
                                     logs_with_metadata as (
                                         select ma.app_name, cl.app_id, cl.session_user, em.title, em.department, em.division
-                                        from {LICENSING_DB}.{LICENSING_SCHEMA}.{TBL_EMPLOYEE_METADATA} em 
+                                        from {LICENSING_DB}.{LICENSING_SCHEMA}.{TBL_EMPLOYEE_METADATA} em
                                         join combined_logs cl on (em.session_user = cl.session_user)
                                         join {LICENSING_DB}.{LICENSING_SCHEMA}.{TBL_MONITORED_APPS} ma on (cl.app_id = ma.app_id)
                                     )

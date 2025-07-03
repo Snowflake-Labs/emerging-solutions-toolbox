@@ -1,4 +1,4 @@
-TITLES_KW_WITH_ACCESS_RETAINED = ["Chief", "VP", "President", "Director"] 
+TITLES_KW_WITH_ACCESS_RETAINED = ["Chief", "VP", "President", "Director"]
 LICENSING_DB="LICENSING"
 LICENSING_SCHEMA="MAIN"
 DATA_STAGE="DATA"

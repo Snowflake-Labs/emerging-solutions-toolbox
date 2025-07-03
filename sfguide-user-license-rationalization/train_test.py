@@ -29,7 +29,7 @@ def create_license_usage_prediction_udf(session: Session, udf_name: str, model, 
         df.columns = predictor_cols
         probability_no_login = model.predict_proba(df[predictor_cols])[:, 1]
         return probability_no_login
-    
+
     # Add comment tag to the UDF
     session.sql(f"ALTER FUNCTION {udf_name}(ARRAY) SET {comment_tag}").collect()
 
