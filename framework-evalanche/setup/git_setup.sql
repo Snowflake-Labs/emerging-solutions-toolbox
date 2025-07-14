@@ -121,10 +121,16 @@ import json
 def send_message(messages, database, schema, stage, semantic_file):
     """Calls the REST API and returns the response."""
 
-    request_body = {
-        "messages": messages,
-        "semantic_model_file": f"@{database}.{schema}.{stage}/{semantic_file}",
-    }
+    if semantic_file.endswith(".yaml") or semantic_file.endswith(".yml"):
+      request_body = {
+          "messages": messages,
+          "semantic_model_file": f"@{database}.{schema}.{stage}/{semantic_file}",
+      }
+    else:
+      request_body = {
+          "messages": messages,
+          "semantic_view": f"{database}.{schema}.{semantic_file}",
+      }
     resp = _snowflake.send_snow_api_request(
             "POST",
             f"/api/v2/cortex/analyst/message",
@@ -148,6 +154,69 @@ def process_message(session, prompt, database, schema, stage, semantic_file):
     messages.append(
         {"role": "user", "content": [{"type": "text", "text": prompt}]}
     )
+    response = send_message(messages, database, schema, stage, semantic_file)
+    for item in response["message"]["content"]:
+        if item["type"] == "sql":
+            return item.get("statement", None)
+    else:
+        return None
+$$;
+
+
+CREATE OR REPLACE PROCEDURE GENAI_UTILITIES.EVALUATION.CORTEX_ANALYST_SQL(prompt STRING, PATH STRING)
+RETURNS STRING
+LANGUAGE PYTHON
+PACKAGES = ('snowflake-snowpark-python')
+RUNTIME_VERSION = '3.9'
+HANDLER = 'process_message'
+as
+$$
+import _snowflake
+import json
+def send_message(messages, database, schema, stage, semantic_file):
+    """Calls the REST API and returns the response."""
+
+    if semantic_file.endswith(".yaml") or semantic_file.endswith(".yml"):
+      request_body = {
+          "messages": messages,
+          "semantic_model_file": f"@{database}.{schema}.{stage}/{semantic_file}",
+      }
+    else:
+      request_body = {
+          "messages": messages,
+          "semantic_view": f"{database}.{schema}.{semantic_file}",
+    }
+    resp = _snowflake.send_snow_api_request(
+            "POST",
+            f"/api/v2/cortex/analyst/message",
+            {},
+            {},
+            request_body,
+            {},
+            30000,
+        )
+    if resp["status"] < 400:
+        response_content = json.loads(resp["content"])
+        return response_content
+    else:
+        raise Exception(
+            f"Failed request with status {resp['status']}: {resp}"
+        )
+
+def process_message(session, prompt, path):
+    """Processes a message and adds the response to the chat."""
+    messages = []
+    messages.append(
+        {"role": "user", "content": [{"type": "text", "text": prompt}]}
+    )
+
+    if "/" in path:
+      stage_part, semantic_file = path.split("/", 1)
+      database, schema, stage = stage_part.split(".", 2)
+    else:
+      database, schema, semantic_file = path.split(".", 3)
+      stage = ""
+
     response = send_message(messages, database, schema, stage, semantic_file)
     for item in response["message"]["content"]:
         if item["type"] == "sql":
