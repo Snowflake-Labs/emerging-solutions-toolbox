@@ -1,5 +1,5 @@
 SET major = 3;
-SET minor = 1;
+SET minor = 2;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "evalanche",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -55,76 +55,21 @@ PUT file://pages/*.py @GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE/pages/ OVERWRI
 CREATE OR REPLACE PROCEDURE GENAI_UTILITIES.EVALUATION.DELETE_METRIC(metric_name string)
 RETURNS STRING
 LANGUAGE PYTHON
-RUNTIME_VERSION = '3.9'
+IMPORTS = ('@GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE/src/sproc_utils.py')
 PACKAGES = ('snowflake-snowpark-python')
-HANDLER = 'run'
-COMMENT = $COMMENT
-EXECUTE AS CALLER
-AS
-$$
-def run(session, metric_name):
-    STAGE = "@GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE"
-    TABLE = "GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS"
-    file_path = f"{STAGE}/{metric_name}.pkl"
-    query = f"rm {file_path}"
-
-    try:
-        session.sql(query).collect()
-        metrics_tbl = session.table(TABLE)
-        metrics_tbl.delete(metrics_tbl["METRIC_NAME"] == metric_name)
-        return f"{file_path} removed."
-    except Exception as e:
-        return f"An error occurred: {e}"
-$$;
+RUNTIME_VERSION = '3.9'
+HANDLER = 'sproc_utils.delete_metric'
+COMMENT = $COMMENT;
 
 -- Cortex Analyst runner
 CREATE OR REPLACE PROCEDURE GENAI_UTILITIES.EVALUATION.CORTEX_ANALYST_SQL(prompt STRING, semantic_file_path STRING)
 RETURNS STRING
 LANGUAGE PYTHON
+IMPORTS = ('@GENAI_UTILITIES.EVALUATION.STREAMLIT_STAGE/src/sproc_utils.py')
 PACKAGES = ('snowflake-snowpark-python')
 RUNTIME_VERSION = '3.9'
-HANDLER = 'process_message'
-as
-$$
-import _snowflake
-import json
-def send_message(messages, semantic_file_path):
-    """Calls the REST API and returns the response."""
-
-    request_body = {
-        "messages": messages,
-        "semantic_model_file": f"@{semantic_file_path}",
-    }
-    resp = _snowflake.send_snow_api_request(
-            "POST",
-            f"/api/v2/cortex/analyst/message",
-            {},
-            {},
-            request_body,
-            {},
-            30000,
-        )
-    if resp["status"] < 400:
-        response_content = json.loads(resp["content"])
-        return response_content
-    else:
-        raise Exception(
-            f"Failed request with status {resp['status']}: {resp}"
-        )
-
-def process_message(session, prompt, semantic_file_path):
-    """Processes a message and adds the response to the chat."""
-    messages = []
-    messages.append(
-        {"role": "user", "content": [{"type": "text", "text": prompt}]}
-    )
-    response = send_message(messages, semantic_file_path)
-    for item in response["message"]["content"]:
-        if item["type"] == "sql":
-            return item.get("statement", None)
-    else:
-        return None
-$$;
+HANDLER = 'sproc_utils.cortex_analyst_runner'
+COMMENT = $COMMENT;
 
 -- Create Streamlit
 CREATE OR REPLACE STREAMLIT GENAI_UTILITIES.EVALUATION.EVALUATION_APP

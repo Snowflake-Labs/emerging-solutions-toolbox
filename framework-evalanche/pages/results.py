@@ -64,16 +64,16 @@ st.config.set_option("global.minCachedMessageSize", 500 * 1e6)
 
 # @st.cache_data
 def make_downloadable_df():
-    if st.session_state.get("include_analysis", False):
+    if st.session_state.get('include_analysis', False):
         analysis_results = run_full_result_analysis()
-        df = pd.concat(
-            [st.session_state["result_data"], pd.DataFrame(analysis_results)], axis=1
-        )
+        df = pd.concat([st.session_state["result_data"],
+                        pd.DataFrame(analysis_results)],
+                                axis=1)
     else:
         df = st.session_state["result_data"]
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
     # return df.to_csv().encode("utf-8")
-    st.session_state["download_result"] = df  # .to_csv().encode("utf-8")
+    st.session_state['download_result'] = df#.to_csv().encode("utf-8")
 
 
 def get_eval_name_desc() -> Tuple[str, str]:
@@ -127,15 +127,10 @@ def save_eval() -> None:
     from src.metric_utils import register_saved_eval_sproc
     from src.snowflake_utils import insert_to_eval_table
 
-    st.write(
-        """Source data and metric configuration will be captured as a Snowflake Stored Procedure.
-             Select the evaluation from Homepage's **Saved Evaluations** section to run."""
-    )
+    st.write("""Source data and metric configuration will be captured as a Snowflake Stored Procedure.
+             Select the evaluation from Homepage's **Saved Evaluations** section to run.""")
     # App logic and saved evaluations must resides in same location so we hard-code these values.
-    schema_context = {
-        "database": STAGE_NAME.split(".")[0],
-        "schema": STAGE_NAME.split(".")[1],
-    }
+    schema_context = {"database": STAGE_NAME.split(".")[0], "schema": STAGE_NAME.split(".")[1]}
     stage_name = STAGE_NAME.split(".")[-1]
     eval_name, eval_description = get_eval_name_desc()
 
@@ -196,16 +191,11 @@ def automate_eval() -> None:
     from src.metric_utils import automate_eval_objects
     from src.snowflake_utils import insert_to_eval_table
 
-    st.write(
-        """Source data will be tracked and metric(s) calculated for new records.
+    st.write("""Source data will be tracked and metric(s) calculated for new records.
             Results will be captured in a table.
-            Select the evaluation from Homepage's **Automated Evaluations** section to view results."""
-    )
+            Select the evaluation from Homepage's **Automated Evaluations** section to view results.""")
     # App logic and saved evaluations must resides in same location so we hard-code these values.
-    schema_context = {
-        "database": STAGE_NAME.split(".")[0],
-        "schema": STAGE_NAME.split(".")[1],
-    }
+    schema_context = {"database": STAGE_NAME.split(".")[0], "schema": STAGE_NAME.split(".")[1]}
     stage_name = STAGE_NAME.split(".")[-1]
 
     warehouse = st.selectbox(
@@ -275,18 +265,12 @@ def get_metric_cols(current_df: Union[DataFrame, pd.DataFrame]) -> list:
     """Returns list of columns in dataframe that contain metric values.
 
     Some metric names have spaces and Snowpark keeps them in lower case with double quotes.
-    Metric names without spaces are capitalized when added to a Snowflake table/dataframe.
-    """
+    Metric names without spaces are capitalized when added to a Snowflake table/dataframe."""
 
-    metric_names = [
-        metric.get_column() for metric in st.session_state["metrics_in_results"]
-    ]
+    metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
     df_columns = current_df.columns
-    return [
-        c_name
-        for c_name in df_columns
-        if c_name.upper() in (m_name.upper() for m_name in metric_names)
-    ]
+    return [c_name for c_name in df_columns if c_name.upper() in (m_name.upper() for m_name in metric_names)]
+
 
 
 def show_metric() -> None:
@@ -295,29 +279,21 @@ def show_metric() -> None:
     # User may navigate away from results and return.
     # If so, we want to keep the previously viewed metrics and avoid error.
     # When user returns to home page, selected_metric set to empty list by default.
-    if len(st.session_state.get("selected_metrics", [])) > 0 and st.session_state.get(
-        "metrics_in_results", []
-    ) != st.session_state.get("selected_metrics", []):
-        st.session_state["metrics_in_results"] = st.session_state["selected_metrics"]
+    if (len(st.session_state.get('selected_metrics', [])) > 0 and
+        st.session_state.get('metrics_in_results', []) != st.session_state.get('selected_metrics', [])):
+        st.session_state['metrics_in_results'] = st.session_state['selected_metrics']
 
     # Stop page from rendering if user selects new metrics from homepage after viewing previous results
-    if (
-        len(st.session_state.get("selected_metrics", [])) > 0
-        and len(st.session_state.get("metrics_in_results", [])) > 0
-        and st.session_state.get("selected_metrics", [])
-        != st.session_state.get("metrics_in_results", [])
-    ):
-        st.error(
-            """Oops! Looks like you have may have selected new metrics from the homepage.
-                 Please create a new evaluation or select an existing one from the homepage."""
-        )
+    if (len(st.session_state.get('selected_metrics', [])) > 0 and
+        len(st.session_state.get('metrics_in_results', [])) > 0 and
+        st.session_state.get('selected_metrics', []) != st.session_state.get('metrics_in_results', [])):
+        st.error("""Oops! Looks like you have may have selected new metrics from the homepage.
+                 Please create a new evaluation or select an existing one from the homepage.""")
         st.stop()
 
     if st.session_state.get("result_data", None) is not None:
         df = st.session_state["result_data"]
-        metric_names = [
-            metric.get_column() for metric in st.session_state["metrics_in_results"]
-        ]
+        metric_names = [metric.get_column() for metric in st.session_state["metrics_in_results"]]
         kpi_row = row(6, vertical_align="top")
         # Placing entire dataframe in memory seems to be more stable than iterating over columns and averaging in snowpark
         # metric_values = df.select(*metric_names).to_pandas()
@@ -326,15 +302,12 @@ def show_metric() -> None:
         for metric_name, metric_value in metric_values.mean().to_dict().items():
             kpi_row.metric(label=metric_name, value=round(metric_value, 2))
 
-
 def reset_analysis():
     """Reset the analysis attribute in session state to None.
 
-    This is necessary so clear out the AI review in the dialog if anything is changed.
-    """
+    This is necessary so clear out the AI review in the dialog if anything is changed."""
 
-    st.session_state["analysis"] = None
-
+    st.session_state['analysis'] = None
 
 def set_selected_row(selection_df: pd.DataFrame) -> None:
     """Callback function to capture the rows in selection_df with REVIEW == True.
@@ -344,10 +317,10 @@ def set_selected_row(selection_df: pd.DataFrame) -> None:
     if selection_df is not None:
         reset_analysis()
         first_metric = get_metric_cols(st.session_state.get("result_data", None))[0]
-        selected_row = selection_df[selection_df["REVIEW"] == True]
+        selected_row = selection_df[selection_df['REVIEW'] == True]
 
         if selected_row is not None and len(selected_row) >= 1:
-            selection = selected_row.to_dict(orient="records")
+            selection = selected_row.to_dict(orient='records')
             st.session_state["selected_dict"] = selection
             st.session_state["selected_score"] = selection[0][first_metric]
         else:
@@ -357,30 +330,24 @@ def set_selected_row(selection_df: pd.DataFrame) -> None:
 
 def set_score(selected_record: Dict[str, str]) -> None:
     """Callback function to capture the score in the selected row corresponding to the selected metric."""
-    st.session_state["selected_score"] = selected_record[
-        st.session_state["metric_selector"]
-    ]
+    st.session_state["selected_score"] = selected_record[st.session_state['metric_selector']]
     reset_analysis()
 
 
 def rerun_metric(prompt_inputs: Dict[str, str], metric: Metric) -> None:
     """Callback function to rerun the selected metric with revised required inputs."""
 
-    response = metric.evaluate(
-        model=st.session_state["review_model_selector"], **prompt_inputs
-    )
+    response = metric.evaluate(model = st.session_state['review_model_selector'], **prompt_inputs)
     if response is not None:
         st.session_state["selected_score"] = response
         reset_analysis()
 
 
-def analyze_result(
-    prompt_inputs: Dict[str, str],
-    metric: Metric,
-    score: Optional[Union[float, int, bool]] = None,
-    model: Optional[str] = None,
-    return_response: bool = False,
-) -> Union[None, str]:
+def analyze_result(prompt_inputs: Dict[str, str],
+                   metric: Metric,
+                   score: Optional[Union[float, int, bool]] = None,
+                   model: Optional[str] = None,
+                   return_response: bool = False) -> Union[None, str]:
     """Function to prompt Cortex LLM to review metric's prompt and requried inputs for explanation
 
     Args:
@@ -409,18 +376,16 @@ def analyze_result(
         score = st.session_state["selected_score"]
 
     if model is None:
-        model = st.session_state["review_model_selector"]
+        model = st.session_state['review_model_selector']
 
     original_prompt = metric.get_prompt(**prompt_inputs)
     recommender_prompt = Recommendation_prompt.format(
         prompt=original_prompt, score=score
     )
     # response = run_complete(st.session_state["session"], model, recommender_prompt)
-    response = run_async_sql_complete(
-        st.session_state["session"], model, recommender_prompt
-    )
+    response = run_async_sql_complete(st.session_state["session"], model, recommender_prompt)
     if response is not None and not return_response:
-        st.session_state["analysis"] = response
+        st.session_state['analysis'] = response
     else:
         return response
 
@@ -434,7 +399,7 @@ def run_full_result_analysis():
     from joblib import Parallel, delayed
 
     metric_cols = get_metric_cols(st.session_state.get("result_data", None))
-    metric_analysis = {}  # Capture columnar analysis with metric name as key
+    metric_analysis = {} # Capture columnar analysis with metric name as key
     for metric_name in metric_cols:
         matching_metric = next(
             (
@@ -443,34 +408,24 @@ def run_full_result_analysis():
                 if metric.get_column() == metric_name.upper()
             ),
             None,
-        )
+            )
         if matching_metric is not None:
             matching_metric.session = st.session_state["session"]
             # Associates metric param with column containing intended value for evaluation
-            prompt_column_specs = st.session_state["param_selection"][
-                matching_metric.name
-            ]
+            prompt_column_specs = st.session_state["param_selection"][matching_metric.name]
 
-            responses = Parallel(
-                n_jobs=multiprocessing.cpu_count(), backend="threading"
-            )(
+            responses = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
                 delayed(analyze_result_row)(
                     matching_metric,
                     row[metric_name],
-                    {key: row[value] for key, value in prompt_column_specs.items()},
-                )
+                    {key: row[value] for key, value in prompt_column_specs.items()})
                 for _, row in st.session_state["result_data"].iterrows()
             )
 
-        metric_analysis[f"{metric_name}_ANALYSIS"] = responses
+        metric_analysis[f'{metric_name}_ANALYSIS'] = responses
     return metric_analysis
 
-
-def analyze_result_row(
-    matching_metric: Metric,
-    score: Union[float, int, bool],
-    prompt_inputs: Dict[str, str],
-) -> Union[None, str]:
+def analyze_result_row(matching_metric: Metric, score: Union[float, int, bool], prompt_inputs: Dict[str, str]) -> Union[None, str]:
     """Analyzes a given row's metric score given metric evaluation and input arguments.
 
     Args:
@@ -490,42 +445,34 @@ def analyze_result_row(
     return analyze_result(prompt_inputs, matching_metric, score, model_default, True)
 
 
+
 @st.dialog("Download Results", width="small")
 def download_dialog() -> None:
-    st.write(
-        "Download the results to a CSV file. Select **Include Analysis** first to add an AI review of each record."
-    )
+    st.write("Download the results to a CSV file. Select **Include Analysis** first to add an AI review of each record.")
     top_row = row(2, vertical_align="top")
-    if top_row.button(
-        "🤖 Include Analysis",
-        use_container_width=True,
-        help="""Include AI analysis of each record and metric in download.
-                              This may take a few minutes.""",
-    ):
+    if top_row.button("🤖 Include Analysis",
+                      use_container_width=True,
+                      help="""Include AI analysis of each record and metric in download.
+                              This may take a few minutes."""):
         with st.spinner("Analyzing results...this may take a few minutes."):
             analysis_results = run_full_result_analysis()
-            data = pd.concat(
-                [st.session_state["result_data"], pd.DataFrame(analysis_results)],
-                axis=1,
-            )
+            data = pd.concat([st.session_state["result_data"],
+                            pd.DataFrame(analysis_results)],
+                                    axis=1)
         st.success("Analysis complete. Ready for download.")
     else:
         data = st.session_state["result_data"]
 
     top_row.download_button(
-        label="⬇️ Download Results",
-        data=data.to_csv().encode("utf-8"),
-        file_name="evalanche_results.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+            label="⬇️ Download Results",
+            data=data.to_csv().encode("utf-8"),
+            file_name="evalanche_results.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
 
-def update_record(
-    table_update_inputs: Dict[str, str],
-    selected_metric_name: str,
-    row_id: Union[int, str],
-) -> None:
+def update_record(table_update_inputs: Dict[str, str], selected_metric_name: str, row_id: Union[int,str]) -> None:
     """Callback function to update result_data (display) in session state.
 
     Required input arguments and metric score are editable through this dialog.
@@ -548,15 +495,11 @@ def update_record(
     table_update_inputs[selected_metric_name] = st.session_state["selected_score"]
     # Create shallow copy of dataframe to update is necessary to avoid read-only error
     df = st.session_state["result_data"].copy()
-    df.loc[df["ROW_ID"] == row_id, table_update_inputs.keys()] = (
-        table_update_inputs.values()
-    )
+    df.loc[df['ROW_ID'] == row_id, table_update_inputs.keys()] = table_update_inputs.values()
     st.session_state["result_data"] = df
 
 
-def show_cortex_analyst_sql_results(
-    metric: Metric, prompt_inputs: Dict[str, str]
-) -> None:
+def show_cortex_analyst_sql_results(metric: Metric, prompt_inputs: Dict[str, str]) -> None:
     """Displays data retrieved from SQL used in Cortex Analyst metrics.
 
     Shows results for generated_sql and expected_sql in the prompt_inputs dictionary.
@@ -574,30 +517,20 @@ def show_cortex_analyst_sql_results(
                 st.write(f"{key.upper()} Result")
                 if key in prompt_inputs:
                     try:
-                        inference_data = run_async_sql_to_dataframe(
-                            metric.session, prompt_inputs[key]
-                        )
-                        st.dataframe(
-                            inference_data,
-                            hide_index=True,
-                        )
+                        inference_data = run_async_sql_to_dataframe(metric.session, prompt_inputs[key])
+                        st.dataframe(inference_data,
+                                    hide_index = True,)
                     except Exception as e:
                         st.write(f"Error: {e}")
                 else:
                     st.write("No data returned")
 
-
 @st.dialog("Review Record", width="large")
 def review_record() -> None:
     """Render dialog box to review a metric result record."""
 
-    st.write(
-        "Analyze and explore the selected record. Model selection will be used for analysis and metric rerunning. Updates can be saved to viewed results."
-    )
-    if (
-        st.session_state["selected_dict"] is None
-        or len(st.session_state["selected_dict"]) == 0
-    ):
+    st.write("Analyze and explore the selected record. Model selection will be used for analysis and metric rerunning. Updates can be saved to viewed results.")
+    if st.session_state["selected_dict"] is None or len(st.session_state["selected_dict"]) == 0:
         st.write("Please select a record to review.")
     elif len(st.session_state["selected_dict"]) > 1:
         st.write("Please select only one record to review at a time.")
@@ -609,13 +542,11 @@ def review_record() -> None:
         metric_col, model_col = st.columns(2)
         with metric_col:
             selected_metric_name = st.selectbox(
-                "Select Metric",
-                metric_cols,
-                index=0,
-                key="metric_selector",
-                on_change=set_score,
-                args=(selected_record,),
-            )
+                    "Select Metric", metric_cols, index=0,
+                    key="metric_selector",
+                    on_change=set_score,
+                    args=(selected_record,)
+                )
             if selected_metric_name is not None:
                 matching_metric = next(
                     (
@@ -634,74 +565,56 @@ def review_record() -> None:
                     model_default = "llama3.2-3b"
             else:
                 model_default = "llama3.2-3b"
-            select_model("review", default=model_default)
+            select_model('review', default = model_default)
 
         if matching_metric is not None:
             # Re-add session attribute to metric object
             matching_metric.session = st.session_state["session"]
 
-            prompt_inputs = {}  # Captures value of f-strings for prompt
-            table_update_inputs = (
-                {}
-            )  # Captures table column values for metric evaluation
+            prompt_inputs = {} # Captures value of f-strings for prompt
+            table_update_inputs = {} # Captures table column values for metric evaluation
             for key, value in st.session_state["param_selection"][
-                matching_metric.name
-            ].items():
-                entered_value = st.text_area(value, selected_record[value], key=value)
+                    matching_metric.name
+                ].items():
+                entered_value = st.text_area(value,
+                                             selected_record[value],
+                                             key = value)
 
                 prompt_inputs[key] = entered_value
                 table_update_inputs[value] = entered_value
             metric_col, comment_col = st.columns((1, 4))
             with metric_col:
-                st.metric(
-                    label=selected_metric_name, value=st.session_state["selected_score"]
-                )
+                st.metric(label=selected_metric_name, value=st.session_state['selected_score'])
             with comment_col:
-                table_update_inputs["COMMENT"] = st.text_area(
-                    "Comment", selected_record["COMMENT"]
-                )
+                table_update_inputs['COMMENT'] = st.text_area("Comment", selected_record["COMMENT"])
 
         bottom_selection = row(4, vertical_align="top")
-        bottom_selection.button(
-            "Analyze",
-            disabled=selected_metric_name is None,
-            use_container_width=True,
-            on_click=analyze_result,
-            args=(prompt_inputs, matching_metric),
-        )
-        bottom_selection.button(
-            "Rerun",
-            disabled=selected_metric_name is None,
-            on_click=rerun_metric,
-            args=(prompt_inputs, matching_metric),
-            use_container_width=True,
-        )
-        save = bottom_selection.button(
-            "Save",
-            disabled=selected_metric_name is None,
-            use_container_width=True,
-            help="Save changes to record in current view.",
-        )
+        bottom_selection.button("Analyze", disabled = selected_metric_name is None,
+                                          use_container_width=True,
+                                          on_click = analyze_result, args = (prompt_inputs, matching_metric))
+        bottom_selection.button("Rerun", disabled = selected_metric_name is None,
+                                        on_click = rerun_metric, args = (prompt_inputs, matching_metric),
+                                        use_container_width=True,)
+        save = bottom_selection.button("Save", disabled = selected_metric_name is None,
+                                       use_container_width=True,
+                                       help = "Save changes to record in current view.")
 
         # Unsaved changes in the dialog may linger if user navigates away and returns.
         # Here we provide a reset button to clear out any unsaved changes.
-        reset = bottom_selection.button(
-            "Reset",
-            disabled=selected_metric_name is None,
-            use_container_width=True,
-            help="Reset all unsaved changed to selected record.",
-        )
+        reset = bottom_selection.button("Reset", disabled = selected_metric_name is None,
+                                       use_container_width=True,
+                                       help = "Reset all unsaved changed to selected record.")
 
-        if st.session_state.get("analysis", None) is not None:
+        if st.session_state.get('analysis', None) is not None:
             st.write(f"**Analysis:** {st.session_state['analysis']}")
 
         # If evaluating SQL, show SQL results of current inputs
         show_cortex_analyst_sql_results(matching_metric, prompt_inputs)
 
         if save:
-            update_record(
-                table_update_inputs, selected_metric_name, selected_record["ROW_ID"]
-            )
+            update_record(table_update_inputs,
+                            selected_metric_name,
+                            selected_record['ROW_ID'])
             st.rerun()
         if reset:
             st.rerun()
@@ -721,26 +634,17 @@ def show_dataframe_results() -> Optional[pd.DataFrame]:
         pandas Dataframe
     """
 
-    if st.session_state.get("result_data", None) is not None:
+
+    if st.session_state.get('result_data', None) is not None:
         df_selection = st.data_editor(
             st.session_state["result_data"],
             hide_index=True,
-            disabled=[
-                col
-                for col in st.session_state["result_data"].columns
-                if col != "REVIEW"
-            ],
-            column_order=["REVIEW"]
-            + [
-                col
-                for col in st.session_state["result_data"].columns
-                if col not in ["REVIEW", "ROW_ID"]
-            ],
+            disabled=[col for col in st.session_state["result_data"].columns if col != "REVIEW"],
+            column_order=['REVIEW'] + [col for col in st.session_state["result_data"].columns if col not in ["REVIEW", 'ROW_ID']],
             use_container_width=True,
         )
-        st.caption(
-            "Please note that edits made above will not be saved to raw evaluation outputs directly. To save, select Record Results."
-        )
+        st.caption("Please note that edits made above will not be saved to raw evaluation outputs directly. To save, select Record Results.")
+
 
         return df_selection
     else:
@@ -759,11 +663,7 @@ def trend_avg_metrics() -> None:
     ):
         metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        df = (
-            st.session_state["result_data"]
-            .groupby("METRIC_DATETIME", as_index=False)[metric_cols]
-            .mean()
-        )
+        df = st.session_state["result_data"].groupby('METRIC_DATETIME', as_index=False)[metric_cols].mean()
 
         # METRIC_DATETIME is batched for every run so there should be many rows per metric calculation set
         st.write("Average Metric Scores over Time")
@@ -803,21 +703,13 @@ def bar_chart_metrics() -> None:
 
     if (
         st.session_state.get("result_data", None) is not None
-        and len(st.session_state.get("metrics_in_results", [])) > 0
+        and len(st.session_state.get("metrics_in_results", []))>0
     ):
         metric_cols = get_metric_cols(st.session_state.get("result_data", None))
 
-        df = (
-            pd.melt(
-                st.session_state["result_data"],
-                value_vars=metric_cols,
-                var_name="METRIC",
-                value_name="SCORE",
-            )
-            .groupby(["METRIC", "SCORE"])
-            .size()
-            .reset_index(name="COUNT")
-        )
+        df = pd.melt(st.session_state["result_data"],
+                     value_vars=metric_cols, var_name = 'METRIC', value_name = 'SCORE')\
+                        .groupby(['METRIC', 'SCORE']).size().reset_index(name='COUNT')
         st.write("Score Counts by Metric")
         st.bar_chart(df, x="SCORE", y="COUNT", color="METRIC")
 
@@ -832,7 +724,7 @@ def get_trendable_column() -> Union[None, str]:
         st.session_state.get("result_data", None) is not None
         and st.session_state.get("metrics_in_results", None) is not None
     ):
-        if "METRIC_DATETIME" in st.session_state["result_data"].columns:
+        if 'METRIC_DATETIME' in st.session_state["result_data"].columns:
             return True
         else:
             return False
@@ -871,27 +763,27 @@ def show_results():
         selection_df = show_dataframe_results()
         recommend_inst = top_row.button(
             "🤖 Review Record",
-            disabled=(
-                True if st.session_state.get("result_data", None) is None else False
-            ),
+            disabled=True
+            if st.session_state.get("result_data", None) is None
+            else False,
             use_container_width=True,
             help="Select a row to review.",
             on_click=set_selected_row,
-            args=(selection_df,),
+            args=(selection_df,)
         )
         record_button = top_row.button(
             "📁 Record Results",
-            disabled=(
-                True if st.session_state.get("result_data", None) is None else False
-            ),
+            disabled=True
+            if st.session_state.get("result_data", None) is None
+            else False,
             use_container_width=True,
             help="Record the results to a table.",
         )
         download_results = top_row.button(
             label="⬇️ Download Results",
-            disabled=(
-                True if st.session_state.get("result_data", None) is None else False
-            ),
+            disabled=True
+            if st.session_state.get("result_data", None) is None
+            else False,
             use_container_width=True,
             help="Download results to csv.",
         )
@@ -920,6 +812,5 @@ def show_results():
             automate_eval()
         if recommend_inst:
             review_record()
-
 
 show_results()

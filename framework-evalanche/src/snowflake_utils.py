@@ -14,7 +14,7 @@ CUSTOM_METRIC_TABLE = "GENAI_UTILITIES.EVALUATION.CUSTOM_METRICS"
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "evalanche",
-    "version": {"major": 3, "minor": 1},
+    "version": {"major": 3, "minor": 2},
 }
 
 models = [
