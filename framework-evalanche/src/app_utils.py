@@ -3,12 +3,16 @@ from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
 from snowflake.snowpark import Session
+from snowflake.snowpark import DataFrame
+import pandas as pd
+import snowflake.snowpark.functions as F
 
 from src.metrics import Metric
 from src.snowflake_utils import (
     get_connection,
     CUSTOM_METRIC_TABLE,
     models,
+    add_row_id,
 )
 
 ABOUT = """
@@ -295,8 +299,9 @@ def get_schemas(name: str):
         st.session_state[f"{name}_schemas"] = []
 
 
-def get_stages(name: str):
-    """Call back function to associate database and schema selector with corresponding stage options."""
+def get_stages_and_views(name: str):
+    """Call back function to associate database and schema selector with corresponding stage
+    and semantic viewoptions."""
 
     if (
         st.session_state[f"{name}_database"] is not None
@@ -305,8 +310,13 @@ def get_stages(name: str):
         st.session_state[f"{name}_stages"] = fetch_stages(
             st.session_state[f"{name}_database"], st.session_state[f"{name}_schema"]
         )
+        st.session_state[f"{name}_semantic_views"] = fetch_semantic_views(
+            st.session_state[f"{name}_database"], st.session_state[f"{name}_schema"]
+        )
+
     else:
         st.session_state[f"{name}_stages"] = []
+        st.session_state[f"{name}_semantic_views"] = []
 
 def get_semantic_models(name: str):
     """Call back function to associate available semantic model selector with corresponding stage selection."""
@@ -367,6 +377,18 @@ def fetch_stages(database: str, schema: str) -> List[str]:
     else:
         session = st.session_state["session"]
     results = session.sql(f"SHOW STAGES IN SCHEMA {database}.{schema}").collect()
+    return [row["name"] for row in results]
+
+def fetch_semantic_views(database: str, schema: str) -> List[str]:
+    """Returns list of semantic views in database and schema from Snowflake account."""
+
+    if database is None or schema is None:
+        return []
+    if "session" not in st.session_state:
+        session = get_connection()
+    else:
+        session = st.session_state["session"]
+    results = session.sql(f"SHOW SEMANTIC VIEWS IN SCHEMA {database}.{schema}").collect()
     return [row["name"] for row in results]
 
 
@@ -580,3 +602,17 @@ def set_session_var_to_none(variable: str):
     """Sets session state to None for all session state variables."""
     if variable in st.session_state:
         st.session_state[variable] = None
+
+def prep_metric_results_for_display(df: DataFrame) -> pd.DataFrame:
+    """Prepares metric results DataFrame for display in Streamlit.
+
+    Args:
+        df (DataFrame): Snowflake DataFrame containing metric results.
+
+    Returns:
+        pd.DataFrame: Pandas DataFrame ready for display.
+    """
+
+    return add_row_id(df)\
+                        .withColumn("REVIEW", F.lit(False))\
+                        .withColumn("COMMENT", F.lit(None)).to_pandas()

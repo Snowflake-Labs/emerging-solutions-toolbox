@@ -1,32 +1,16 @@
 # EVALANCHE: The GenAI Evaluation Application
+Created by Jason Summer, *Solution Innovation Architect - AI/ML*
 
-<a href="https://emerging-solutions-toolbox.streamlit.app/">
-    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
-</a>
+All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
 
-Evalanche is a Streamlit in Snowflake (SiS) application that provides a single location to evaluate and compare generative AI use case outputs in a streamlined, on demand, and automated fashion. Regardless if your goal is to measure the quality of RAG-based LLM solutions or accuracy of SQL generation, Evalanche provides a scalable, customizable, and trackable way to do it.
+Copyright (c) 2024 Snowflake Inc. All Rights Reserved.
 
-> **Note:** Snowflake provides a few tools/frameworks for conducting LLM evaluations.
-This solution, Evalanche, serves as a generalized application to make it easy to create and automate LLM use case evaluations.
-Most LLM use cases can be evaluated with Evalanche through out of the box metrics or custom metrics.
-Alternatively, Snowflake's AI Observability (Private Preview) is powered by open source [TruLens](https://www.trulens.org/), which provides extensible evaluations and tracing for LLM apps including RAGs and LLM agents.
-Lastly, [Cortex Search Evaluation and Tuning Studio](https://github.com/Snowflake-Labs/cortex-search/tree/main/examples/streamlit-evaluation) (Private Preview) offers systematic evaluation and search quality improvements for specific search-based use cases.
-Please contact your account representative to learn more about any of these other offerings.
-
-## Support Notice
-
-All sample code is provided for reference purposes only. Please note that this code is
-provided `as is` and without warranty. Snowflake will not offer any support for the use
-of the sample code. The purpose of the code is to provide customers with easy access to
-innovative ideas that have been built to accelerate customers' adoption of key
-Snowflake features. We certainly look for customers' feedback on these solutions and
-will be updating features, fixing bugs, and releasing new solutions on a regular basis.
-
-Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
+Please see TAGGING.md for details on object comments.
 
 ## Table of Contents
 
 * [Table of Contents](#table-of-contents)
+* [Overview](#overview)
 * [How it  Works](#how-it-works)
     + [Metrics](#metrics)
     + [Data Sources](#data-sources)
@@ -38,6 +22,16 @@ Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 * [Extras](#extras)
     + [Custom Metrics](#custom-metrics)
     + [Generating Results to Evaluate](#generating-results-to-evaluate)
+
+# Overview
+Evalanche is a Streamlit in Snowflake (SiS) application that provides a single location to evaluate and compare generative AI use case outputs in a streamlined, on demand, and automated fashion. Regardless if your goal is to measure the quality of RAG-based LLM solutions or accuracy of SQL generation, Evalanche provides a scalable, customizable, and trackable way to do it.
+
+> **Note:** Snowflake provides a few tools/frameworks for conducting LLM evaluations.
+This solution, Evalanche, serves as a generalized application to make it easy to create and automate LLM use case evaluations.
+Most LLM use cases can be evaluated with Evalanche through out of the box metrics or custom metrics.
+Alternatively, Snowflake's AI Observability (Private Preview) is powered by open source [TruLens](https://www.trulens.org/), which provides extensible evaluations and tracing for LLM apps including RAGs and LLM agents.
+Lastly, [Cortex Search Evaluation and Tuning Studio](https://github.com/Snowflake-Labs/cortex-search/tree/main/examples/streamlit-evaluation) (Private Preview) offers systematic evaluation and search quality improvements for specific search-based use cases.
+Please contact your account representative to learn more about any of these other offerings.
 
 # How it Works
 Evalanche's primary structure is based on 2 components: 1) Metrics and 2) Data Sources. Together, Metrics and Data Sources can be combined to make an Evaluation.
@@ -156,7 +150,3 @@ Out of the box Metrics have defaulted LLMs. These defaults are selected based on
 
 # Feedback
 Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).
-
-## Tagging
-
-Please see `TAGGING.md` for details on object comments.
