@@ -7,6 +7,12 @@ from streamlit_extras.grid import grid
 from streamlit_extras.row import row
 from streamlit_extras.stylable_container import stylable_container
 
+from src.snowflake_utils import (
+    get_connection,
+    add_row_id,
+)
+import snowflake.snowpark.functions as F
+
 from src.app_utils import (
     css_yaml_editor,
     fetch_evals,
@@ -278,6 +284,7 @@ def run_saved_eval(evaluation: Dict[str, Any]) -> None:
                 st.session_state["session"],
                 evaluation["ASSOCIATED_OBJECTS"]["PROCEDURE"],
             )
+
             st.session_state["metric_result_data"] = result
             st.session_state["eval_name"] = evaluation["EVAL_NAME"]
             st.session_state["eval_funnel"] = "existing"
@@ -286,6 +293,14 @@ def run_saved_eval(evaluation: Dict[str, Any]) -> None:
             st.session_state["source_sql"] = evaluation["SOURCE_SQL"]
             st.session_state["param_selection"] = evaluation["PARAM_ASSIGNMENTS"]
             st.session_state["model_selection"] = evaluation["MODELS"]
+
+            st.session_state["result_data"] = (
+                add_row_id(st.session_state["metric_result_data"])
+                .withColumn("REVIEW", F.lit(False))
+                .withColumn("COMMENT", F.lit(None))
+                .to_pandas()
+            )
+
             st.switch_page("pages/results.py")
 
 
