@@ -375,32 +375,44 @@ def pipeline_runner_dialog() -> None:
             )
 
         else:
-            st.write(
-                "Select the stage that contains your semantic model for Cortex Analyst."
-            )
-            schema_context = select_schema_context(
-                name, on_change=get_stages, args=(name,)
+            model_source = st.radio(
+                "Select source of semantic file:",
+                options=["From Stage", "From Schema (Semantic View File)"],
+                index=0,
+                key=f"{name}_model_source"
             )
 
-            if f"{name}_stages" not in st.session_state:
-                st.session_state[f"{name}_stages"] = []
-            if f"{name}_models" not in st.session_state:
-                st.session_state[f"{name}_models"] = []
-            stage_name = st.selectbox(
-                "Select Snowflake Stage",
-                st.session_state[f"{name}_stages"],
-                index=None,
-                key=f"{name}_stage",
-                on_change=get_semantic_models,
-                args=(name,),
+            schema_context = select_schema_context(
+                name, on_change=get_stages if model_source == "From Stage" else None, args=(name,)
             )
-            semantic_model = st.selectbox(
-                "Select Semantic Model",
-                st.session_state[f"{name}_models"],
-                index=None,
-                key=f"{name}_model",
-            )
-            qualified_semantic_model = f"{schema_context['database']}.{schema_context['schema']}.{stage_name}/{semantic_model}"
+
+            if model_source == "From Stage":
+                if f"{name}_stages" not in st.session_state:
+                    st.session_state[f"{name}_stages"] = []
+                if f"{name}_models" not in st.session_state:
+                    st.session_state[f"{name}_models"] = []
+                stage_name = st.selectbox(
+                    "Select Snowflake Stage",
+                    st.session_state[f"{name}_stages"],
+                    index=None,
+                    key=f"{name}_stage",
+                    on_change=get_semantic_models,
+                    args=(name,),
+                )
+                semantic_model = st.selectbox(
+                    "Select Semantic Model",
+                    st.session_state[f"{name}_models"],
+                    index=None,
+                    key=f"{name}_model",
+                )
+                qualified_semantic_model = f"{schema_context['database']}.{schema_context['schema']}.{stage_name}/{semantic_model}"
+
+            else:  # From Schema
+                semantic_model_view = st.text_input(
+                    "Enter path to semantic view object:",
+                    key=f"{name}_semantic_view_path"
+                )
+                qualified_semantic_model = f"{schema_context['database']}.{schema_context['schema']}.{semantic_model_view}"
 
         table = st.text_input(
             "Enter Name for Generated Table",
