@@ -1,17 +1,27 @@
 ## Snowparser for dbt
-Snowparser is a Helper created by Snowflake’s Solution Innovation Team (SIT).
 
 > [!IMPORTANT]
-> Snowparser for dbt is under active development. Please reach out to your account rep to learn more and get connected with the development team for further assistance.
+> Snowparser for dbt is under active development.
+> Please reach out to your account rep to learn more and get connected with the development team for further assistance.
+
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
+
+Snowparser is a Helper created by Snowflake’s Solution Innovation Team (SIT).
+
+
 
 ## Support Notice
-All sample code is provided for reference purposes only. Please note that this code is provided `as is` and without warranty. Snowflake will not offer any support for the use of the sample code.
 
-## Copyright Notice
-Copyright (c) [Current Year] Snowflake Inc. All Rights Reserved.
+All sample code is provided for reference purposes only. Please note that this code is
+provided `as is` and without warranty. Snowflake will not offer any support for the use
+of the sample code. The purpose of the code is to provide customers with easy access to
+innovative ideas that have been built to accelerate customers' adoption of key
+Snowflake features. We certainly look for customers' feedback on these solutions and
+will be updating features, fixing bugs, and releasing new solutions on a regular basis.
 
-## Purpose
-The purpose of the code is to provide customers with easy access to innovative ideas that have been built to accelerate customers' adoption of key Snowflake features. We certainly look for customers' feedback on these solutions and will be updating features, fixing bugs, and releasing new solutions on a regular basis.
+Copyright (c) 2025 Snowflake Inc. All Rights Reserved.
 
 ## Tagging
 Please see `TAGGING.md` for details on object comments.
