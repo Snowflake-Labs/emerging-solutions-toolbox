@@ -1,12 +1,13 @@
 ## Snowparser for dbt
+<a href="https://emerging-solutions-toolbox.streamlit.app/">
+    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
+</a>
 
 > [!IMPORTANT]
 > Snowparser for dbt is under active development.
 > Please reach out to your account rep to learn more and get connected with the development team for further assistance.
 
-<a href="https://emerging-solutions-toolbox.streamlit.app/">
-    <img src="https://github.com/user-attachments/assets/aa206d11-1d86-4f32-8a6d-49fe9715b098" alt="image" width="150" align="right";">
-</a>
+
 
 Snowparser is a Helper created by Snowflake’s Solution Innovation Team (SIT).
 
