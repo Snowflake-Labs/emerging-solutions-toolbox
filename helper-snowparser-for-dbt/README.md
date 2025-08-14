@@ -1,6 +1,9 @@
 ## Snowparser for dbt
 Snowparser is a Helper created by Snowflake’s Solution Innovation Team (SIT).
 
+> [!IMPORTANT]
+> Snowparser for dbt is under active development. Please reach out to your account rep to learn more and get connected with the development team for further assistance.
+
 ## Support Notice
 All sample code is provided for reference purposes only. Please note that this code is provided `as is` and without warranty. Snowflake will not offer any support for the use of the sample code.
 
@@ -12,9 +15,6 @@ The purpose of the code is to provide customers with easy access to innovative i
 
 ## Tagging
 Please see `TAGGING.md` for details on object comments.
-
-> [!IMPORTANT]
-> Snowparser for dbt is under active development. Please reach out to your account rep to learn more and get connected with the development team for further assistance.
 
 ## Overview
 Snowparser for dbt enables Snowflake users to generate Snowflake Semantic [Models](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/semantic-model-spec)/[Views](https://docs.snowflake.com/LIMITEDACCESS/semantic-views/overview) from existing dbt projects using dbt [manifest JSON](https://docs.getdbt.com/reference/artifacts/manifest-json) artifact files.  The Snowparser utility is operationalized via a Snowflake Stored Procedure and callable via SQL or Python API.
