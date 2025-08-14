@@ -13,6 +13,9 @@ The purpose of the code is to provide customers with easy access to innovative i
 ## Tagging
 Please see `TAGGING.md` for details on object comments.
 
+> [!IMPORTANT]
+> Snowparser for dbt is under active development. Please reach out to your account rep to learn more and get connected with the development team for further assistance.
+
 ## Overview
 Snowparser for dbt enables Snowflake users to generate Snowflake Semantic [Models](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/semantic-model-spec)/[Views](https://docs.snowflake.com/LIMITEDACCESS/semantic-views/overview) from existing dbt projects using dbt [manifest JSON](https://docs.getdbt.com/reference/artifacts/manifest-json) artifact files.  The Snowparser utility is operationalized via a Snowflake Stored Procedure and callable via SQL or Python API.
 
@@ -40,6 +43,10 @@ Files should be uploaded to a directory named `dbt/` within the Snowflake stage.
 For example, the path for semantic_manifest_parser.py may be `@DROPBOX/dbt/semantic_manifest_parser.py`.
 
 Once the 2 files have been uploaded to a Snowflake stage, you may copy and paste the 2 `CREATE OR REPLACE PROCEDURE` found at the bottom of `setup.sql` ensuring you revise the IMPORTS path to the approriate stage. Please maintain the COMMENT portion for continuity with future versions. Please see `TAGGING.md` for details on object comments.
+
+## Manifest File
+
+Artifact files are produced when dbt projects are run as a standalone job or pipeline. Nearly all dbt run types/commands produce a `manifest.json` for all dbt projects with an additional `semantic_manifest.json` for dbt projects that include MetricFlow. `dbt parse —-no-partial-parse` is a simple command to create these artifact files without actually initiating any write commands to a data source. Artifact files can be downloaded directly from dbtCloud job artifacts. dbtCore users can also generate these files.
 
 ## Executing
 Below is an example of executing the stored procedure to parse dbt MetricFlow semantic models to create a Snowflake Semantic YAML.
