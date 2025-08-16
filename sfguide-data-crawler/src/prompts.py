@@ -17,22 +17,25 @@ start_prompt = """
         1. Do not comment on the vector truncation.
         2. Generated descriptions should be concise and contain 50 words or less.
         3. Do not use apostrophes or single quotes in your descriptions.
-        4. Do not make assumptions. If unsure, return Unable to generate table description with high degree of certainty.
+        4. Do not make assumptions. If unsure, return {tablename} contains insufficient information to generate table description with high degree of certainty.
+        5. Start the response with table name followed by an appropriate descriptive verb. Choose from: contains, stores, tracks, holds, manages, etc. Format: {tablename} [chosen verb]...
+        6. You may reference records conceptually, but do not include actual sample row data in the description.
+
         </rules>
         <tablename>
-        {tablename} 
+        {tablename}
         </tablename>
-        <table_columns> 
+        <table_columns>
         {table_columns}
         </table_columns>
         <table_comment>
-        {table_comment} 
+        {table_comment}
         </table_comment>
-        <table_samples> 
+        <table_samples>
         {{table_samples}}
         </table_samples>
         <schema_tables>
         {schema_tables}
         </schema_tables>
-        Description: 
+        Description:
         """
