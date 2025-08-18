@@ -8,38 +8,43 @@ from snowflake.snowpark.context import get_active_session
 # Get the current credentials
 session = get_active_session()
 
+# Streamlit page configuration
 st.set_page_config(layout="wide", page_title="Data Catalog", page_icon="🧮")
 st.title("Snowflake Data Catalog ❄️")
 st.subheader("Sort and update table descriptions")
 
+# Helper function to get the TABLE_CATALOG table, which contains information about the tables in the Snowflake database.
 def get_dataset(table, columns = None):
     df = session.table(table)
     if columns:
         return df.select(columns)
     else:
         return df
-
+# Helper function to filter the TABLE_CATALOG table based on the user's input.
+# This function uses the SNOWFLAKE.CORTEX.EMBED_TEXT_768 function to compute the cosine similarity between the user's input and the embeddings stored in the TABLE_CATALOG table.
+# The function returns the top results sorted by similarity.
 def filter_embeddings(question):
 
     cmd = """
         with results as
-        (SELECT TABLENAME, DESCRIPTION, CREATED_ON, EMBEDDINGS, 
+        (SELECT TABLENAME, DESCRIPTION, CREATED_ON, EMBEDDINGS,
            VECTOR_COSINE_SIMILARITY(TABLE_CATALOG.EMBEDDINGS,
                     SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', ?)) as similarity
         from TABLE_CATALOG
         order by similarity desc)
-        select TABLENAME, DESCRIPTION, CREATED_ON from results 
+        select TABLENAME, DESCRIPTION, CREATED_ON from results
     """
-    
-    ordered_results = session.sql(cmd, params=[question])      
-             
+
+    ordered_results = session.sql(cmd, params=[question])
+
     return ordered_results
 
 descriptions_dataset = get_dataset("TABLE_CATALOG")
 
 text_search = st.text_input("", placeholder="Sort tables by data context", value="")
 
-if text_search and descriptions_dataset.count() > 0:             
+# If the user has entered a search term, filter the dataset based on the embeddings.
+if text_search and descriptions_dataset.count() > 0:
     descriptions_dataset = filter_embeddings(text_search)
 
 with st.form("data_editor_form"):
@@ -72,7 +77,7 @@ with st.form("data_editor_form"):
                 help="Date the descriptions was generated",
                 width=None,
                 required=True,
-            )                   
+            )
             }
             )
         submit_disabled = False

@@ -2,5 +2,5 @@ name: sf_env
 channels:
 - snowflake
 dependencies:
-- streamlit
-- snowflake-ml-python
+- streamlit=1.44.1
+- snowflake-ml-python=1.8.3

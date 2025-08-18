@@ -1,5 +1,7 @@
+CATALOG_RESULT_SCHEMA = ['TABLENAME', 'DESCRIPTION', 'COMMENT_UPDATED']
+
 def run_table_catalog(session,
-                      target_database, 
+                      target_database,
                       catalog_database,
                       catalog_schema,
                       catalog_table,
@@ -10,14 +12,18 @@ def run_table_catalog(session,
                       sampling_mode,
                       update_comment,
                       n,
-                      model):
-    
+                      model,
+                      use_native_feature):
+
     """
     Catalogs data contained in Snowflake Database/Schema.
 
-    Writes results to table. Output table contains
-    - tablename
-    - description of data contained in respective table
+    Writes results to table. Output table contains:
+    - TABLENAME: Name of the table
+    - DESCRIPTION: Description of data contained in respective table
+    - COMMENT_UPDATED: Boolean indicating if table comment was successfully updated (when update_comment=True)
+    - EMBEDDINGS: Vector embeddings of the description
+    - CREATED_ON: Timestamp when the record was created
 
     Args:
         target_database (string): Snowflake database to catalog.
@@ -37,86 +43,166 @@ def run_table_catalog(session,
         update_comment (bool): If True, update table's current comments. Defaults to False
         n (int): Number of records to sample from table. Defaults to 5.
         model (string): Cortex model to generate table descriptions. Defaults to 'mistral-7b'.
+        use_native_feature (bool): If True, use native feature for processing. Defaults to False.
 
     Returns:
-        Table
+        Snowpark DataFrame containing the catalog results
     """
 
     import json
-    import time
-
+    import multiprocessing
+    import joblib
+    from joblib import Parallel, delayed
     import pandas as pd
     import snowflake.snowpark.functions as F
-
-    from tables import get_crawlable_tbls, get_unique_context, get_all_tables, add_records_to_catalog
+    from tables import get_crawlable_tbls, apply_table_filters, get_unique_context, get_all_tables, add_records_to_catalog
     from prompts import start_prompt
 
-    tables = get_crawlable_tbls(session, target_database, target_schema, 
-                                catalog_database, catalog_schema, catalog_table,
-                                replace_catalog)
-    if include_tables:
-        tables = list(set(tables).intersection(set(include_tables)))
-    elif exclude_tables:
-        tables = list(set(tables).difference(set(exclude_tables)))
-    else:
-        tables = tables
-    if tables:
-        context_db, context_schemas = get_unique_context(tables) # Database and set of Schemas to crawl
-        schema_df = get_all_tables(session, context_db, context_schemas) # Contains all tables in schema(s)
-        async_jobs = []
-        for t in tables:
-            current_schema = t.split('.')[1]
-            prompt_args = { # Samples gathered during CATALOG_TABLE sproc
-                'tablename': t,
-                'table_columns': schema_df[schema_df.TABLENAME == t]['COLUMN_INFO'].to_numpy().item(),
-                'table_comment': schema_df[schema_df.TABLENAME == t]['TABLE_COMMENT'].to_numpy().item(),
+    def process_single_table(table, schema_df, catalog_info, sampling_mode, n, model, update_comment, use_native_feature):
+        """Process a single table with all necessary parameters
+
+        Args:
+            table (str): Fully qualified table name to process
+            schema_df (pd.DataFrame): DataFrame containing schema information for all tables
+            catalog_info (dict): Dictionary containing catalog database and schema info
+            sampling_mode (str): How to retrieve sample data records ('fast' or 'nonnull')
+            n (int): Number of records to sample from table
+            model (str): Cortex model to generate table descriptions
+            update_comment (bool): Whether to update table comments with generated descriptions
+            use_native_feature (bool): Whether to use Snowflake's native AI_GENERATE_TABLE_DESC function
+
+        Returns:
+            Dictionary containing:
+            - TABLENAME: Name of the table
+            - DESCRIPTION: Description or error message
+            - COMMENT_UPDATED: Boolean indicating if comment was updated (when update_comment=True)
+        """
+        try:
+            # Prepare table metadata
+            current_schema = table.split('.')[1]
+            prompt_args = {
+                'tablename': table,
+                'table_columns': schema_df[schema_df.TABLENAME == table]['COLUMN_INFO'].to_numpy().item(),
+                'table_comment': schema_df[schema_df.TABLENAME == table]['TABLE_COMMENT'].to_numpy().item(),
                 'schema_tables': schema_df[schema_df.TABLE_SCHEMA == current_schema]\
                                 .groupby('TABLE_SCHEMA')['TABLE_DDL']\
                                 .apply(list).to_numpy().item()[0]
             }
-            # Samples passed later via double {{table_samples}}
-            prompt = start_prompt.format(**prompt_args).replace("'", "\\'") 
-            query = f"""
-            CALL {catalog_database}.{catalog_schema}.CATALOG_TABLE(
-                                            tablename => '{t}',
-                                            prompt => '{prompt}',
-                                            sampling_mode => '{sampling_mode}',
-                                            n => {n},
-                                            model => '{model}',
-                                            update_comment => {update_comment})
-            """
-            async_jobs.append(session.sql(query).collect_nowait())
 
-        n = 20 # Give 20 seconds to finish first
-        while not any(job.is_done() for job in async_jobs):
-            time.sleep(n)
-            n = 60 # Now check every minute
-            pass
+            try:
+                # Only generate prompt if not using native feature
+                if not use_native_feature:
+                    try:
+                        prompt = start_prompt.format(**prompt_args)
+                        prompt = prompt.replace("'", "\\'")  # Simple quote escaping
+                    except Exception as e:
+                        return {
+                            'TABLENAME': table,
+                            'DESCRIPTION': f'Error creating prompt: {str(e)}',
+                            'COMMENT_UPDATED': False if update_comment else None
+                        }
+                else:
+                    prompt = ''  # Empty prompt when using native feature
 
-        results = [json.loads(job.result()[0][0]) for job in async_jobs if job.is_done()]
-        # there is a bit of latency between when the query is done and when it is available in the query history
-        while len(results) != len(tables):
-            results = [json.loads(job.result()[0][0]) for job in async_jobs if job.is_done()]
-            time.sleep(60)
-            pass
-        
-        df = session.create_dataframe(pd.DataFrame.from_records(results))\
-                    .withColumn('EMBEDDINGS',
-                                F.call_udf('SNOWFLAKE.CORTEX.EMBED_TEXT_768',
-                                           'e5-base-v2',
-                                           F.col('DESCRIPTION')))\
-                    .withColumn('CREATED_ON', F.current_timestamp())
-        
-        add_records_to_catalog(session,
-                               catalog_database,
-                               catalog_schema,
-                               catalog_table,
-                               df,
-                               replace_catalog)
-        
-        # df.write.save_as_table(table_name = [catalog_database, catalog_schema, catalog_table],
-        #                        mode = "append",
-        #                        column_order = "name")
-        return df
-    else:
-        return session.create_dataframe([['No new tables to crawl','']], schema=['TABLENAME', 'DESCRIPTION'])
+                # Execute the catalog procedure
+                async_job = session.sql(f"""
+                    CALL {catalog_info['database']}.{catalog_info['schema']}.CATALOG_TABLE(
+                        tablename => '{table}',
+                        prompt => '{prompt}',
+                        sampling_mode => '{sampling_mode}',
+                        n => {n},
+                        model => '{model}',
+                        update_comment => {update_comment},
+                        use_native_feature => {use_native_feature})
+                """).collect()
+
+                # Wait for and get the result
+                result = async_job
+
+                # Added debug logging
+                if not bool(result):
+                    return {
+                        'TABLENAME': table,
+                        'DESCRIPTION': f'Error: Empty result from CATALOG_TABLE',
+                        'COMMENT_UPDATED': False if update_comment else None
+                    }
+
+                # Get the dictionary result from generate_description
+                result_data = json.loads(result[0][0])
+                return result_data
+
+            except Exception as e:
+                # Return failed result - will still be included in catalog
+                return {
+                    'TABLENAME': table,
+                    'DESCRIPTION': f'Error processing table: {str(e)}',
+                    'COMMENT_UPDATED': False if update_comment else None
+                }
+
+        except Exception as e:
+            # Catch any other unexpected errors
+            return {
+                'TABLENAME': table,
+                'DESCRIPTION': f'Unexpected error: {str(e)}',
+                'COMMENT_UPDATED': False if update_comment else None
+            }
+
+    # Get tables to crawl
+    tables = get_crawlable_tbls(session, target_database, target_schema,
+                                catalog_database, catalog_schema, catalog_table,
+                                replace_catalog)
+
+    # Apply table filters if provided
+    tables = apply_table_filters(tables, include_tables, exclude_tables)
+
+    # If no tables to crawl, return empty dataframe
+    if not tables:
+        return session.create_dataframe([['No new tables to crawl', '', None]],
+                                      schema=CATALOG_RESULT_SCHEMA)
+
+    # Get context and schema information
+    context_db, context_schemas = get_unique_context(tables)
+    schema_df = get_all_tables(session, context_db, context_schemas)
+
+    # Prepare catalog info for reuse
+    catalog_info = {
+        'database': catalog_database,
+        'schema': catalog_schema
+    }
+
+    # Parallel processing of tables using the cpu count available
+    results = Parallel(n_jobs=multiprocessing.cpu_count(), backend="threading")(
+        delayed(process_single_table)(
+            table,
+            schema_df,
+            catalog_info,
+            sampling_mode,
+            n,
+            model,
+            update_comment,
+            use_native_feature
+        ) for table in tables
+    )
+
+    # Create DataFrame from results (list -> pd dataframe -> snowpark dataframe -> add embeddings and timestamp)
+    try:
+        df = session.create_dataframe(pd.DataFrame.from_records(results),
+                                    schema=CATALOG_RESULT_SCHEMA)\
+               .withColumn('EMBEDDINGS',
+                          F.call_udf('SNOWFLAKE.CORTEX.EMBED_TEXT_768',
+                                    'e5-base-v2',
+                                    F.col('DESCRIPTION')))\
+               .withColumn('CREATED_ON', F.current_timestamp())
+    except Exception as e:
+        return session.create_dataframe([['Error creating results dataframe', str(e), None]],
+                                      schema=CATALOG_RESULT_SCHEMA)
+
+    # Write to catalog table
+    add_records_to_catalog(session,
+                          catalog_database,
+                          catalog_schema,
+                          catalog_table,
+                          df,
+                          replace_catalog)
+
+    return df
