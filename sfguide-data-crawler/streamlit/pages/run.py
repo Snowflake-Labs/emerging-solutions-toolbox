@@ -129,7 +129,7 @@ st.caption("Select crawling parameters.")
 st.subheader("Description Generation Mode")
 st.write("Choose how you want to generate table descriptions:")
 
-mode_options = ["**Standard**: ⚡ Native AI Function", "**Advanced**: 🤖 LLM with Custom Prompts"]
+mode_options = ["**(Preview) Standard**: ⚡ Native AI Function", "**Advanced**: 🤖 LLM with Custom Prompts"]
 
 # Default to Standard mode
 generation_method = st.radio(
