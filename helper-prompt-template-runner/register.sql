@@ -2,7 +2,7 @@ SET db_name = 'GENAI_UTILITIES';
 SET schema_name = 'UTILITIES';
 
 SET major = 1;
-SET minor = 5;
+SET minor = 6;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "prompt_template_runner",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
