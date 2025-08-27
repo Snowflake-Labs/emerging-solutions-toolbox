@@ -105,7 +105,7 @@ class NodeModel:
 
         return columns
 
-    def convert_to_object(self, connection: SnowflakeConnection):
+    def convert_to_object(self, connection: SnowflakeConnection, parse_snowflake_columns: bool = True):
         """Iterates over table columns to produce object of table, column, and description.
 
         Description is only passed if found in the manifest.json"""
@@ -117,12 +117,19 @@ class NodeModel:
             'columns': []
         }
 
-        for column in self.get_snow_columns(connection):
-            description = next((c.description for c in self.manifest_columns if c.name.lower() == column.lower()), None)
-            return_object['columns'].append({
-                'column_name': column,
-                'description': description
-            })
+        if parse_snowflake_columns: # Columns will consist of those associated to Snowflake table
+            for column in self.get_snow_columns(connection):
+                description = next((c.description for c in self.manifest_columns if c.name.lower() == column.lower()), None)
+                return_object['columns'].append({
+                    'column_name': column,
+                    'description': description
+                })
+        else: # Columns will consist of those associated to dbt models
+            for column in self.manifest_columns:
+                return_object['columns'].append({
+                    'column_name': column.name,
+                    'description': column.description
+                })
 
         return return_object
 
@@ -198,7 +205,11 @@ class Measure:
         )
 
     def create_metric_from_fact(self) -> semantics_schema.Metric:
-        agg = semantics_schema.AggregationType[self.agg.lower()].value
+        agg = None
+        agg_type = semantics_schema.AggregationType.__members__.get(self.agg.lower(), None)
+        if agg_type is not None:
+            agg = agg_type.value
+
         if agg is not None and self.create_metric:
             expr = f"{agg}({self.name})"
             name = f"{agg}_{self.name}"
@@ -218,7 +229,7 @@ class Measure:
             expr=self.expr,
             data_type=semantics_schema.DataType.NUMBER, # This is an assumption, we need to figure out how to handle this
             synonyms=[self.label] if self.label else None,
-            default_aggregation=semantics_schema.AggregationType[self.agg.lower()].value,
+            default_aggregation=semantics_schema.AggregationType[self.agg.lower()].value if self.agg.lower() in semantics_schema.AggregationType.__members__ else None,
         ).__dict__
 
     def to_dict(self) -> Dict[str, Any]:
@@ -532,7 +543,6 @@ class Manifest:
     node_models: List[NodeModel] = field(default_factory=list) # Only present in manifest.json
     selected_models: List[str] = field(default_factory=list)
     connection: Optional[SnowflakeConnection] = None
-    # project_configuration: Optional[ProjectConfiguration] = None
 
     @staticmethod
     def flatten_manifest_contents(data: Dict[str, Any], key: str) -> Any:
@@ -744,7 +754,7 @@ class Manifest:
         """Load manifest from a local JSON file or staged file if running in Snowflake"""
 
         if file_path.startswith('https://') or file_path.startswith('@'):
-            from snowflake.snowpark.files import SnowflakeFile
+            from snowflake.snowpark.files import SnowflakeFile # type: ignore
 
             if file_path.startswith('https://'):
                 open_file = SnowflakeFile.open(file_path)
@@ -828,9 +838,22 @@ class Manifest:
                                         break
 
 
-    def convert(self, semantic_view_name: str = None, semantic_view_description: str = None) -> dict[str, Any]:
-        # Only return a SemanticModel if semantic models are present
-        # Otherwise, we return just table and column names for remaining workflow steps
+    def convert(self, semantic_view_name: str = None, semantic_view_description: str = None, parse_snowflake_columns: bool = True) -> dict[str, Any]:
+        """Converts Manifest to Semantic Models or Objects of table metadata.
+
+        Only return a SemanticModel if semantic models are present
+        Otherwise, we return just table and column names for remaining workflow steps
+
+        Args:
+            semantic_view_name: Name of the semantic view to be created.
+            semantic_view_description: Description of the semantic view to be created.
+            parse_snowflake_columns: Whether to parse snowflake columns.
+                                     Only used if semantic models are not present in the manifest.json.
+                                     If set to True, descriptions of Snowflake columns will be added to the metadata.
+
+        Returns:
+            SemanticModel or list of objects of table metadata.
+        """
         if len(self.semantic_models) > 0:
             self.extract_descriptions_from_models()
 
@@ -842,7 +865,7 @@ class Manifest:
                 relationships=self.get_relationships(),
             ).__dict__
         else:
-            return [model.convert_to_object(connection=self.connection) for model in self.node_models]
+            return [model.convert_to_object(connection=self.connection, parse_snowflake_columns=parse_snowflake_columns) for model in self.node_models]
 
     def to_dict(self, semantic_view_name: str, semantic_view_description: str) -> Dict[str, Any]:
         x = self.convert(semantic_view_name, semantic_view_description)

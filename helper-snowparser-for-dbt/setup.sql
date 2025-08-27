@@ -5,7 +5,7 @@ SET schema_name = 'UTILITIES';
 USE DATABASE IDENTIFIER($db_name);
 USE SCHEMA IDENTIFIER($schema_name);
 SET major = 1;
-SET minor = 0;
+SET minor = 1;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "snowparser_dbt",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -67,7 +67,8 @@ def get_yaml(session, manifest_file, semantic_view_name, semantic_view_descripti
 -- This stored procedure should be used if the manifest.json does not contain semantic models.
 CREATE OR REPLACE PROCEDURE SNOWPARSER_DBT_GET_OBJECTS(
     manifest_file varchar,
-    dbt_models array DEFAULT []
+    dbt_models array DEFAULT [],
+    parse_snowflake_columns boolean DEFAULT TRUE
 )
 RETURNS ARRAY
 LANGUAGE PYTHON
@@ -83,10 +84,10 @@ EXECUTE AS CALLER
 AS $$
 from semantic_manifest_parser import Manifest
 
-def get_objects(session, manifest_file, dbt_models):
+def get_objects(session, manifest_file, dbt_models, parse_snowflake_columns):
     manifest = Manifest.manifest_from_json_file(session.connection, manifest_file,selected_models=dbt_models)
 
-    return manifest.convert()
+    return manifest.convert(parse_snowflake_columns=parse_snowflake_columns)
 
   $$;
 
@@ -99,5 +100,6 @@ def get_objects(session, manifest_file, dbt_models):
 
 -- CALL SNOWPARSER_DBT_GET_OBJECTS(
 --     manifest_file => '@DROPBOX/samples/manifest_wo_metricflow.json',
---     dbt_models =>  TO_ARRAY(['customers','order_items', 'orders', 'stg_locations', 'stg_products'])
+--     dbt_models =>  TO_ARRAY(['customers','order_items', 'orders', 'stg_locations', 'stg_products']),
+--     parse_snowflake_columns => TRUE
 -- );

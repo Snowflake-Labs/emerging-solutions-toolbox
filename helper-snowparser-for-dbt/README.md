@@ -81,6 +81,7 @@ It is recommended to pass a list of dbt models to limit the number of dbt models
 CALL SNOWPARSER_DBT_GET_OBJECTS(
     manifest_file => '@DROPBOX/samples/manifest_wo_metricflow.json',
     dbt_models =>  TO_ARRAY(['customers','order_items', 'orders', 'stg_locations', 'stg_products'])
+    parse_snowflake_columns => TRUE -- Set to False to ONLY rely on column metadata in Manifest and not query for columns in associated Snowflake tables; Default is True
 );
 ```
 
