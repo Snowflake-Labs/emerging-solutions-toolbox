@@ -67,7 +67,8 @@ Below is an example of executing the stored procedure to parse dbt MetricFlow se
 CALL SNOWPARSER_DBT_SEMANTIC_YAML(
     manifest_file => '@DROPBOX/samples/manifest.json', -- Can be fully qualified stage
     semantic_view_name => 'my_semantic_view',
-    semantic_view_description => 'Semantic view about customers and orders'
+    semantic_view_description => 'Semantic view about customers and orders',
+    semantic_models => TO_ARRAY(['customers', 'orders']) -- Can select which semantic models to use. If omitted, all will be retained.
 );
 ```
 

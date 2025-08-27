@@ -40,7 +40,8 @@ COPY FILES
 CREATE OR REPLACE PROCEDURE SNOWPARSER_DBT_SEMANTIC_YAML(
     manifest_file varchar,
     semantic_view_name varchar DEFAULT 'MY_SEMANTIC_VIEW',
-    semantic_view_description varchar DEFAULT 'MY_SEMANTIC_VIEW_DESCRIPTION'
+    semantic_view_description varchar DEFAULT 'MY_SEMANTIC_VIEW_DESCRIPTION',
+    semantic_models array DEFAULT []
 )
 RETURNS STRING
 LANGUAGE PYTHON
@@ -56,8 +57,8 @@ EXECUTE AS CALLER
 AS $$
 from semantic_manifest_parser import Manifest
 
-def get_yaml(session, manifest_file, semantic_view_name, semantic_view_description):
-    manifest = Manifest.manifest_from_json_file(session.connection, manifest_file,selected_models=[])
+def get_yaml(session, manifest_file, semantic_view_name, semantic_view_description, semantic_models):
+    manifest = Manifest.manifest_from_json_file(session.connection, manifest_file, selected_models=semantic_models)
 
     return manifest.generate_yaml(semantic_view_name, semantic_view_description)
 

@@ -558,6 +558,31 @@ class Manifest:
 
     @classmethod
     def from_dict(cls, connection: SnowflakeConnection, data: Dict[str, Any], selected_models: List[str] = []) -> 'Manifest':
+        """
+        Ingest models from manifest.json
+
+        Args:
+            connection: Snowflake connection object
+            data: Dictionary containing the manifest.json data
+            selected_models: List of models to select from the manifest.json
+                             If semantic_models exist in Manifest.json, selected_models will be used to filter them.
+                             If selected_models is empty, selected_models will be used to filter dbt models.
+                             If selected_models is not empty, no filtering will be applied to the applicable models.
+
+        Returns:
+            Manifest object
+        """
+
+        # First determine if selected_models should be applied to semantic models or dbt models
+        # The selected models will be used to filter the applicable model list from Manifest.json
+        selected_semantic_models = []
+        selected_dbt_models = []
+        if len(data.get('semantic_models', [])) > 0:
+            # We will consider all dbt models if semantic models are present
+            selected_semantic_models = selected_models.copy()
+        else:
+            selected_dbt_models = selected_models.copy()
+
 
         # Ingest models from manifest.json
         node_models = []
@@ -566,10 +591,10 @@ class Manifest:
             # materialized_view materializations are not supported in Snowflake; dynamic_tables are used instead
             # Remaining acceptable materializations are: table, view, incremental, and dynamic_table
             if model['resource_type'] == 'model' and model['config'].get('materialized') not in ['ephemeral', 'materialized_view']:
-                if len(selected_models) == 0 or model['name'] in selected_models:
+                if len(selected_dbt_models) == 0 or model['name'] in selected_dbt_models:
                     node_models.append(NodeModel.from_dict(model))
 
-        semantic_models = [SemanticModel.from_dict(model) for model in cls.flatten_manifest_contents(data, 'semantic_models')]
+        semantic_models = [SemanticModel.from_dict(model) for model in cls.flatten_manifest_contents(data, 'semantic_models') if (model['name'] in selected_semantic_models or len(selected_semantic_models) == 0)]
         metrics_metadata = cls.flatten_manifest_contents(data, 'metrics')
 
         # Get all measures from semantic models to augment automated  metrics in next section
@@ -751,7 +776,15 @@ class Manifest:
 
     @classmethod
     def manifest_from_json_file(cls, connection: SnowflakeConnection, file_path: Union[str, Path], selected_models: List[str] = []) -> 'Manifest':
-        """Load manifest from a local JSON file or staged file if running in Snowflake"""
+        """Load manifest from a local JSON file or staged file if running in Snowflake
+
+        Args:
+            connection: Snowflake connection object
+            file_path: Path to the manifest.json file
+            selected_models: List of models to select from the manifest.json
+
+        Returns:
+        """
 
         if file_path.startswith('https://') or file_path.startswith('@'):
             from snowflake.snowpark.files import SnowflakeFile # type: ignore
