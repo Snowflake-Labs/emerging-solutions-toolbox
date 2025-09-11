@@ -41,6 +41,7 @@ class AggregationType(Enum):
     count_distinct = "count_distinct"
     percentile = None # not implemented yet
     sum_boolean = "countif"
+    count = "count"
 
 
 @dataclass
