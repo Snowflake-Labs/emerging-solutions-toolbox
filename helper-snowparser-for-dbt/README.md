@@ -69,6 +69,7 @@ CALL SNOWPARSER_DBT_SEMANTIC_YAML(
     semantic_view_name => 'my_semantic_view',
     semantic_view_description => 'Semantic view about customers and orders',
     semantic_models => TO_ARRAY(['customers', 'orders']) -- Can select which semantic models to use. If omitted, all will be retained.
+    parse_snowflake_columns => TRUE -- Default is True. Can omit. If True, queries Snowflake columns for correct data types.
 );
 ```
 
