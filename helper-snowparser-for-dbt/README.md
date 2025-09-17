@@ -67,7 +67,8 @@ Below is an example of executing the stored procedure to parse dbt MetricFlow se
 CALL SNOWPARSER_DBT_SEMANTIC_YAML(
     manifest_file => '@DROPBOX/samples/manifest.json', -- Can be fully qualified stage
     semantic_view_name => 'my_semantic_view',
-    semantic_view_description => 'Semantic view about customers and orders'
+    semantic_view_description => 'Semantic view about customers and orders',
+    semantic_models => TO_ARRAY(['customers', 'orders']) -- Can select which semantic models to use. If omitted, all will be retained.
 );
 ```
 
@@ -81,6 +82,7 @@ It is recommended to pass a list of dbt models to limit the number of dbt models
 CALL SNOWPARSER_DBT_GET_OBJECTS(
     manifest_file => '@DROPBOX/samples/manifest_wo_metricflow.json',
     dbt_models =>  TO_ARRAY(['customers','order_items', 'orders', 'stg_locations', 'stg_products'])
+    parse_snowflake_columns => TRUE -- Set to False to ONLY rely on column metadata in Manifest and not query for columns in associated Snowflake tables; Default is True
 );
 ```
 
