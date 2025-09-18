@@ -10,7 +10,7 @@ from snowflake.snowpark import Session
 from snowflake.cortex import complete
 from snowflake.snowpark.files import SnowflakeFile
 
-major, minor = 1, 5
+major, minor = 1, 6
 QUERY_TAG = {
     "origin": "sf_sit",
     "name": "prompt_template_runner",
@@ -58,7 +58,13 @@ class PromptParser:
         if column_vars:
             for var_name, col_name in column_vars.items():
                 if col_name in row_data:
-                    mapped_column_vals[var_name] = row_data.get(col_name, '')
+                    column_value = row_data.get(col_name)
+                    # Handle complex data types (dict, list) by serializing to JSON
+                    if isinstance(column_value, (dict, list)):
+                        mapped_column_vals[var_name] = json.dumps(column_value)
+                    else:
+                        # Convert to string, handling None values
+                        mapped_column_vals[var_name] = str(column_value) if column_value is not None else ''
 
         replace_dict = {**(literal_vars or {}), **(mapped_column_vals or {})} # Combine dictionaries if not empty
 
@@ -245,30 +251,45 @@ def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFr
     """
     Adds metadata to a specified column in the DataFrame.
 
-    If the metadata contains nested dictionaries, they are unnested and added as separate keys.
+    This function replicates the original behavior where model_options
+    are treated as nested JSON objects.
 
     Args:
         df (DataFrame): The DataFrame to which metadata will be added.
         column (str): The name of the column to which metadata will be added.
-        metadata (dict[str, Any]): A dictionary containing metadata to be added. Nested dictionaries are supported.
+        metadata (dict[str, Any]): A dictionary containing metadata to be added.
+
     Returns:
         DataFrame: The DataFrame with the added metadata.
     """
-
     try:
         for key, value in metadata.items():
-
-                if value is None:
-                    continue
-                elif key == 'model_options':
-                    df = df.with_column(column,
-                            F.sql_expr(f"OBJECT_INSERT({column}, '{key}', TO_JSON({value}))")
-                            )
+            if value is None:
+                continue
+            elif key == 'model_options':
+                # Handle model_options as nested JSON - Fixed condition
+                if isinstance(value, dict):
+                    if value:  # Non-empty dictionary
+                        df = df.with_column(
+                            column,
+                            F.sql_expr(f"OBJECT_INSERT({column}, '{key}', PARSE_JSON('{json.dumps(value)}'))")
+                        )
+                    else:  # Empty dictionary
+                        df = df.with_column(
+                            column,
+                            F.sql_expr(f"OBJECT_INSERT({column}, '{key}', PARSE_JSON('{{}}'))")
+                        )
                 else:
+                    # Not a dict, treat as empty
                     df = df.with_column(
                         column,
-                        F.sql_expr(f"OBJECT_INSERT({column}, '{key}', '{value}')")
+                        F.sql_expr(f"OBJECT_INSERT({column}, '{key}', PARSE_JSON('{{}}'))")
                     )
+            else:
+                df = df.with_column(
+                    column,
+                    F.sql_expr(f"OBJECT_INSERT({column}, '{key}', '{value}')")
+                )
         return df
     except Exception as e:
         raise Exception(f"Error adding metadata to DataFrame: {e}")
