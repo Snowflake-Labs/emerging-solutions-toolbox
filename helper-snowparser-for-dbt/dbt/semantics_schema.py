@@ -137,6 +137,8 @@ class Metric:
     expr: str
     description: str
     data_type: Union[DataType, str]
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     def __post_init__(self):
 
@@ -155,6 +157,7 @@ class GlobalMetric:
     expr: str
     description: str
     synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     def __post_init__(self):
 

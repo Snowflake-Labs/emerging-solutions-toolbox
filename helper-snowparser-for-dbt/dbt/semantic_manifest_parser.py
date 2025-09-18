@@ -17,6 +17,24 @@ from pathlib import Path
 from snowflake.connector import connect, DictCursor
 from snowflake.connector.connection import SnowflakeConnection
 
+def get_meta_info(data: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """
+    Get the meta information from the data.
+
+    Returns value as a list if it is not None.
+    Returns None if value is None.
+    """
+    value = data.get('config', {}).get('meta', {}).get(key)
+
+    if value is not None:
+        if isinstance(value, list):
+            return value
+        else:
+            return [value]
+    else:
+        return None
+
+
 def query_expression_datatype(connection: SnowflakeConnection, expr: str, table_name: str) -> str:
     """
     Query Snowflake to determine the datatype of an expression.
@@ -172,6 +190,8 @@ class Entity:
     expr: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     label: Optional[str] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Entity':
@@ -183,6 +203,8 @@ class Entity:
             expr=data.get('expr') or data['name'], # if expr is not provided, use the name as the expr
             metadata=data.get('metadata'),
             label=data.get('label'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def convert(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, Any]:
@@ -200,7 +222,8 @@ class Entity:
             expr=self.expr,
             unique=True if (self.type=="primary" or self.type=="Unique") else False,
             data_type=data_type,
-            synonyms=[self.label] if self.label else None,
+            synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+            sample_values=self.sample_values if self.sample_values else None
         ).__dict__
 
     def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
@@ -224,6 +247,8 @@ class Measure:
     non_additive_dimension: Optional[str] = None
     agg_time_dimension: Optional[str] = None
     label: Optional[str] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Measure':
@@ -237,6 +262,8 @@ class Measure:
             non_additive_dimension=data.get('non_additive_dimension'),
             agg_time_dimension=data.get('agg_time_dimension'),
             label=data.get('label'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def create_metric_from_fact(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> semantics_schema.Metric:
@@ -262,6 +289,8 @@ class Measure:
                 description=self.description,
                 expr=expr,
                 data_type=data_type,
+                synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+                sample_values=self.sample_values if self.sample_values else None
             ).__dict__
 
 
@@ -280,8 +309,9 @@ class Measure:
             description=self.description,
             expr=self.expr,
             data_type=data_type,
-            synonyms=[self.label] if self.label else None,
             default_aggregation=semantics_schema.AggregationType[self.agg.lower()].value if self.agg.lower() in semantics_schema.AggregationType.__members__ else None,
+            synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+            sample_values=self.sample_values if self.sample_values else None
         ).__dict__
 
     def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
@@ -303,6 +333,8 @@ class Dimension:
     expr: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     label: Optional[str] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Dimension':
@@ -314,6 +346,8 @@ class Dimension:
             expr=data.get('expr') or data['name'],
             metadata=data.get('metadata'),
             label=data.get('label'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def convert(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, Any]:
@@ -338,7 +372,8 @@ class Dimension:
                 description=self.description,
                 expr=self.expr,
                 data_type=data_type,
-                synonyms=[self.label] if self.label else None,
+                synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+                sample_values=self.sample_values if self.sample_values else None
             ).__dict__
         else:
             return semantics_schema.Dimension(
@@ -347,7 +382,8 @@ class Dimension:
                 expr=self.expr,
                 unique=True if (self.type=="primary" or self.type=="Unique") else False,
                 data_type=data_type,
-                synonyms=[self.label] if self.label else None,
+                synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+                sample_values=self.sample_values if self.sample_values else None
             ).__dict__
 
     def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
@@ -467,6 +503,8 @@ class SimpleMetric:
     description: Optional[str] = None
     label: Optional[str] = None
     fill_nulls_with: Optional[str|int] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'SimpleMetric':
@@ -477,6 +515,8 @@ class SimpleMetric:
             description=data.get('description'),
             label=data.get('label'),
             fill_nulls_with=data.get('fill_nulls_with'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def convert(self) -> dict[str, Any]:
@@ -493,7 +533,8 @@ class SimpleMetric:
             name=self.name,
             description=self.description,
             expr=expr,
-            synonyms=[self.label] if self.label else None,
+            synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+            sample_values=self.sample_values if self.sample_values else None
         ).__dict__
 
     def to_dict(self) -> Dict[str, Any]:
@@ -514,6 +555,8 @@ class DerivedMetric:
     expr: Optional[str] = None
     description: Optional[str] = None
     label: Optional[str] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DerivedMetric':
@@ -524,6 +567,8 @@ class DerivedMetric:
             expr=data.get('expr'),
             description=data.get('description'),
             label=data.get('label'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def convert(self) -> dict[str, Any]:
@@ -536,7 +581,8 @@ class DerivedMetric:
             name=self.name,
             description=self.description,
             expr=expr,
-            synonyms=[self.label] if self.label else None,
+            synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+            sample_values=self.sample_values if self.sample_values else None
         ).__dict__
 
     def to_dict(self) -> Dict[str, Any]:
@@ -557,6 +603,8 @@ class RatioMetric:
     denominator_specs: str|dict[str, Any]
     description: Optional[str] = None
     label: Optional[str] = None
+    synonyms: Optional[List[str]] = None
+    sample_values: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DerivedMetric':
@@ -567,6 +615,8 @@ class RatioMetric:
             denominator_specs=data['denominator_specs'],
             description=data.get('description'),
             label=data.get('label'),
+            synonyms=get_meta_info(data, 'synonyms'),
+            sample_values=get_meta_info(data, 'sample_values'),
         )
 
     def convert(self) -> dict[str, Any]:
@@ -586,7 +636,8 @@ class RatioMetric:
             name=self.name,
             description=self.description,
             expr=expr,
-            synonyms=[self.label] if self.label else None,
+            synonyms=self.synonyms if self.synonyms else ([self.label] if self.label else None),
+            sample_values=self.sample_values if self.sample_values else None
         ).__dict__
 
     def to_dict(self) -> Dict[str, Any]:
@@ -971,27 +1022,18 @@ class Manifest:
         else:
             return [model.convert_to_object(connection=self.connection, parse_snowflake_columns=parse_snowflake_columns) for model in self.node_models]
 
-    def to_dict(self, semantic_view_name: str, semantic_view_description: str) -> Dict[str, Any]:
-        x = self.convert(semantic_view_name, semantic_view_description)
+    def to_dict(self, semantic_view_name: str, semantic_view_description: str, parse_snowflake_columns: bool = True) -> Dict[str, Any]:
+        x = self.convert(semantic_view_name, semantic_view_description, parse_snowflake_columns)
         d = {}
         for key, value in x.items():
             if value is not None and value != []:
                 d[key] = value
         return d
 
-    def generate_yaml(self, semantic_view_name: str, semantic_view_description: str) -> str:
+    def generate_yaml(self, semantic_view_name: str, semantic_view_description: str, parse_snowflake_columns: bool = True) -> str:
         if len(self.semantic_models) == 0:
             raise Exception("Semantic models are not present in the manifest.json. Please use the convert method to get a list of tables and columns."
                             "If using the stored procedure, please use the SNOWPARSER_DBT_GET_OBJECTS stored procedure instead.")
         else:
-            return yaml.dump(self.to_dict(semantic_view_name, semantic_view_description),
+            return yaml.dump(self.to_dict(semantic_view_name, semantic_view_description, parse_snowflake_columns),
                              default_flow_style=False, sort_keys=False)
-
-    def get_all_measures(self) -> List[Measure]:
-        return [measure for model in self.semantic_models for measure in model.measures]
-
-    def get_all_metrics(self) -> List[SimpleMetric]:
-        return [metric for metric in self.metrics]
-
-    def get_all_semantic_models(self) -> List[SemanticModel]:
-        return self.semantic_models
