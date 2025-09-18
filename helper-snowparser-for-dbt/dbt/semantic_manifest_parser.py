@@ -17,7 +17,6 @@ from pathlib import Path
 from snowflake.connector import connect, DictCursor
 from snowflake.connector.connection import SnowflakeConnection
 
-
 def get_meta_info(data: Dict[str, Any], key: str) -> Dict[str, Any]:
     """
     Get the meta information from the data.
@@ -34,6 +33,7 @@ def get_meta_info(data: Dict[str, Any], key: str) -> Dict[str, Any]:
             return [value]
     else:
         return None
+
 
 def query_expression_datatype(connection: SnowflakeConnection, expr: str, table_name: str) -> str:
     """
