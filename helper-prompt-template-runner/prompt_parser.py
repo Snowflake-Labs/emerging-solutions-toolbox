@@ -247,38 +247,6 @@ def extract_prompt(prompt_template_file: str) -> dict[str, Any]:
         except yaml.YAMLError as e:
             raise yaml.YAMLError(f"Error parsing YAML file {prompt_template_file}. Error: {e}")
 
-# def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFrame:
-#     """
-#     Adds metadata to a specified column in the DataFrame.
-
-#     If the metadata contains nested dictionaries, they are unnested and added as separate keys.
-
-#     Args:
-#         df (DataFrame): The DataFrame to which metadata will be added.
-#         column (str): The name of the column to which metadata will be added.
-#         metadata (dict[str, Any]): A dictionary containing metadata to be added. Nested dictionaries are supported.
-#     Returns:
-#         DataFrame: The DataFrame with the added metadata.
-#     """
-
-#     try:
-#         for key, value in metadata.items():
-
-#                 if value is None:
-#                     continue
-#                 elif key == 'model_options':
-#                     df = df.with_column(column,
-#                             F.sql_expr(f"OBJECT_INSERT({column}, '{key}', TO_JSON({value}))")
-#                             )
-#                 else:
-#                     df = df.with_column(
-#                         column,
-#                         F.sql_expr(f"OBJECT_INSERT({column}, '{key}', '{value}')")
-#                     )
-#         return df
-#     except Exception as e:
-#         raise Exception(f"Error adding metadata to DataFrame: {e}")
-
 def add_metadata(df: DataFrame, column: str, metadata: dict[str, Any]) -> DataFrame:
     """
     Adds metadata to a specified column in the DataFrame.
