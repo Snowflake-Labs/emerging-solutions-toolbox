@@ -88,6 +88,7 @@ CALL SNOWPARSER_DBT_GET_OBJECTS(
 ```
 
 ## Supported Translations
+
 The below chart highlights what elements of dbt semantic models and metrics are translated into Snowflake semantic elements.
 
 | dbt Semantic Model Element | Definition | Translation Supported | Snowflake Semantic Element |
@@ -105,6 +106,28 @@ The below chart highlights what elements of dbt semantic models and metrics are 
 | Saved Queries | Way to save commonly used queries in MetricFlow | no | - |
 | Filters | Saved Queries and Metrics can include filters | no | - |
 
+## Synonyms and Sample Values
+
+Dimensions, Time Dimensions, Facts, and Metrics in the Cortex Analyst semantic model support synonyms and sample values. Synonyms and sample values can be explicitly set in dbt semantic models via the meta key, e.g.
+
+```
+semantic_models:
+  - name: semantic_model
+    ...
+    dimensions:
+      - name: order_date
+        type: time
+        config:
+          meta:
+            synonyms:
+                - "transaction date"
+            sample_values:
+                - "9/18/2025"
+                - "9/10/2025"
+    ...
+```
+
+Values for `synonyms` and `sample_values` can be a list or a single item. Label will be used for `synonyms` if `synonyms` are not explicitly provided or set in a field's meta information.
 
 ## Feedback
 Please add issues to GitHub or email Jason Summer (jason.summer@snowflake.com).
