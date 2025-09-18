@@ -5,7 +5,7 @@ SET schema_name = 'UTILITIES';
 USE DATABASE IDENTIFIER($db_name);
 USE SCHEMA IDENTIFIER($schema_name);
 SET major = 1;
-SET minor = 1;
+SET minor = 2;
 SET COMMENT = concat('{"origin": "sf_sit",
             "name": "snowparser_dbt",
             "version": {"major": ',$major,', "minor": ',$minor,'}}');
@@ -41,7 +41,8 @@ CREATE OR REPLACE PROCEDURE SNOWPARSER_DBT_SEMANTIC_YAML(
     manifest_file varchar,
     semantic_view_name varchar DEFAULT 'MY_SEMANTIC_VIEW',
     semantic_view_description varchar DEFAULT 'MY_SEMANTIC_VIEW_DESCRIPTION',
-    semantic_models array DEFAULT []
+    semantic_models array DEFAULT [],
+    parse_snowflake_columns boolean DEFAULT TRUE
 )
 RETURNS STRING
 LANGUAGE PYTHON
@@ -57,10 +58,10 @@ EXECUTE AS CALLER
 AS $$
 from semantic_manifest_parser import Manifest
 
-def get_yaml(session, manifest_file, semantic_view_name, semantic_view_description, semantic_models):
+def get_yaml(session, manifest_file, semantic_view_name, semantic_view_description, semantic_models, parse_snowflake_columns):
     manifest = Manifest.manifest_from_json_file(session.connection, manifest_file, selected_models=semantic_models)
 
-    return manifest.generate_yaml(semantic_view_name, semantic_view_description)
+    return manifest.generate_yaml(semantic_view_name, semantic_view_description, parse_snowflake_columns)
 
   $$;
 

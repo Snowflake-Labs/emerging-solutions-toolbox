@@ -17,6 +17,33 @@ from pathlib import Path
 from snowflake.connector import connect, DictCursor
 from snowflake.connector.connection import SnowflakeConnection
 
+def query_expression_datatype(connection: SnowflakeConnection, expr: str, table_name: str) -> str:
+    """
+    Query Snowflake to determine the datatype of an expression.
+
+    Args:
+        connection: Snowflake connection object
+        expr: The expression to evaluate (e.g., column name or SQL expression)
+        table_name: Fully qualified table name (database.schema.table)
+
+    Returns:
+        String representing the Snowflake datatype
+    """
+    try:
+        query = f"SELECT TYPEOF(({expr})::VARIANT) FROM {table_name} WHERE ({expr}) IS NOT NULL LIMIT 1"
+        cursor = connection.cursor()
+        cursor.execute(query)
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            # If no non-null values found, will fall back to basic type of class
+            return None
+    except Exception:
+        return None
+    finally:
+        cursor.close()
+
 # Stored procedure does not maintain specific directory structure
 # In SPROC, .py files are imported as modules sans directory structure.
 # If running locally with directory structure intact, import dbt.semantics_schema
@@ -158,18 +185,26 @@ class Entity:
             label=data.get('label'),
         )
 
-    def convert(self) -> dict[str, Any]:
+    def convert(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, Any]:
+        # Query actual datatype if connection and table are provided
+        if connection and table_name:
+            data_type = query_expression_datatype(connection, self.expr, table_name)
+            if data_type is None:
+                data_type = semantics_schema.DataType.TEXT.value
+        else:
+            data_type = semantics_schema.DataType.TEXT.value
+
         return semantics_schema.Dimension(
             name=self.name,
             description=self.description,
             expr=self.expr,
             unique=True if (self.type=="primary" or self.type=="Unique") else False,
-            data_type=semantics_schema.DataType.TEXT, # This is an assumption, we need to figure out how to handle this
+            data_type=data_type,
             synonyms=[self.label] if self.label else None,
         ).__dict__
 
-    def to_dict(self) -> Dict[str, Any]:
-        x = self.convert()
+    def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
+        x = self.convert(connection, table_name)
         d = {}
         for key, value in x.items():
             if value is not None and value != []:
@@ -204,7 +239,7 @@ class Measure:
             label=data.get('label'),
         )
 
-    def create_metric_from_fact(self) -> semantics_schema.Metric:
+    def create_metric_from_fact(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> semantics_schema.Metric:
         agg = None
         agg_type = semantics_schema.AggregationType.__members__.get(self.agg.lower(), None)
         if agg_type is not None:
@@ -213,27 +248,44 @@ class Measure:
         if agg is not None and self.create_metric:
             expr = f"{agg}({self.name})"
             name = f"{agg}_{self.name}"
+
+            # Query actual datatype if connection and table are provided
+            if connection and table_name:
+                data_type = query_expression_datatype(connection, expr, table_name)
+                if data_type is None:
+                    data_type = semantics_schema.DataType.NUMBER.value
+            else:
+                data_type = semantics_schema.DataType.NUMBER.value
+
             return semantics_schema.Metric(
                 name=name,
                 description=self.description,
                 expr=expr,
-                data_type=semantics_schema.DataType.NUMBER,
+                data_type=data_type,
             ).__dict__
 
 
 
-    def convert(self) -> dict[str, Any]:
+    def convert(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, Any]:
+        # Query actual datatype if connection and table are provided
+        if connection and table_name:
+            data_type = query_expression_datatype(connection, self.expr, table_name)
+            if data_type is None:
+                data_type = semantics_schema.DataType.NUMBER.value
+        else:
+            data_type = semantics_schema.DataType.NUMBER.value  # Fallback to assumption
+
         return semantics_schema.Fact(
             name=self.name,
             description=self.description,
             expr=self.expr,
-            data_type=semantics_schema.DataType.NUMBER, # This is an assumption, we need to figure out how to handle this
+            data_type=data_type,
             synonyms=[self.label] if self.label else None,
             default_aggregation=semantics_schema.AggregationType[self.agg.lower()].value if self.agg.lower() in semantics_schema.AggregationType.__members__ else None,
         ).__dict__
 
-    def to_dict(self) -> Dict[str, Any]:
-        x = self.convert()
+    def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
+        x = self.convert(connection, table_name)
         d = {}
         for key, value in x.items():
             if value is not None and value != []:
@@ -264,14 +316,28 @@ class Dimension:
             label=data.get('label'),
         )
 
-    def convert(self) -> dict[str, Any]:
+    def convert(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, Any]:
+        # Query actual datatype if connection and table are provided
+        if connection and table_name:
+            data_type = query_expression_datatype(connection, self.expr, table_name)
+            if data_type is None:
+                if self.type == "time":
+                    data_type = semantics_schema.DataType.DATE.value
+                else:
+                    data_type = semantics_schema.DataType.NUMBER.value
+        else:
+            # Fallback to assumptions based on dimension type
+            if self.type == "time":
+                data_type = semantics_schema.DataType.DATE.value
+            else:
+                data_type = semantics_schema.DataType.TEXT.value
 
         if self.type == "time":
             return semantics_schema.TimeDimension(
                 name=self.name,
                 description=self.description,
                 expr=self.expr,
-                data_type=semantics_schema.DataType.DATE, # This is an assumption, we need to figure out how to handle this
+                data_type=data_type,
                 synonyms=[self.label] if self.label else None,
             ).__dict__
         else:
@@ -280,12 +346,12 @@ class Dimension:
                 description=self.description,
                 expr=self.expr,
                 unique=True if (self.type=="primary" or self.type=="Unique") else False,
-                data_type=semantics_schema.DataType.TEXT, # This is an assumption, we need to figure out how to handle this
+                data_type=data_type,
                 synonyms=[self.label] if self.label else None,
             ).__dict__
 
-    def to_dict(self) -> Dict[str, Any]:
-        x = self.convert()
+    def to_dict(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> Dict[str, Any]:
+        x = self.convert(connection, table_name)
         d = {}
         for key, value in x.items():
             if value is not None and value != []:
@@ -337,30 +403,32 @@ class SemanticModel:
             metadata=data.get('metadata'),
         )
 
-    def split_facts_and_metrics(self) -> dict[str, list[dict[str, Any]]]:
+    def split_facts_and_metrics(self, connection: Optional[SnowflakeConnection] = None, table_name: Optional[str] = None) -> dict[str, list[dict[str, Any]]]:
 
         metrics = []
         facts = []
 
         for measure in self.measures:
-            fact = measure.to_dict()
+            fact = measure.to_dict(connection, table_name)
             facts.append(fact)
-            if measure.create_metric_from_fact():
-                metrics.append(measure.create_metric_from_fact())
+
+            metric = measure.create_metric_from_fact(connection, table_name)
+            if metric:
+                metrics.append(metric)
 
         return {
             "metrics": metrics,
             "facts": facts
         }
 
-    def convert(self) -> dict[str, Any]:
+    def convert(self, connection: Optional[SnowflakeConnection] = None) -> dict[str, Any]:
 
         # dimensions could be time_dimensions or dimensions so separate out first
-        dimensions = [entity.to_dict() for entity in self.entities] or []
+        dimensions = [entity.to_dict(connection, self.node_relation.relation_name) for entity in self.entities] or []
         time_dimensions = []
         for dim in self.dimensions:
 
-            new_dim = dim.to_dict()
+            new_dim = dim.to_dict(connection, self.node_relation.relation_name)
 
             if dim.type == 'time':
                 time_dimensions.append(new_dim)
@@ -369,7 +437,7 @@ class SemanticModel:
 
         db, schema, table = self.node_relation.relation_name.split(".")
 
-        facts_and_metrics = self.split_facts_and_metrics()
+        facts_and_metrics = self.split_facts_and_metrics(connection, self.node_relation.relation_name)
 
         return semantics_schema.Table(
             name=self.name,
@@ -382,8 +450,8 @@ class SemanticModel:
             primary_key=semantics_schema.PrimaryKey(columns=[entity.name for entity in self.entities if entity.type == "primary"]).__dict__,
         ).__dict__
 
-    def to_dict(self) -> Dict[str, Any]:
-        x = self.convert()
+    def to_dict(self, connection: Optional[SnowflakeConnection] = None) -> Dict[str, Any]:
+        x = self.convert(connection)
         d = {}
         for key, value in x.items():
             if value is not None and value != []:
@@ -412,7 +480,6 @@ class SimpleMetric:
         )
 
     def convert(self) -> dict[str, Any]:
-
 
         agg = self.measure.agg
         measure = self.measure.name
@@ -465,7 +532,6 @@ class DerivedMetric:
             if spec.get('alias') is not None:
                 expr = expr.replace(spec['alias'], spec['name'])
 
-
         return semantics_schema.GlobalMetric(
             name=self.name,
             description=self.description,
@@ -515,7 +581,6 @@ class RatioMetric:
             denominator = self.denominator_specs
 
         expr = f"CAST({numerator} AS DOUBLE) / CAST(NULLIF({denominator}, 0) AS DOUBLE)"
-
 
         return semantics_schema.GlobalMetric(
             name=self.name,
@@ -880,9 +945,10 @@ class Manifest:
         Args:
             semantic_view_name: Name of the semantic view to be created.
             semantic_view_description: Description of the semantic view to be created.
-            parse_snowflake_columns: Whether to parse snowflake columns.
-                                     Only used if semantic models are not present in the manifest.json.
-                                     If set to True, descriptions of Snowflake columns will be added to the metadata.
+            parse_snowflake_columns: Whether to parse snowflake columns for metadata.
+                                     If True and semantic models are not present in the manifest.json, Snowflake column descriptions will be added to the metadata.
+                                     If semantic models are present, descriptions from the semantic models are used, not Snowflake column descriptions.
+                                     If True and semantic models are present, Snowflake column data types will be extracted.
 
         Returns:
             SemanticModel or list of objects of table metadata.
@@ -890,10 +956,15 @@ class Manifest:
         if len(self.semantic_models) > 0:
             self.extract_descriptions_from_models()
 
+            if parse_snowflake_columns:
+                connection = self.connection
+            else:
+                connection = None
+
             return semantics_schema.SemanticModel(
                 name=semantic_view_name if semantic_view_name is not None else "<placeholder>",
                 description=semantic_view_description if semantic_view_description is not None else "<placeholder>",
-                tables=[model.to_dict() for model in self.semantic_models],
+                tables=[model.to_dict(connection) for model in self.semantic_models],
                 metrics=[metric.to_dict() for metric in self.metrics],
                 relationships=self.get_relationships(),
             ).__dict__
