@@ -2878,7 +2878,7 @@ def render_catalog_sync_log_view():
                     st.session_state.btn_sync_task_details[f"btn_{id}"].update({"label":"Suspend"})
                     st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":False})
                 
-                if st.button(st.session_state.btn_sync_task_details[f"btn_{id}"]["label"], type="secondary", key=f"btn_{id}"):
+                if st.button(st.session_state.btn_sync_task_details[f"btn_{id}"]["label"], type="primary", key=f"btn_{id}"):
                     st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":True})
 
             with col12:
@@ -2964,16 +2964,120 @@ class BasePage(Page):
     
     def print_page(self):
         with st.sidebar:
-            add_radio = st.radio(
-                "Choose a shipping method",
-                ("Standard (5-15 days)", "Express (2-5 days)")
+            #logo
+            col1, col2, col3 = st.columns([0.4,1,0.5])
+            with col2:
+                u.render_image_menu("img/snowflake-logo-color-rgb@2x.png")
+
+            #header
+            col1, col2, col3 = st.columns([0.3,1.75,0.25])
+            with col2:
+                st.header("ICEBERG MIGRATOR")
+
+            #set menu header css
+            st.markdown(
+                """
+                <style>
+                .sidebar-divider-text {
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    color: #555;
+                    text-align: center;
+                    margin-top: 10px;
+                    margin-bottom: 5px;
+                }
+                .sidebar-divider {
+                    border-bottom: 1px solid #ccc;
+                    margin-bottom: 15px;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
             )
+
+            #Prerequisites
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Home</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("Home", use_container_width=True, key="sb_home", type="primary" if st.session_state.page == "home" else "secondary", on_click=set_page, args=["home"])
+            
+            #Prerequisites
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Prerequisites</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("Snowflake Prerequisites", use_container_width=True, type="secondary", key="sb_snowflake_prereqs"):
+                render_sf_prereqs()
+
+            if st.button("Delta Prerequisites", use_container_width=True, type="secondary", key="sb_delta_prereqs"):
+                render_delta_prereqs()
+
+            if st.button("AWS Glue Prerequisites", use_container_width=True, type="secondary", key="sb_aws_glue_prereqs"):
+                render_aws_glue_prereqs()
+
+            #Create
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Create</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("Create External Volume", use_container_width=True, type="primary" if st.session_state.page == "create_ev" else "secondary", on_click=set_page,args=("create_ev",), key="sb_create_ev")
+            st.button("Create Catalog Integration", use_container_width=True, type="primary" if st.session_state.page == "create_ci" else "secondary", on_click=set_page,args=("create_ci",), key="sb_create_ci")
+            st.button("Create External Access Integration", use_container_width=True, type="primary" if st.session_state.page == "create_eai" else "secondary", on_click=set_page,args=("create_eai",), key="sb_external_access_aws_glue")
+
+            #Migrate/Sync
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Migrate/Sync</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("Choose Snowflake Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_snowflake_tables" else "secondary", on_click=set_page,args=("choose_snowflake_tables",), key="sb_choose_fdn")
+            st.button("Choose Delta Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_delta_tables" else "secondary", on_click=set_page,args=("choose_delta_tables",), key="sb_choose_delta")
+            st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary" if st.session_state.page == "sync_iceberg_to_aws_glue" else "secondary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="sb_sync_iceberg_to_aws_glue")
+
+            #Migrate/Sync Logs
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Migrate/Sync Logs</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("View Migration Log", use_container_width=True, type="primary" if st.session_state.page == "migration_log" else "secondary", on_click=set_page,args=("migration_log",), key="sb_migration_log")
+            st.button("View Catalog Sync Log", use_container_width=True, type="primary" if st.session_state.page == "catalog_sync_log" else "secondary", on_click=set_page,args=("catalog_sync_log",), key="sb_catalog_sync_log")
+
+            #MConfig
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Config</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("View Tool Configuration", use_container_width=True, type="primary" if st.session_state.page == "configuration" else "secondary", on_click=set_page,args=("configuration",), key="sb_configuration")
     
         u.render_image("img/snowflake-logo-color-rgb@2x.png")
         
         st.markdown("<h1 style='text-align: center; color: black;'>ICEBERG MIGRATOR</h1>", unsafe_allow_html=True)
         st.write("")
-        st.write("The Iceberg Migrator tool allows a customer to perform bulk migrations of native Snowflake and Delta tables to Iceberg tables.")
+        st.write("The Iceberg Migrator tool allows users to perform bulk migrations of native Snowflake and Delta tables to Iceberg tables. This tool also supports the ability to sync Snowflake-managed Iceberg table metadata to an AWS Glue catalog.")
         st.divider()
 
 
@@ -2984,7 +3088,7 @@ class home(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear session_state when at home screen
+        #clear any previously set vars from session_state
         clear_c2i_session_vars()
 
         st.markdown(
@@ -2998,45 +3102,30 @@ class home(BasePage):
             unsafe_allow_html=True,
         )
 
-        st.markdown(
-            """
-            <style>
-            div[data-testid='stVerticalBlock']:has(div#chat_inner):not(:has(div#chat_outer)){
-                width: 730px !important; /* Set desired width as a percentage or fixed value */
-                max-width: 1000px; /* Optional: Set a maximum width */
-                margin: auto; /* Center the container */
-                padding: 0px;
-                #border: 1px solid #ccc;
-            }
-            </style>
-            """, unsafe_allow_html=True
-        )
-
         prereq_menu = st.container()
-        st.markdown("<div id = 'chat_outer' />", unsafe_allow_html=True)
 
         with prereq_menu:
-            st.markdown("<div id='chat_inner' >", unsafe_allow_html=True)
-    
-            col1, col2, col3, col4, col5 = st.columns([0.85,0.85,0.85,0.85,0.85])
-    
-            st.markdown('</div>', unsafe_allow_html=True)
-    
+            col1, col2, col3 = st.columns([1.1,1,1])
             with col2:
+                st.markdown("<h3 style='text-align: center; color: black;'>Prerequisites</h3>", unsafe_allow_html=True)
+    
+            col1, col2, col3 = st.columns(3)    
+            with col1:
                 st.write("")
-                if st.button("Snowflake Prerequisites", type="primary"):
+                if st.button("Snowflake Prerequisites", use_container_width=True, type="primary"):
                     render_sf_prereqs()
                     
-            with col3:
+            with col2:
                 st.write("")
-                if st.button("Delta Prerequisites", type="primary"):
+                if st.button("Delta Prerequisites", use_container_width=True, type="primary"):
                     render_delta_prereqs()
     
-            with col4:
+            with col3:
                 st.write("")
-                if st.button("AWS Glue Prerequisites", type="primary"):
+                if st.button("AWS Glue Prerequisites", use_container_width=True, type="primary"):
                     render_aws_glue_prereqs()
-
+        
+        st.write("")
         st.divider()
 
 
@@ -3051,10 +3140,7 @@ class home(BasePage):
                         Create a new External Volume to use for Iceberg tables.
                         """)
            st.write("")
-
-           ev_col1, ev_col2, ev_col3 = st.columns([0.25,0.55,0.25], gap="small")
-           with ev_col2:
-                st.button("Create External Volume", type="primary", on_click=set_page,args=("create_ev",), key="btn_create_ev")
+           st.button("Create External Volume", use_container_width=True, type="primary", on_click=set_page,args=("create_ev",), key="btn_create_ev")
 
         with col2:
            st.markdown("<h3 style='text-align: center; color: black;'>Catalog Integration</h3>", unsafe_allow_html=True)
@@ -3067,10 +3153,7 @@ class home(BasePage):
                         Create a new Catalog Integration for Delta files in object storage.
                         """)
            st.write("")
-
-           ci_col1, ci_col2, ctiol3 = st.columns([0.25,0.55,0.25], gap="small")
-           with ci_col2:
-                st.button("Create Catalog Integration", type="primary", on_click=set_page,args=("create_ci",), key="btn_create_ci")
+           st.button("Create Catalog Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_ci",), key="btn_create_ci")
 
         with col3:
             st.markdown("<h3 style='text-align: center; color: black;'>External Access</h3>", unsafe_allow_html=True)
@@ -3081,11 +3164,7 @@ class home(BasePage):
                         Create an External Access Integration to access AWS Glue.
                         """)
             st.write("") 
-
-            qc_col1, qc_col2, qc_col3 = st.columns([0.5,1.5,0.5], gap="small")
-            with qc_col2:
-                st.button("Create External Access Integration", type="primary", on_click=set_page,args=("create_eai",), key="btn_external_access_aws_glue")
-
+            st.button("Create External Access Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_eai",), key="btn_external_access_aws_glue")
 
         st.write("")
         st.write("")
@@ -3104,10 +3183,7 @@ class home(BasePage):
                         Choose existing FDN tables to migrate to Iceberg.
                         """)
            st.write("")
-
-           cs_col1, cs_col2, cs_col3 = st.columns([0.2125,0.95,0.3], gap="small")
-           with cs_col2:
-                st.button("Choose Snowflake Tables", type="primary", on_click=set_page,args=("choose_snowflake_tables",), key="btn_choose_fdn")
+           st.button("Choose Snowflake Tables", use_container_width=True, type="primary", on_click=set_page,args=("choose_snowflake_tables",), key="btn_choose_fdn")
 
         with col2:
            st.markdown("<h3 style='text-align: center; color: black;'>Delta Tables</h3>", unsafe_allow_html=True)
@@ -3120,10 +3196,7 @@ class home(BasePage):
                         Choose existing Delta table files to migrate to Iceberg.
                         """)
            st.write("")
-
-           cd_col1, cd_col2, cd_col3 = st.columns([0.215,0.6,0.30], gap="small")
-           with cd_col2:
-                st.button("Choose Delta Tables", type="primary", on_click=set_page,args=("choose_delta_tables",), key="btn_choose_delta")   
+           st.button("Choose Delta Tables", use_container_width=True, type="primary", on_click=set_page,args=("choose_delta_tables",), key="btn_choose_delta")   
         
         with col3:
            st.markdown("<h3 style='text-align: center; color: black;'>Sync to AWS Glue</h3>", unsafe_allow_html=True)
@@ -3134,10 +3207,7 @@ class home(BasePage):
                         Sync Snowflake-Managed Iceberg Tables to AWS Glue. 
                         """)
            st.write("")
-
-           cq_col1, cq_col2, cq_col3 = st.columns([0.2,0.55,0.25], gap="small")
-           with cq_col2: 
-               st.button("Sync Iceberg to AWS Glue", type="primary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="btn_sync_iceberg_to_aws_glue") 
+           st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="btn_sync_iceberg_to_aws_glue") 
         
         st.write("")
         st.write("")
@@ -3154,10 +3224,7 @@ class home(BasePage):
                         View the logs and status of each Iceberg migration run. 
                         """)
            st.write("")
-
-           cq_col1, cq_col2, cq_col3 = st.columns([0.2,0.55,0.25], gap="small")
-           with cq_col2: 
-               st.button("View Migration Log", type="primary", on_click=set_page,args=("migration_log",), key="btn_migration_log")
+           st.button("View Migration Log", use_container_width=True, type="primary", on_click=set_page,args=("migration_log",), key="btn_migration_log")
  
         with col2:
            st.markdown("<h3 style='text-align: center; color: black;'>Catalog Sync Log</h3>", unsafe_allow_html=True)
@@ -3168,10 +3235,7 @@ class home(BasePage):
                         View the status of each Iceberg table synced to an external catalog. 
                         """)
            st.write("")
-
-           cq_col1, cq_col2, cq_col3 = st.columns([0.2,0.55,0.25], gap="small")
-           with cq_col2: 
-               st.button("View Catalog Sync Log", type="primary", on_click=set_page,args=("catalog_sync_log",), key="btn_catalog_sync_log")
+           st.button("View Catalog Sync Log", use_container_width=True, type="primary", on_click=set_page,args=("catalog_sync_log",), key="btn_catalog_sync_log")
         
         
         with col3:
@@ -3183,10 +3247,7 @@ class home(BasePage):
                         View and/or update the tool's configuration settings.
                         """)
            st.write("") 
-
-           qc_col1, qc_col2, qc_col3 = st.columns([0.5,1.5,0.5], gap="small")
-           with qc_col2:
-                st.button("View Tool Configuration", type="primary", on_click=set_page,args=("configuration",), key="btn_configuration")
+           st.button("View Tool Configuration", use_container_width=True, type="primary", on_click=set_page,args=("configuration",), key="btn_configuration")
 
         
 
@@ -3200,6 +3261,9 @@ class create_ev_page(BasePage):
     def print_page(self):
         super().print_page()
 
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
+
         #render create new External Volume wizard
         render_create_ev()
 
@@ -3211,6 +3275,9 @@ class create_ci_page(BasePage):
         
     def print_page(self):
         super().print_page()
+
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
 
         #render create new Catalog Integration page
         render_create_ci()
@@ -3224,6 +3291,9 @@ class create_eai_page(BasePage):
     def print_page(self):
         super().print_page()
 
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
+
         #render create new External Access Integration page
         render_create_eai()
 
@@ -3235,6 +3305,9 @@ class choose_snowflake_tables_page(BasePage):
         
     def print_page(self):
         super().print_page()
+
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
 
         #render Choose Snowflake FDN tables wizard
         render_choose_snowflake_tables_wizard_view()
@@ -3248,6 +3321,9 @@ class choose_delta_tables_page(BasePage):
     def print_page(self):
         super().print_page()
 
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
+
         #render Choose Delta Tables wizard
         render_choose_delta_tables_wizard_view()
         
@@ -3259,6 +3335,9 @@ class sync_iceberg_to_aws_glue_page(BasePage):
         
     def print_page(self):
         super().print_page()
+
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
 
         #render sync Iceberg tables to AWS Glue wizard
         render_choose_iceberg_tables_aws_sync_wizard_view()
@@ -3272,6 +3351,9 @@ class migration_log(BasePage):
     def print_page(self):
         super().print_page()
 
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
+
         #render Migration Log
         render_migration_log_view()
         
@@ -3284,6 +3366,9 @@ class catalog_sync_log(BasePage):
     def print_page(self):
         super().print_page()
 
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
+
         #render Catalog Sync Log
         render_catalog_sync_log_view()
 
@@ -3295,6 +3380,9 @@ class configuration_page(BasePage):
         
     def print_page(self):
         super().print_page()
+
+        #clear any previously set vars from session_state
+        clear_c2i_session_vars()
 
         #render Configuration view
         render_configuration_view()
