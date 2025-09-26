@@ -3050,10 +3050,10 @@ class BasePage(Page):
             st.button("Choose Delta Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_delta_tables" else "secondary", on_click=set_page,args=("choose_delta_tables",), key="sb_choose_delta")
             st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary" if st.session_state.page == "sync_iceberg_to_aws_glue" else "secondary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="sb_sync_iceberg_to_aws_glue")
 
-            #Migrate/Sync Logs
+            #Logs
             st.markdown(
                 """
-                <div class="sidebar-divider-text">Migrate/Sync Logs</div>
+                <div class="sidebar-divider-text">Logs</div>
                 <div class="sidebar-divider"></div>
                 """,
                 unsafe_allow_html=True
