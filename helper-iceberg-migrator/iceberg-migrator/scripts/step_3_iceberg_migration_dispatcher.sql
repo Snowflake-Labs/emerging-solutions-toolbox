@@ -35,6 +35,8 @@ $$
     // 05/14/2025   S Ramsey    Add support for clustering target table
     // 05/15/2025   M Henderson Updated MIGRATE_TABLE_TO_ICEBERG call to include TABLE_TYPE and
     //                          TABLE_LOCATION, and DELTA_CATALOG_INTEGRATION
+    // 09/17/2025   M Henderson Updated MIGRATE_TABLE_TO_ICEBERG call to include AWS Glue-related
+    //                          fields.
     // ---------------------------------------------------------------------------------------------
 
     // ----- Standard tag 
@@ -118,8 +120,31 @@ $$
                 let tbl_schema = (tbl_rs.TABLE_SCHEMA == null) ? null : `'${tbl_rs.TABLE_SCHEMA}'`;
                 let target_tbl_catalog = (tbl_rs.TARGET_TABLE_CATALOG == null) ? null : `'${tbl_rs.TARGET_TABLE_CATALOG}'`;
                 let target_tbl_schema = (tbl_rs.TARGET_TABLE_SCHEMA == null) ? null : `'${tbl_rs.TARGET_TABLE_SCHEMA}'`;
+                let update_frequency_mins = (tbl_rs.UPDATE_FREQUENCY_MINS == null) ? null : `${tbl_rs.UPDATE_FREQUENCY_MINS}`;
+                let warehouse = (tbl_rs.WAREHOUSE == null) ? null : `'${tbl_rs.WAREHOUSE}'`;
 
-                task_itm['proc'] = `ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATE_TABLE_TO_ICEBERG(${tbl_rs.TABLE_INSTANCE_ID}, ${run_id},'${tbl_rs.TABLE_TYPE}',${tbl_location},${tbl_catalog},${tbl_schema}, '${tbl_rs.TABLE_NAME}',${target_tbl_catalog}, ${target_tbl_schema}, '${settings.external_volume}', '${settings.delta_catalog_integration}', '${settings.location_pattern}', parse_json('${JSON.stringify(tbl_rs.TABLE_CONFIGURATION)}'), ${settings.truncate_time}, '${settings.timezone_conversion}', ${settings.count_only_validation})`
+                task_itm['proc'] = `ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATE_TABLE_TO_ICEBERG(
+                                        ${tbl_rs.TABLE_INSTANCE_ID}
+                                        ,${run_id}
+                                        ,'${tbl_rs.TABLE_TYPE}'
+                                        ,${tbl_location}
+                                        ,${tbl_catalog}
+                                        ,${tbl_schema}
+                                        ,'${tbl_rs.TABLE_NAME}'
+                                        ,'${tbl_rs.TARGET_TYPE}'
+                                        ,${target_tbl_catalog}
+                                        ,${target_tbl_schema}
+                                        ,'${tbl_rs.TARGET_TABLE_NAME}'
+                                        ,${update_frequency_mins}
+                                        ,${warehouse}
+                                        ,'${settings.external_volume}'
+                                        ,'${settings.delta_catalog_integration}'
+                                        ,'${settings.location_pattern}'
+                                        ,'${settings.aws_glue_external_access_integration}'
+                                        ,parse_json('${JSON.stringify(tbl_rs.TABLE_CONFIGURATION)}')
+                                        ,${settings.truncate_time}
+                                        ,'${settings.timezone_conversion}'
+                                        ,${settings.count_only_validation})`
                 task_arr.push(task_itm)
                 tbl_id_arr.push(tbl_rs.TABLE_INSTANCE_ID)
                 task_cnt++
