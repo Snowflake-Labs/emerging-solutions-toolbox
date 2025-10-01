@@ -10,7 +10,7 @@ USE SCHEMA IDENTIFIER($T2I_SCH);
 CREATE or REPLACE PROCEDURE iceberg_migration_end_task(RUN_ID FLOAT)
 RETURNS VARIANT 
 LANGUAGE JAVASCRIPT 
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}}' 
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}' 
 EXECUTE AS CALLER 
 AS
 $$
@@ -30,7 +30,7 @@ $$
     // 05/16/2025   M Henderson Add support to remove delta table-related objects created during run
     // ---------------------------------------------------------------------------------------------
     // ----- Standard tag 
-    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 2}}
+    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 3}}
 
     // -- Define return value
     var ret = {}

@@ -504,8 +504,8 @@ def manual_migration_log_check():
                                                     
                                                     SELECT
                                                         * EXCLUDE(row_number)
-                                                    FROM log_cte
-                                                    WHERE row_number = (SELECT MAX(row_number) FROM log_cte WHERE table_id = log_cte.table_id AND run_id = log_cte.run_id GROUP BY ALL);
+                                                    FROM log_cte c1
+                                                    WHERE row_number = (SELECT MAX(row_number) FROM log_cte c2 WHERE c1.table_id = c2.table_id AND c1.run_id = c2.run_id GROUP BY ALL);
                                                     """).collect())
 
     return df_migration_log_check
@@ -1438,6 +1438,9 @@ def render_choose_snowflake_tables_wizard_view():
         
     if "snowflake_target_sch" not in st.session_state:
         st.session_state.snowflake_target_sch = None
+        
+    if "master_table_list" not in st.session_state:
+        st.session_state.master_table_list = None
 
     master_table_list = []
 
@@ -3033,9 +3036,26 @@ class BasePage(Page):
                 unsafe_allow_html=True
             )
 
-            st.button("Create External Volume", use_container_width=True, type="primary" if st.session_state.page == "create_ev" else "secondary", on_click=set_page,args=("create_ev",), key="sb_create_ev")
-            st.button("Create Catalog Integration", use_container_width=True, type="primary" if st.session_state.page == "create_ci" else "secondary", on_click=set_page,args=("create_ci",), key="sb_create_ci")
-            st.button("Create External Access Integration", use_container_width=True, type="primary" if st.session_state.page == "create_eai" else "secondary", on_click=set_page,args=("create_eai",), key="sb_external_access_aws_glue")
+            if st.button("Create External Volume", use_container_width=True, type="primary" if st.session_state.page == "create_ev" else "secondary", key="sb_create_ev"): 
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_ev")
+                
+            if st.button("Create Catalog Integration", use_container_width=True, type="primary" if st.session_state.page == "create_ci" else "secondary", key="sb_create_ci"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_ci")
+                
+            if st.button("Create External Access Integration", use_container_width=True, type="primary" if st.session_state.page == "create_eai" else "secondary", key="sb_external_access_aws_glue"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_eai")
 
             #Migrate/Sync
             st.markdown(
@@ -3046,9 +3066,26 @@ class BasePage(Page):
                 unsafe_allow_html=True
             )
 
-            st.button("Choose Snowflake Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_snowflake_tables" else "secondary", on_click=set_page,args=("choose_snowflake_tables",), key="sb_choose_fdn")
-            st.button("Choose Delta Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_delta_tables" else "secondary", on_click=set_page,args=("choose_delta_tables",), key="sb_choose_delta")
-            st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary" if st.session_state.page == "sync_iceberg_to_aws_glue" else "secondary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="sb_sync_iceberg_to_aws_glue")
+            if st.button("Choose Snowflake Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_snowflake_tables" else "secondary", key="sb_choose_fdn"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("choose_snowflake_tables")
+                
+            if st.button("Choose Delta Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_delta_tables" else "secondary", key="sb_choose_delta"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("choose_delta_tables")
+                
+            if st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary" if st.session_state.page == "sync_iceberg_to_aws_glue" else "secondary", key="sb_sync_iceberg_to_aws_glue"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("sync_iceberg_to_aws_glue")
 
             #Logs
             st.markdown(
@@ -3059,8 +3096,19 @@ class BasePage(Page):
                 unsafe_allow_html=True
             )
 
-            st.button("View Migration Log", use_container_width=True, type="primary" if st.session_state.page == "migration_log" else "secondary", on_click=set_page,args=("migration_log",), key="sb_migration_log")
-            st.button("View Catalog Sync Log", use_container_width=True, type="primary" if st.session_state.page == "catalog_sync_log" else "secondary", on_click=set_page,args=("catalog_sync_log",), key="sb_catalog_sync_log")
+            if st.button("View Migration Log", use_container_width=True, type="primary" if st.session_state.page == "migration_log" else "secondary", key="sb_migration_log"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("migration_log")
+                
+            if st.button("View Catalog Sync Log", use_container_width=True, type="primary" if st.session_state.page == "catalog_sync_log" else "secondary", key="sb_catalog_sync_log"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("catalog_sync_log")
 
             #MConfig
             st.markdown(
@@ -3071,7 +3119,12 @@ class BasePage(Page):
                 unsafe_allow_html=True
             )
 
-            st.button("View Tool Configuration", use_container_width=True, type="primary" if st.session_state.page == "configuration" else "secondary", on_click=set_page,args=("configuration",), key="sb_configuration")
+            if st.button("View Tool Configuration", use_container_width=True, type="primary" if st.session_state.page == "configuration" else "secondary", key="sb_configuration"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("configuration")
     
         u.render_image("img/snowflake-logo-color-rgb@2x.png")
         
@@ -3261,9 +3314,6 @@ class create_ev_page(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
-
         #render create new External Volume wizard
         render_create_ev()
 
@@ -3275,9 +3325,6 @@ class create_ci_page(BasePage):
         
     def print_page(self):
         super().print_page()
-
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
 
         #render create new Catalog Integration page
         render_create_ci()
@@ -3291,9 +3338,6 @@ class create_eai_page(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
-
         #render create new External Access Integration page
         render_create_eai()
 
@@ -3305,9 +3349,6 @@ class choose_snowflake_tables_page(BasePage):
         
     def print_page(self):
         super().print_page()
-
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
 
         #render Choose Snowflake FDN tables wizard
         render_choose_snowflake_tables_wizard_view()
@@ -3321,9 +3362,6 @@ class choose_delta_tables_page(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
-
         #render Choose Delta Tables wizard
         render_choose_delta_tables_wizard_view()
         
@@ -3335,9 +3373,6 @@ class sync_iceberg_to_aws_glue_page(BasePage):
         
     def print_page(self):
         super().print_page()
-
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
 
         #render sync Iceberg tables to AWS Glue wizard
         render_choose_iceberg_tables_aws_sync_wizard_view()
@@ -3351,9 +3386,6 @@ class migration_log(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
-
         #render Migration Log
         render_migration_log_view()
         
@@ -3366,9 +3398,6 @@ class catalog_sync_log(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
-
         #render Catalog Sync Log
         render_catalog_sync_log_view()
 
@@ -3380,9 +3409,6 @@ class configuration_page(BasePage):
         
     def print_page(self):
         super().print_page()
-
-        #clear any previously set vars from session_state
-        clear_c2i_session_vars()
 
         #render Configuration view
         render_configuration_view()

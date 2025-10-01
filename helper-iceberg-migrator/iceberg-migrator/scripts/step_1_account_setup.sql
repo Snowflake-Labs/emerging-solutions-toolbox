@@ -22,7 +22,7 @@ CREATE SCHEMA IF NOT EXISTS ICEBERG_MIGRATOR_DB.ICEBERG_STAGING;
 
 --create ICEBERG_MIGRATOR_WH warehouse
 CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($T2I_WH) WITH WAREHOUSE_SIZE = 'XSMALL'
-  COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}}';
+  COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}';
 
 --create streamlit
 USE SCHEMA ICEBERG_MIGRATOR_DB.STREAMLIT;

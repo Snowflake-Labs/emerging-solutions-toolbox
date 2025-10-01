@@ -48,6 +48,7 @@ USE SCHEMA IDENTIFIER($T2I_SCH);
 CREATE OR REPLACE PROCEDURE GLUE_SYNC_TASK_MANAGER()
 RETURNS VARCHAR
 LANGUAGE SQL
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}' 
 AS
 $$
  declare

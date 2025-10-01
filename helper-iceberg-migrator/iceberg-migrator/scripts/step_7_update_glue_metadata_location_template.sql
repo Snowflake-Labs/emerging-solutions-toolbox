@@ -60,6 +60,7 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
 PACKAGES = ('boto3','botocore', 'snowflake-snowpark-python')
 HANDLER = 'check_and_update'
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}'
 EXECUTE AS CALLER
 AS 
 $$

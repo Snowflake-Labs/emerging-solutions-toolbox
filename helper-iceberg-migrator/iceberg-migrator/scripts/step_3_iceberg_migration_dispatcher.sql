@@ -10,7 +10,7 @@ USE SCHEMA IDENTIFIER($T2I_SCH);
 CREATE or REPLACE PROCEDURE iceberg_migration_dispatcher()
 RETURNS VARIANT 
 LANGUAGE JAVASCRIPT
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}}' 
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}' 
 EXECUTE AS CALLER 
 AS
 $$
@@ -40,7 +40,7 @@ $$
     // ---------------------------------------------------------------------------------------------
 
     // ----- Standard tag 
-    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 2}}
+    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 3}}
 
     // ----- Define return value
     var ret = {}

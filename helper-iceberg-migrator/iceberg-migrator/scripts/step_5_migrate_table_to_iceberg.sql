@@ -83,7 +83,7 @@ $$
 	// 09/17/2025	M Henderson Add support for syncing Snowflake iceberg table metadata to AWS Glue
     // ---------------------------------------------------------------------------------------------
     // ----- Standard tag 
-    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 2}}
+    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 3}}
 
     // ----- Define return value
     var ret = {}

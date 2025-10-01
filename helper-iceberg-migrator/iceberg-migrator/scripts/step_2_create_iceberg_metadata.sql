@@ -29,7 +29,7 @@ CREATE OR REPLACE TABLE MIGRATION_RUN_LOG
  END_TIME        timestamp              COMMENT 'End time of the iceberg migration',
  CONSTRAINT PK_1 PRIMARY KEY ( RUN_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Runtime information for the complete execution of a group of tables"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Runtime information for the complete execution of a group of tables"}';
 
 --  MIGRATION_TABLE
 CREATE OR REPLACE TABLE MIGRATION_TABLE
@@ -50,7 +50,7 @@ CREATE OR REPLACE TABLE MIGRATION_TABLE
  INSERT_DATE           timestamp    NOT NULL DEFAULT current_timestamp(),
  CONSTRAINT PK_1 PRIMARY KEY ( TABLE_INSTANCE_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Queue of tables to migrate to iceberg"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Queue of tables to migrate to iceberg"}';
 
 --  MIGRATION_LOG
 CREATE OR REPLACE TABLE MIGRATION_TABLE_LOG
@@ -65,7 +65,7 @@ CREATE OR REPLACE TABLE MIGRATION_TABLE_LOG
  CONSTRAINT FK_1 FOREIGN KEY ( RUN_ID )             REFERENCES MIGRATION_RUN_LOG    ( RUN_ID ),
  CONSTRAINT FK_2 FOREIGN KEY ( TABLE_INSTANCE_ID )  REFERENCES MIGRATION_TABLE      ( TABLE_INSTANCE_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Runtime information for a table load"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Runtime information for a table load"}';
 
 --  SNOWFLAKE_TOOL_CONFIG
 CREATE OR REPLACE TABLE SNOWFLAKE_TOOL_CONFIG
@@ -76,7 +76,7 @@ CREATE OR REPLACE TABLE SNOWFLAKE_TOOL_CONFIG
 
  CONSTRAINT PK_1 PRIMARY KEY ( TOOL_NAME, TOOL_PARAMETER )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"The configuration table contains customer specific configuration information used by various PS developed tools"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"The configuration table contains customer specific configuration information used by various PS developed tools"}';
 
 
 -- Populate the SNOWFLAKE_TOOL_CONFIG table
@@ -116,7 +116,7 @@ CREATE OR REPLACE TABLE ICEBERG_METADATA_SYNC
  INSERT_DATE                    timestamp    NOT NULL DEFAULT current_timestamp(),
  CONSTRAINT PK_1 PRIMARY KEY ( TABLE_INSTANCE_ID,  TABLE_RUN_ID)
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Queue of iceberg tables to sync to external catalog"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Queue of iceberg tables to sync to external catalog"}';
 
 
 --unset vars
