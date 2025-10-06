@@ -2968,12 +2968,12 @@ class BasePage(Page):
     def print_page(self):
         with st.sidebar:
             #logo
-            col1, col2, col3 = st.columns([0.4,1,0.5])
+            col1, col2, col3 = st.columns([0.5,1,0.5])
             with col2:
                 u.render_image_menu("img/snowflake-logo-color-rgb@2x.png")
 
             #header
-            col1, col2, col3 = st.columns([0.3,1.75,0.25])
+            col1, col2, col3 = st.columns([0.5,1.75,0.25])
             with col2:
                 st.header("ICEBERG MIGRATOR")
 
