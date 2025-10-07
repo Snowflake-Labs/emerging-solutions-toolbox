@@ -1049,6 +1049,10 @@ def render_create_eai():
     create_secret_ddl = ""
     flag_secret_selected = False
     flag_create_secret = False
+    
+    eai_si = ""
+    create_si_ddl = ""
+    flag_create_si = False
 
     eai_nr = ""
     eai_nr_values = ""
@@ -1099,7 +1103,7 @@ def render_create_eai():
             st.write("")
             st.write("")
             st.write("")
-            st.markdown("<h6 style='text-align: left; color: black;'>Create new Secret</h6>", unsafe_allow_html=True)
+            st.markdown("<h6 style='text-align: left; color: black;'>Create New Secret</h6>", unsafe_allow_html=True)
 
             secret_db = ""
             secret_sch = ""
@@ -1126,9 +1130,6 @@ def render_create_eai():
             txt_secret_name = st.text_input('Secret Name:'
                                         , key = "txt_secret_name"
                                         )
-            
-            #st.write("")
-
             #set secret type
             secret_type_list = ["Choose...","password","cloud_provider_token"]
 
@@ -1170,14 +1171,46 @@ def render_create_eai():
                     select_si_list = []
                     
                     if not st.session_state.eai_si.empty :
-                        select_si_list = ["Choose..."] + filtered_eai_si["name"].values.tolist()
+                        select_si_list = ["Choose..."] + filtered_eai_si["name"].values.tolist() + ["Create new..."]
                     else:
-                        select_si_list = ["Choose..."]
+                        select_si_list = ["Choose...", "Create new..."]
 
                     sb_eai_si = st.selectbox("Select Security Integration:"
                                             , select_si_list
                                             , key = "sb_eai_si"
                                             )
+                    
+                    if sb_eai_si not in ["Choose...", "Create new..."]:
+                        eai_si = sb_eai_si
+                    
+                    if sb_eai_si == "Create new...":
+                        st.write("")
+                        st.write("")
+                        st.write("")
+                        st.markdown("<h6 style='text-align: left; color: black;'>Create New Security Integration</h6>", unsafe_allow_html=True)
+                        
+                        #security integration name
+                        txt_si_name = st.text_input('Security Integration Name:'
+                                                    , key = "txt_si_name"
+                                                    )
+                        
+                        #aws_role_arn
+                        txt_si_aws_role_arn = st.text_input('AWS Role ARN'
+                                                    , key = "txt_si_aws_role_arn"
+                                                    , help = "i.e.: arn:aws:iam::123456789012:role/myrole"
+                                                    )
+                        
+                        #create security integration ddl
+                        if all(v != "" for v in [txt_si_name, txt_si_aws_role_arn]):
+                            create_si_ddl = f"""CREATE OR REPLACE SECURITY INTEGRATION {txt_si_name}
+                                                        TYPE = API_AUTHENTICATION
+                                                        AUTH_TYPE = AWS_IAM
+                                                        ENABLED = TRUE
+                                                        AWS_ROLE_ARN = '{txt_si_aws_role_arn}';"""
+                                                        
+                            eai_si = txt_si_name
+                            flag_create_si = True
+                        
                     
                     txt_si_iam_role = """The Security Integration requires an IAM role with AWS Glue permissions. i.e.
 
@@ -1203,21 +1236,17 @@ def render_create_eai():
         ]
     }
 
-
 - AWS documentation to create an IAM role: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html
 - Add permissions for AWS Glue: https://docs.aws.amazon.com/glue/latest/dg/set-up-iam.html
-- Add permissions for AWS Athena: https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
-- Execute `DESCRIBE SECURITY INTEGRATION <integration_name>` to set the **API_AWS_IAM_USER_ARN** and **API_AWS_EXTERNAL_ID** values for the IAM user. 
-    - Follow **Step 5** in Option 1: Configuring a Snowflake storage integration to access Amazon S3 to grant the IAM user access to the Amazon S3 service: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration 
-                    """
+- Add permissions for AWS Athena: https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html"""
+                    
                     st.write("")
-                    #st.write("")
                     st.warning(txt_si_iam_role, icon="⚠️")
                     
-                    if all(v != "" for v in [secret_db, secret_sch, txt_secret_name, sb_eai_si]):
+                    if all(v != "" for v in [secret_db, secret_sch, txt_secret_name, eai_si]):
                         create_secret_ddl = f"""CREATE OR REPLACE SECRET {secret_db}.{secret_sch}.{txt_secret_name}
                                           TYPE = CLOUD_PROVIDER_TOKEN
-                                          API_AUTHENTICATION = {sb_eai_si};"""
+                                          API_AUTHENTICATION = {eai_si};"""
 
                         flag_secret_selected = True
                         flag_create_secret = True
@@ -1229,7 +1258,7 @@ def render_create_eai():
     st.write("")
     st.write("")
     st.markdown("<h6 style='text-align: left; color: black;'>Network Rules with AWS Glue/Athena access</h6>", unsafe_allow_html=True)
-    #fetch security integrations
+    #fetch network rules
     with st.spinner("Fetching Network Rules..."):
         if not st.session_state.eai_nr_check:
             #call run_sis_cmd to get network rules --SiS cannot execute this show command
@@ -1302,7 +1331,7 @@ def render_create_eai():
         
     st.write("#")
 
-    #create catalog integration
+    #create external access integration
     col1, col2, col3 = st.columns([3.5,3.5,0.975])
 
     with col1:
@@ -1320,6 +1349,8 @@ def render_create_eai():
 
     if flag_create_eai:
         with st.spinner("Updating..."):
+            if flag_create_si:
+                session.sql(create_si_ddl).collect()
             if flag_create_secret:
                 session.sql(create_secret_ddl).collect()
             if flag_create_nr:
@@ -1332,27 +1363,63 @@ def render_create_eai():
             
             #get ddl for update_glue_metadata_location_template proc
             glue_proc_template_ddl = pd.DataFrame(session.sql(f"""SELECT GET_DDL('procedure'
-                                                     ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)'
+                                                     ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)'
                                                      , TRUE);""").collect()).iloc[0,0]
             
             #set new glue proc name
             glue_proc_name = f"UPDATE_GLUE_METADATA_LOCATION_{txt_eai_name}"
 
             #replace the proc's name with the name for this EAI
-            template_proc_name_pattern = re.compile("UPDATE_GLUE_METADATA_LOCATION_TEMPLATE", re.IGNORECASE)
-            new_glue_proc_ddl = template_proc_name_pattern.sub(glue_proc_name, glue_proc_template_ddl)
+            template_proc_name_pattern = re.compile("ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE", re.IGNORECASE)
+            new_glue_proc_ddl = template_proc_name_pattern.sub(f"AWS_GLUE_SYNC.{glue_proc_name.upper()}", glue_proc_template_ddl)
             
             session.sql(f"""{new_glue_proc_ddl}""").collect()
             
             #set proc's EAI and secret
-            session.sql(f"""ALTER PROCEDURE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.{glue_proc_name}(VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)
+            session.sql(f"""ALTER PROCEDURE ICEBERG_MIGRATOR_DB.AWS_GLUE_SYNC.{glue_proc_name.upper()}(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)
                             SET EXTERNAL_ACCESS_INTEGRATIONS = ({txt_eai_name}), SECRETS = ('cred'={eai_secret});""").collect()
             
             eai_created = True            
 
     if eai_created:
         st.write("")
+        st.write("")
         st.success(f"External Access Integration: **{txt_eai_name}** successfully created. 🎉")
+        
+        if sb_eai_secret_type == "cloud_provider_token":
+            api_aws_iam_user_arn = ""
+            api_aws_external_id = ""
+            txt_si_iam_user = ""
+            with st.spinner(f"Fetching Security Integration Details..."):
+                #describe the security integration chosen/created and inform the user to use the values to set the IAM User
+                desc_si = run_sis_cmd(f"DESCRIBE SECURITY INTEGRATION {eai_si}", True)
+                
+                if not desc_si.empty:
+                    api_aws_iam_user_arn = desc_si[desc_si["property"] == 'API_AWS_IAM_USER_ARN'].iloc[0,2]
+                    api_aws_external_id = desc_si[desc_si["property"] == 'API_AWS_EXTERNAL_ID'].iloc[0,2]
+                    
+                    txt_si_iam_user = f"""Follow **Step 5** in Option 1: Configuring a Snowflake storage integration to access Amazon S3 to grant the IAM user access to the Amazon S3 service: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
+
+Copy the values below for Security Integration: **{eai_si.upper()}**."""
+                        
+            st.write("")
+            st.warning(txt_si_iam_user, icon="⚠️")
+
+            with st.container(border=True):
+                st.write("")
+                col1, col2 = st.columns([0.9,1.9])
+                with col1:
+                    st.write("")
+                    st.markdown("**API_AWS_IAM_USER_ARN:**")
+                with col2:
+                    st.code(f"{api_aws_iam_user_arn}")
+    
+                col1, col2 = st.columns([0.9,1.9])
+                with col1:
+                    st.write("")
+                    st.markdown("**API_AWS_EXTERNAL_ID:**")
+                with col2:
+                    st.code(f"{api_aws_external_id}")
 
 
 def render_choose_snowflake_tables_wizard_view():
@@ -2667,7 +2734,7 @@ def render_choose_iceberg_tables_aws_sync_wizard_view():
 
                         #get the proc using the template ddl
                         glue_proc_template_ddl = pd.DataFrame(session.sql(f"""SELECT GET_DDL('procedure'
-                                                                                            ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(FLOAT,FLOAT,STRING,STRING,STRING,STRING,STRING)'
+                                                                                            ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)'
                                                                                             ,TRUE
                                                                                             );""").collect()).iloc[0,0]
                         
@@ -3044,7 +3111,7 @@ class BasePage(Page):
             if st.button("Delta Prerequisites", use_container_width=True, type="secondary", key="sb_delta_prereqs"):
                 render_delta_prereqs()
 
-            if st.button("AWS Glue Prerequisites", use_container_width=True, type="secondary", key="sb_aws_glue_prereqs"):
+            if st.button("AWS Glue Sync Prerequisites", use_container_width=True, type="secondary", key="sb_aws_glue_prereqs"):
                 render_aws_glue_prereqs()
 
             #Create
@@ -3195,7 +3262,7 @@ class home(BasePage):
     
             with col3:
                 st.write("")
-                if st.button("AWS Glue Prerequisites", use_container_width=True, type="primary"):
+                if st.button("AWS Glue Sync Prerequisites", use_container_width=True, type="primary"):
                     render_aws_glue_prereqs()
         
         st.write("")
