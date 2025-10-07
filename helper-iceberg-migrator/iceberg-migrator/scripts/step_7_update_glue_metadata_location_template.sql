@@ -1,12 +1,12 @@
 /* ==============================================
 Procedure: update_glue_metadata_location_template
 Description:  This procedure serves as a template to update the metadata location of an Iceberg table in AWS Glue
-              to create the procedure. For each External Access Integration chosen via the Iceberg Migrator to 
+              to create the procedure. For each External Access Integration chosen via the Iceberg Migrator to
               sync to AWS GLUE, a copy of this proc will be created and updated with the applicable EAI and secret
 
  Sample Call:
  -----------------------------------------------
- -- Update glue-athena table with snowflake iceberg table data and structure change: 
+ -- Update glue-athena table with snowflake iceberg table data and structure change:
  CALL update_glue_metadata_location_<eai_name>(
      1,
      1,
@@ -14,9 +14,9 @@ Description:  This procedure serves as a template to update the metadata locatio
      'my_athena_table',
      get_ddl('table', 'my_snow_db.my_snow_schema.my_snow_iceberg_table'),
      CAST(GET(PARSE_JSON(SYSTEM$GET_ICEBERG_TABLE_INFORMATION('my_snow_db.my_snow_schema.my_snow_iceberg_table')), 'metadataLocation') AS VARCHAR) ,
-     'my_snowflake_stream_name'  
+     'my_snowflake_stream_name'
  );
------------------------------------------------ 
+-----------------------------------------------
 ===============================================
  Change History
 ===============================================
@@ -30,11 +30,15 @@ Description:  This procedure serves as a template to update the metadata locatio
 2025-07-25   | J. Ma         | updated update procedure to automatically sync schema changes from Snowflake to Athena
              |               | Combined create table logic and update logic into one procedure
              |               | For data type conversion, timezone is not converted, so it is assumed that the data in Snowflake and Athena are in the same timezone.
-             |               | For data type conversion, geometry types are not supported in Athena, it is currently not mappped. 
+             |               | For data type conversion, geometry types are not supported in Athena, it is currently not mappped.
 2025-09-17   | M.Henderson   | Renamed proc to UPDATE_GLUE_METADATA_LOCATION_TEMPLATE.
              |               | This proc will serve as a template. A version of this proc will be created (if not exists) per EAI/secret created or selected when syncing to Glue
              |               | Updated the clear_stream logic to advance the stream
-             |               | Added clear_stream call to create_table function to advance the stream after creating a new table            
+             |               | Added clear_stream call to create_table function to advance the stream after creating a new table
+2025-10-05.  | J. Ma.        | Retrofit changes made after 7/25 while keeping Marc's change:
+             |               | propagate function errors to main return; create DB if not exists before table ops;
+             |               | map NUMBER to DOUBLE and preserve precision; make stream clearing optional; standardize logging and error messages;
+             |               | strip NOT NULL constraints; fix table reference in existence check.
 ===============================================
 */
 
@@ -50,10 +54,10 @@ USE SCHEMA IDENTIFIER($T2I_SCH);
 CREATE OR REPLACE PROCEDURE update_glue_metadata_location_template(
     table_instance_id float,
     table_run_id float,
-    athena_database_name string, 
-    athena_table_name string, 
+    athena_database_name string,
+    athena_table_name string,
     snowflake_table_ddl string,
-    snow_metadata_location string, 
+    snow_metadata_location string,
     snow_stream_name string)
 RETURNS VARCHAR
 LANGUAGE PYTHON
@@ -62,20 +66,35 @@ PACKAGES = ('boto3','botocore', 'snowflake-snowpark-python')
 HANDLER = 'check_and_update'
 COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}'
 EXECUTE AS CALLER
-AS 
+AS
 $$
-import _snowflake 
+import _snowflake
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 import logging
 from datetime import datetime
 import re
-
+import inspect
 
 logger = logging.getLogger("python_logger")
-logging.basicConfig(level=logging.INFO) 
-logger.info(f"Logging from [{__name__}].")
+# logging.basicConfig(level=logging.INFO)
+
+def log_with_context(level, message):
+    frame = inspect.currentframe().f_back
+    func_name = frame.f_code.co_name
+    line_no = frame.f_lineno
+    logger.log(level, f"{func_name}:{line_no} - {message}")
+
+def log_exception(e, msg=None):
+    frame = inspect.currentframe().f_back
+    func_name = frame.f_code.co_name
+    line_no = frame.f_lineno
+    stack = traceback.format_exc()
+    full_msg = f"{msg} | Exception: {e}" if msg else f"Exception: {e}"
+    logger.error(f"{func_name}:{line_no} - {full_msg}\n{stack}")
+
+log_with_context(logging.INFO, f"Logging from [{__name__}].")
 
 
 cloud_provider_object = _snowflake.get_cloud_provider_token('cred')
@@ -95,6 +114,37 @@ glue_client = boto3.client(
     region_name='us-west-2'
 )
 
+def check_database_exists (athena_database_name):
+    try:
+        glue_client.get_database(Name=athena_database_name)
+        log_with_context(logging.INFO, f"Database '{athena_database_name}' exists.")
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'EntityNotFoundException':
+            log_with_context(logging.INFO, f"Database '{athena_database_name}' does not exist.")
+            return False
+        else:
+            log_exception(e, f"Error checking if database '{athena_database_name}' exists.")
+    except Exception as e:
+        log_exception(e, "An unhandled exception occurred in check_database_exists.")
+        raise Exception (f"An unhandled exception occurred in check_database_exists.  Error: {e}")
+
+def create_database (athena_database_name):
+    try:
+        glue_client.create_database(
+            DatabaseInput={
+                'Name': athena_database_name
+            }
+        )
+        log_with_context(logging.INFO, f"Database '{athena_database_name}' created successfully.")
+        return f"Database '{athena_database_name}' created successfully."
+    except ClientError as e:
+        log_exception(e, f"Error creating database '{athena_database_name}'.")
+        return f"ERROR: Failed to create database '{athena_database_name}'. Error: {e}"
+    except Exception as e:
+        log_exception(e, "An unhandled exception occurred. ")
+        raise Exception (f"An unhandled exception occurred in create_database. Error: {e}")
+        return f"ERROR: An unhandled exception occurred. Error: {e}"
 
 def check_table_exists(athena_database_name, athena_table_name):
     try:
@@ -107,7 +157,10 @@ def check_table_exists(athena_database_name, athena_table_name):
         if e.response['Error']['Code'] == 'EntityNotFoundException':
             return False  # Table does not exist
         else:
-            logger.exception(f"Sth wrong when checking if {table_name} exists in athena. ")
+            log_exception(e, f"Sth wrong when checking if {athena_table_name} exists in athena. ")
+    except Exception as e:
+        log_exception(e, "An unhandled exception occurred in check_table_exists.")
+        raise Exception (f"An unhandled exception occurred in check_table_exists. Error: {e}")
 
 def extract_base_s3_path(full_s3_path: str) -> str:
     base_path = full_s3_path.rsplit('/', 1)[0] + '/'
@@ -130,22 +183,23 @@ def create_table(session, database_name, table_name, col_definition_str, metadat
             }
     }
 
-    
-     
     # Start query execution for table creation
-    try: 
+    try:
         response =   response = glue_client.create_table(
             DatabaseName=database_name,
             TableInput=table_input
         )
         clear_stream(session, snow_stream_name)
+        return 'successful created. '
     except Exception as e:
-            logger.exception(f" Failed to create {table_name} in database {database_name}:{str(e)} ")
+        log_exception(e, f" Failed to create {table_name} in database {database_name}. ")
+        raise Exception (f"Failed to create {table_name} in database {database_name}:{str(e)}")
+        return 'failed to create table '
 
 
 def get_table_details(athena_database_name, athena_table_name):
     response = glue_client.get_table(
-        DatabaseName=athena_database_name, 
+        DatabaseName=athena_database_name,
         Name=athena_table_name
     )
 
@@ -158,25 +212,44 @@ def extract_snow_columns(table_ddl: str) -> str:
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         # Extract the content between the first '(' and the last ')'
         columns_block = table_ddl[start_idx + 1:end_idx].strip()
-        logger.debug(f"extract_columns_handler: Extracted columns_block: '{columns_block}'")
-        
+        log_with_context(logging.DEBUG, f"extract_columns_handler: Extracted columns_block: '{columns_block}'")
+
         # Clean up any extra whitespace around commas
         final_columns_string = re.sub(r'\s*,\s*', ', ', columns_block).strip()
-        
-        logger.debug(f"extract_columns_handler: Final processed columns string: '{final_columns_string}'")
+
+        log_with_context(logging.DEBUG, f"extract_columns_handler: Final processed columns string: '{final_columns_string}'")
         return final_columns_string
     else:
-        logger.error(f"Could not extract column block from DDL: {table_ddl}")
-        return ""
+        log_exception(e, f"Could not extract column block from DDL: {table_ddl}")
+        raise Exception (f"Could not extract column block from DDL: {table_ddl}")
+        return "Error"
 
-def parse_columns_to_glue_format(columns_str: str) -> list:
-    """
-    Parses a string like 'col1 INT, col2 STRING' into a list of Glue column dictionaries.
-    Handles basic types and maps them to Glue compatible types using a dictionary for cleaner mapping.
-    """
-    logger.debug(f"parse_columns_to_glue_format: Input columns_str: '{columns_str}'")
+def split_columns(columns_str: str) -> list:
+    """Split columns by commas, ignoring commas inside parentheses."""
+    columns = []
+    bracket_level = 0
+    current = []
+
+    for char in columns_str:
+        if char == '(':
+            bracket_level += 1
+        elif char == ')':
+            bracket_level -= 1
+        elif char == ',' and bracket_level == 0:
+            columns.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    if current:
+        columns.append(''.join(current).strip())
+    return columns
+
+def parse_columns_to_glue_format(table_ddl: str) -> list:
+    columns_block = extract_snow_columns(table_ddl)
+    column_defs = split_columns(columns_block)
+
     type_mapping = {
-        'number': 'int',
+        'number': 'double',
         'int': 'int',
         'integer': 'int',
         'string': 'string',
@@ -185,49 +258,47 @@ def parse_columns_to_glue_format(columns_str: str) -> list:
         'float': 'double',
         'double': 'double',
         'boolean': 'boolean',
-        'date': 'date',
-        'timestamp_ntz(6)': 'timestamp'
+        'date': 'date'
     }
 
-    parsed_columns = []
-    column_defs = columns_str.split(',')
-    logger.debug(f"parse_columns_to_glue_format: Split column_defs: {column_defs}")
+    glue_columns = []
 
     for i, col_def in enumerate(column_defs):
-        col_def = col_def.strip()
-        logger.debug(f"parse_columns_to_glue_format: Processing col_def[{i}]: '{col_def}'")
         if not col_def:
-            logger.debug(f"parse_columns_to_glue_format: Skipping empty col_def at index {i}.")
             continue
 
-        parts = col_def.split(' ', 1)
-        logger.debug(f"parse_columns_to_glue_format: col_def[{i}] split parts: {parts}")
-
-        if len(parts) >= 2:
-            col_name = parts[0].strip()
-            raw_col_type = parts[1].strip().lower()
-
-            glue_type = raw_col_type # Default to raw type
-
-            if raw_col_type.startswith('timestamp'):
-                glue_type = 'timestamp'
-            elif raw_col_type.startswith('decimal') or raw_col_type.startswith('numeric'):
-                # Keep decimal/numeric types as they are (e.g., decimal(10,2))
-                glue_type = raw_col_type
-            elif raw_col_type in type_mapping:
-                glue_type = type_mapping[raw_col_type]
-            else:
-                glue_type = 'string' # Fallback for unknown types
-                logger.warning(f"Unknown column type '{raw_col_type}' for column '{col_name}'. Defaulting to 'string'.")
-
-            parsed_columns.append({'Name': col_name, 'Type': glue_type})
-            logger.debug(f"parse_columns_to_glue_format: Added column: {{'Name': '{col_name}', 'Type': '{glue_type}'}}")
-        else:
+        parts = col_def.strip().split(' ', 1)
+        if len(parts) < 2:
             logger.warning(f"Malformed column definition at index {i}: '{col_def}'. Skipping.")
-    
-    logger.debug(f"parse_columns_to_glue_format: Final parsed_columns: {parsed_columns}")
-    return parsed_columns
-    
+            continue
+
+        col_name = parts[0].strip()
+        raw_col_type = ' '.join(parts[1:]).strip().lower()
+
+        # Remove "not null" from the type string before processing
+        raw_col_type = raw_col_type.replace('not null', '').strip()
+
+        # Handle decimal, number, numeric types with precision, now more robust to spacing
+        number_match = re.match(r'^(number|decimal|numeric)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$', raw_col_type)
+        if number_match:
+            _, precision, scale = number_match.groups()
+            glue_type = f"decimal({precision},{scale})"
+        elif raw_col_type.startswith('timestamp'):
+            glue_type = 'timestamp'
+        elif raw_col_type in type_mapping:
+            glue_type = type_mapping[raw_col_type]
+        else:
+            glue_type = 'string'
+            logger.warning(f"Unknown column type '{raw_col_type}' for column '{col_name}'. Defaulting to 'string'.")
+
+        glue_columns.append({
+            "Name": col_name,
+            "Type": glue_type
+        })
+
+    # Return as JSON-compatible structure
+    return glue_columns
+
 def clear_stream(session, stream_name):
     try:
         tmp_table_name = f"{stream_name}_tmp"
@@ -241,19 +312,19 @@ def clear_stream(session, stream_name):
         #force the drop of the table (not needed past the session)
         drop_tmp_table_query = f"DROP TABLE {tmp_table_name};"
         session.sql(drop_tmp_table_query).collect()
-        
-        logger.info(f"Successfully create tmp table to consume stream")
+        log_with_context(logging.INFO, f"Successfully created tmp table to consume stream")
 
         return "Temporary table created successfully."
     except Exception as e:
-        logger.exception(f"Error in clear_stream: {str(e)}")
-        return f"Error: {str(e)}"
-        
+        log_exception(e, f"Error in clear_stream.")
+        raise Exception ( f"Error in clear_stream: {str(e)}")
+        return f"Error "
+
 def update_table(session, database_name, table_name, snow_table_def, new_metadata_location, snow_stream_name):
     existing_table = get_table_details(database_name, table_name)
     snow_column_def = extract_snow_columns (snow_table_def)
     glue_column_list = parse_columns_to_glue_format (snow_column_def)
-    
+
     update_table_dict = {
         'DatabaseName': database_name,
         'TableInput': existing_table['Table']
@@ -264,27 +335,29 @@ def update_table(session, database_name, table_name, snow_table_def, new_metadat
 
     if 'Parameters' not in update_table_dict['TableInput']:
             update_table_dict['TableInput']['Parameters'] = {}
-            
+
     # if 'StorageDescriptor' not in update_table_dict['TableInput']:
     #    update_table_dict['TableInput']['StorageDescriptor'] = {}
     update_table_dict['TableInput']['StorageDescriptor']['Columns'] = glue_column_list
-        
+
     keys_to_remove = ['DatabaseName', 'CreatedBy', 'IsRegisteredWithLakeFormation', 'CatalogId', 'VersionId', 'IsMultiDialectView', 'CreateTime', 'UpdateTime']
-    
+
     for key in keys_to_remove:
         if key in update_table_dict['TableInput']:
             del update_table_dict['TableInput'][key]
-    
+
     try:
         # Update the table in Glue catalog
         response = glue_client.update_table(**update_table_dict)
-        logger.info(f"Successfully updated for {table_name} at {datetime.now()}")
+        log_with_context(logging.INFO, f"Successfully updated for {table_name} at {datetime.now()}")
+
 
         clear_stream(session, snow_stream_name)
         return 'successful update. '
     except Exception as e:
-        logger.exception("An error occurred during updated for {table_name} at {datetime.now()}")
-        return 'failed to update: ' + str(e)
+        log_exception(e, "An error occurred during updated for {table_name} at {datetime.now()}")
+        raise Exception(f"%(lineno)d ERROR: 'failed to update: ' + str(e)")
+        return 'failed to update. '
 
 
 def check_and_update(session, table_instance_id, table_run_id, athena_database_name, athena_table_name, snow_table_def, snow_metadata_location, snow_stream_name):
@@ -292,22 +365,45 @@ def check_and_update(session, table_instance_id, table_run_id, athena_database_n
                                 SET UPDATED_TIMESTAMP = CURRENT_TIMESTAMP()
                                 WHERE TABLE_INSTANCE_ID = {table_instance_id} AND TABLE_RUN_ID = {table_run_id};"""
 
-    if not check_table_exists(athena_database_name, athena_table_name):
-        logger.info(f"Table {athena_table_name} does not exist. Creating table...")
-        create_table(session, athena_database_name, athena_table_name, snow_table_def, snow_metadata_location, snow_stream_name)
-        logger.info(f"Table {athena_table_name} created successfully in glue catalog.")
+    try:
+        if not check_database_exists (athena_database_name):
+            return_msg = create_database(athena_database_name)
 
-        #set the updated_timestamp onced created/updated
-        session.sql(update_sync_log_stmt).collect()
+            if 'success' in return_msg:
+                log_with_context(logging.INFO,  f"create database  '{athena_database_name}' .")
+            else:
+                log_exception(e, f"create database {athena_database_name} failed. Message: {return_msg}")
+                raise Exception(f"create database {athena_database_name} failed. Message: {return_msg}")
 
-        return f"Table {athena_table_name} created successfully in glue catalog."
-    else:
-        logger.info(f"Table {athena_table_name} exists. Perform update...")
-        update_table(session, athena_database_name, athena_table_name, snow_table_def, snow_metadata_location, snow_stream_name)
-        logger.info(f"Updated table: {athena_table_name} ")
 
-        #set the updated_timestamp onced created/updated
-        session.sql(update_sync_log_stmt).collect()
+        if not check_table_exists(athena_database_name, athena_table_name):
+            log_with_context(logging.INFO, f"Table {athena_table_name} does not exist. Creating table...")
+            return_msg = create_table(session, athena_database_name, athena_table_name, snow_table_def, snow_metadata_location, snow_stream_name)
+            log_with_context(logging.INFO, f"Table {athena_table_name} created with this msg: {return_msg}.")
+            session.sql(update_sync_log_stmt).collect()
+        else:
+            log_with_context(logging.INFO, f"Table {athena_table_name} exists. Perform update...")
+            return_msg = update_table(session, athena_database_name, athena_table_name, snow_table_def, snow_metadata_location, snow_stream_name)
+            log_with_context(logging.INFO, f"Table {athena_table_name} updated with this msg: {return_msg}.")
+            session.sql(update_sync_log_stmt).collect()
 
-        return f"Table {athena_table_name} already exists in glue catalog. Updated."
-$$;
+
+        if 'success' in return_msg:
+            if snow_stream_name:
+                stream_clear_msg = clear_stream (session, snow_stream_name)
+                if 'success' in stream_clear_msg:
+                    log_with_context(logging.DEBUG,  f"SUCCESS: Table '{athena_table_name}' processed. Stream cleared.")
+                else:
+                    log_exception(e, f"Failed to clear stream. Message: {stream_clear_msg}")
+                    raise Exception(f"Failed to clear stream. Message: {stream_clear_msg}")
+        else:
+            log_exception(e, f"Main operation for {athena_table_name} failed. Message: {return_msg}")
+            raise Exception(f"Main operation for {athena_table_name} failed. Message: {return_msg}")
+
+        return f"Successfull processed table '{athena_table_name}' "
+    except Exception as e:
+        log_exception(e, "An unhandled exception occurred. ")
+        raise Exception (f"ERROR: Failed to process table '{athena_table_name}'. Error: {e}")
+        return f"ERROR"
+$$
+;

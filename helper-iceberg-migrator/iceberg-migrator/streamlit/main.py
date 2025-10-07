@@ -246,7 +246,7 @@ def clear_c2i_session_vars():
         del st.session_state.display_alter_task_msg
 
     #clear all cached data
-    st.cache_data.clear()
+    #st.cache_data.clear()
     
     
 def set_form_step(action,step=None):
@@ -524,6 +524,7 @@ def manual_catalog_sync_log_check():
                                                                 ,TO_VARCHAR(UPDATED_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS') AS UPDATED_TIMESTAMP
                                                                 ,TO_VARCHAR(INSERT_DATE, 'YYYY-MM-DD HH24:MI:SS') AS INSERT_DATE 
                                                             FROM ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            ORDER BY INSERT_DATE DESC
                                                             """).collect())
 
     return df_catalog_sync_log_check
@@ -2483,19 +2484,6 @@ def render_choose_iceberg_tables_aws_sync_wizard_view():
             st.divider()
             if aws_glue_master_table_list:
                 st.markdown("<h4 style='text-align: left; color: black;'>AWS Glue Sync Details</h4>", unsafe_allow_html=True)
-                #enter target Athena Database, Table, and Update frequency 
-                
-                st.session_state.aws_glue_target_db = st.text_input("Enter Target Athena Database:"
-                                                                        , key = "txt_aws_glue_target_db"
-                                                                        , help = "the name of the Athena database to sync the tables to. **NOTE:** the tables selected will be synced to AWS Glue with the same name"
-                                                                        , on_change = input_callback
-                                                                        , args = ("aws_glue_table", "aws_glue_target_db", "txt_aws_glue_target_db"))
-                
-                st.session_state.aws_glue_update_freq = st.text_input("Enter Update Frequency (mins):"
-                                                                        , key = "txt_aws_glue_update_freq"
-                                                                        , help = "the frequency in minutes in which the Iceberg table's metadata is synced with AWS Glue"
-                                                                        , on_change = input_callback
-                                                                        , args = ("aws_glue_table", "aws_glue_update_freq", "txt_aws_glue_update_freq"))
                 
                 with st.spinner("Fetching Warehouses..."):
                     if not st.session_state.aws_glue_sync_wh_check:
@@ -2509,7 +2497,21 @@ def render_choose_iceberg_tables_aws_sync_wizard_view():
                         select_aws_glue_sync_wh_list = ["Choose..."] + st.session_state.aws_glue_sync_whs["name"].values.tolist()
                     else:
                         select_aws_glue_sync_wh_list = ["Choose..."]
+
+                    #enter target Athena Database, Update frequency
+                    st.session_state.aws_glue_target_db = st.text_input("Enter Target Athena Database:"
+                                                                        , key = "txt_aws_glue_target_db"
+                                                                        , help = "the name of the Athena database to sync the tables to. **NOTE:** the tables selected will be synced to AWS Glue with the same name"
+                                                                        , on_change = input_callback
+                                                                        , args = ("aws_glue_table", "aws_glue_target_db", "txt_aws_glue_target_db"))
                 
+                    st.session_state.aws_glue_update_freq = st.text_input("Enter Update Frequency (mins):"
+                                                                        , key = "txt_aws_glue_update_freq"
+                                                                        , help = "the frequency in minutes in which the Iceberg table's metadata is synced with AWS Glue"
+                                                                        , on_change = input_callback
+                                                                        , args = ("aws_glue_table", "aws_glue_update_freq", "txt_aws_glue_update_freq"))
+
+                    #select warehouse
                     st.session_state.aws_glue_sync_wh_name = st.selectbox("Select Warehouse:"
                                                                 , select_aws_glue_sync_wh_list
                                                                 , index = st.session_state.aws_glue_sync_wh_idx
@@ -2700,7 +2702,7 @@ def render_choose_iceberg_tables_aws_sync_wizard_view():
                 #call ICEBERG_MIGRATION_DISPATCHER proc
                 session.sql(f"CALL ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_MIGRATION_DISPATCHER()").collect()
 
-            st.success(f"Iceberg sync has started. Check the **Iceberg Sync Log** page of the app for updates.")
+            st.success(f"Iceberg sync has started. Check the **Catalog Sync Log** page of the app for updates.")
         
 
     ###### Bottom Navigation ###### 
@@ -2851,6 +2853,8 @@ def render_catalog_sync_log_view():
         
         for index, row in df_catalog_sync_log.iterrows():
             id = str(row["ID"])
+            table_instance_id = id.split("_")[0]
+            table_run_id = id.split("_")[1]
             source_table = str(row["SOURCE_TABLE"])
             destination = str(row["DESTINATION"])
             target_database = str(row["TARGET_DATABASE"])
@@ -2878,8 +2882,13 @@ def render_catalog_sync_log_view():
             with col11:
                 if f"btn_{id}" not in st.session_state.btn_sync_task_details:
                     st.session_state.btn_sync_task_details[f"btn_{id}"] = {}
+                    
+                if sync_started.lower() == 'y':
                     st.session_state.btn_sync_task_details[f"btn_{id}"].update({"label":"Suspend"})
-                    st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":False})
+                if sync_started.lower() == 'n':
+                    st.session_state.btn_sync_task_details[f"btn_{id}"].update({"label":"Resume"})
+                    
+                st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":False})
                 
                 if st.button(st.session_state.btn_sync_task_details[f"btn_{id}"]["label"], type="primary", key=f"btn_{id}"):
                     st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":True})
@@ -2900,13 +2909,19 @@ def render_catalog_sync_log_view():
                             current_task_status = str(df_current_task_status.iloc[0]['state'])
         
                             if task_action == 'Suspend':
+                                #update sync log statement
+                                update_sync_log_sync_n_stmt = f"""UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            SET SYNC_STARTED = 'N'
+                                                            WHERE TABLE_INSTANCE_ID = {table_instance_id} AND TABLE_RUN_ID = {table_run_id};"""
+
                                 if current_task_status.lower() == 'started':
-                                    #session.sql(f"ALTER TASK {task_fqn} {task_action}").collect()
                                     run_sis_cmd(f"ALTER TASK {task_fqn} {task_action}", False)
+                                    session.sql(update_sync_log_sync_n_stmt).collect()
                                     st.session_state.alter_task_msg = f"Task: **{task_fqn}** successfully **suspended.**"
                                     st.session_state.display_alter_task_msg = True
         
                                 if current_task_status.lower() == 'suspended':
+                                    session.sql(update_sync_log_sync_n_stmt).collect()
                                     st.session_state.alter_task_msg = f"Task: **{task_fqn}** already suspended. **No action taken.**"
                                     st.session_state.display_alter_task_msg = True
         
@@ -2916,13 +2931,18 @@ def render_catalog_sync_log_view():
                                 st.rerun()
         
                             if task_action == 'Resume':
+                                #update sync log statement
+                                update_sync_log_sync_y_stmt = f"""UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            SET SYNC_STARTED = 'Y'
+                                                            WHERE TABLE_INSTANCE_ID = {table_instance_id} AND TABLE_RUN_ID = {table_run_id};"""
                                 if current_task_status.lower() == 'suspended':
-                                    #session.sql(f"ALTER TASK {task_fqn} {task_action}").collect()
                                     run_sis_cmd(f"ALTER TASK {task_fqn} {task_action}", False)
+                                    session.sql(update_sync_log_sync_y_stmt).collect()
                                     st.session_state.alter_task_msg = f"Task: **{task_fqn}** successfully **started.**"
                                     st.session_state.display_alter_task_msg = True
         
                                 if current_task_status.lower() == 'started':
+                                    session.sql(update_sync_log_sync_y_stmt).collect()
                                     st.session_state.alter_task_msg = f"Task: **{task_fqn}** already started. **No action taken.**"
                                     st.session_state.display_alter_task_msg = True
         
