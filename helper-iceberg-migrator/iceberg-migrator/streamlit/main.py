@@ -1200,7 +1200,7 @@ def render_create_eai():
                         #aws_role_arn
                         txt_si_aws_role_arn = st.text_input('AWS Role ARN'
                                                     , key = "txt_si_aws_role_arn"
-                                                    , help = "i.e.: arn:aws:iam::123456789012:role/myrole"
+                                                    , help = "i.e.: arn:aws:iam::123456789012:role/myrole. This is the IAM role with the permissions described below."
                                                     )
                         
                         #create security integration ddl
@@ -1229,13 +1229,14 @@ def render_create_eai():
                     "glue:CreateTable",
                     "glue:UpdateTable",
                     "glue:GetTable",
+                    "glue:CreateDatabase",
                     "glue:GetDatabase"
                 ],
                 "Resource": [
-                    "arn:aws:glue:us-west-2:087354435437:catalog",
-            "arn:aws:glue:us-west-2:087354435437:catalog/*",
-                    "arn:aws:glue:us-west-2:087354435437:table/<my athena database>/*",
-                    "arn:aws:glue:us-west-2:087354435437:database/<my athena database>"
+                    "arn:aws:glue:<region>:<aws_account_id>:catalog",
+            "arn:aws:glue:<region>:<aws_account_id>:catalog/*",
+                    "arn:aws:glue:<region>:<aws_account_id>:table/<my_athena_database>/*",
+                    "arn:aws:glue:<region>:<aws_account_id>:database/<my_athena_database>"
                 ]
             }
         ]
@@ -3202,7 +3203,7 @@ class BasePage(Page):
                 #go to page
                 set_page("catalog_sync_log")
 
-            #MConfig
+            #Config
             st.markdown(
                 """
                 <div class="sidebar-divider-text">Config</div>
@@ -3217,8 +3218,11 @@ class BasePage(Page):
                 
                 #go to page
                 set_page("configuration")
-    
-        u.render_image("img/snowflake-logo-color-rgb@2x.png")
+
+        col1, col2, col3 = st.columns([0.28,1,0.25])
+
+        with col2:
+            u.render_image("img/snowflake-logo-color-rgb@2x.png")
         
         st.markdown("<h1 style='text-align: center; color: black;'>ICEBERG MIGRATOR</h1>", unsafe_allow_html=True)
         st.write("")
