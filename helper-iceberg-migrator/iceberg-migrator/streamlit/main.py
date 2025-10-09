@@ -15,9 +15,9 @@ if "page" not in st.session_state:
     st.session_state.page = "home"
 
 if st.session_state.page in ["migration_log", "catalog_sync_log"]:
-    st.set_page_config(layout="wide")
+    st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 else:
-    st.set_page_config(layout="centered")
+    st.set_page_config(layout="centered", initial_sidebar_state="collapsed")
 
 if "ev_created" not in st.session_state:
     st.session_state.ev_created = False
@@ -1052,7 +1052,9 @@ def render_create_eai():
     
     eai_si = ""
     create_si_ddl = ""
+    flag_si_selected = False
     flag_create_si = False
+    
 
     eai_nr = ""
     eai_nr_values = ""
@@ -1182,6 +1184,7 @@ def render_create_eai():
                     
                     if sb_eai_si not in ["Choose...", "Create new..."]:
                         eai_si = sb_eai_si
+                        flag_si_selected = True
                     
                     if sb_eai_si == "Create new...":
                         st.write("")
@@ -1209,6 +1212,8 @@ def render_create_eai():
                                                         AWS_ROLE_ARN = '{txt_si_aws_role_arn}';"""
                                                         
                             eai_si = txt_si_name
+
+                            flag_si_selected = True
                             flag_create_si = True
                         
                     
@@ -3277,7 +3282,7 @@ class home(BasePage):
            with ev_col2:
                u.render_image_menu("img/ra_volume.png")
            st.markdown("""
-                        Create a new External Volume to use for Iceberg tables.
+                        Create a new External Volume to use for Iceberg tables (if one doesn't exist).
                         """)
            st.write("")
            st.button("Create External Volume", use_container_width=True, type="primary", on_click=set_page,args=("create_ev",), key="btn_create_ev")
@@ -3290,7 +3295,7 @@ class home(BasePage):
                st.write("")
                u.render_image_menu("img/metadata.png")
            st.markdown("""
-                        Create a new Catalog Integration for Delta files in object storage.
+                        Create a new Catalog Integration for Delta files in object storage (if one doesn't exist).
                         """)
            st.write("")
            st.button("Create Catalog Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_ci",), key="btn_create_ci")
@@ -3301,7 +3306,7 @@ class home(BasePage):
             with qc_col2:  
                 u.render_image_menu("img/services.png")
             st.markdown("""
-                        Create an External Access Integration to access AWS Glue.
+                        Create an External Access Integration to access AWS Glue (if one doesn't exist).
                         """)
             st.write("") 
             st.button("Create External Access Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_eai",), key="btn_external_access_aws_glue")
