@@ -8,15 +8,16 @@ import datetime
 import json
 import pandas as pd
 import time
+import re
 import utils.utils as u
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
-if st.session_state.page in ["migration_log"]:
-    st.set_page_config(layout="wide")
+if st.session_state.page in ["migration_log", "catalog_sync_log"]:
+    st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 else:
-    st.set_page_config(layout="centered")
+    st.set_page_config(layout="centered", initial_sidebar_state="collapsed")
 
 if "ev_created" not in st.session_state:
     st.session_state.ev_created = False
@@ -184,9 +185,68 @@ def clear_c2i_session_vars():
         
     if "delta_target_sch" in st.session_state:
         del st.session_state.delta_target_sch
+        
+    #sync to AWS Glue session vars
+    if "aws_glue_eai_check" in st.session_state:
+        del st.session_state.aws_glue_eai_check
+
+    if "aws_glue_eais" in st.session_state:
+        del st.session_state.aws_glue_eais
+
+    if "aws_glue_eai_idx" in st.session_state:
+        del st.session_state.aws_glue_eai_idx
+
+    if "aws_glue_eai_name" in st.session_state:
+        del st.session_state.aws_glue_eai_name
+
+    if "aws_glue_src_db_idx" in st.session_state:
+        del st.session_state.aws_glue_src_db_idx
+        
+    if "aws_glue_src_db" in st.session_state:
+        del st.session_state.aws_glue_src_db
+
+    if "aws_glue_disable_schemas_ms" in st.session_state:
+        del st.session_state.aws_glue_disable_schemas_ms
+
+    if "aws_glue_schema_val" in st.session_state:
+        del st.session_state.aws_glue_schema_val
+
+    if "aws_glue_schema_list" in st.session_state:
+        del st.session_state.aws_glue_schema_list
+        
+    if "aws_glue_src_schemas" in st.session_state:
+        del st.session_state.aws_glue_src_schemas
+        
+    if "aws_glue_target_db" in st.session_state:
+        del st.session_state.aws_glue_target_db
+        
+    if "aws_glue_update_freq" in st.session_state:
+        del st.session_state.aws_glue_update_freq
+
+    if "aws_glue_sync_wh_check" in st.session_state:
+        del st.session_state.aws_glue_sync_wh_check
+
+    if "aws_glue_sync_whs" in st.session_state:
+        del st.session_state.aws_glue_sync_whs
+        
+    if "aws_glue_sync_wh_idx" in st.session_state:
+        del st.session_state.aws_glue_sync_wh_idx
+        
+    if "aws_glue_sync_wh_name" in st.session_state:
+        del st.session_state.aws_glue_sync_wh_name
+
+    #Sync Log vars
+    if "btn_sync_task_details" in st.session_state:
+        del st.session_state.btn_sync_task_details
+
+    if "alter_task_msg" in st.session_state:
+        del st.session_state.alter_task_msg
+
+    if "display_alter_task_msg" in st.session_state:
+        del st.session_state.display_alter_task_msg
 
     #clear all cached data
-    st.cache_data.clear()
+    #st.cache_data.clear()
     
     
 def set_form_step(action,step=None):
@@ -229,14 +289,15 @@ def create_pairs(input_list):
     return pairs
 
 
-def input_callback(session_key, input_key):
+def input_callback(wizard, session_key, input_key):
     st.session_state[session_key] = st.session_state[input_key]
-
-    if input_key.lower() == "txt_enter_query_id":
-        if st.session_state.selected_query_id == "" or (st.session_state.enter_query_id == st.session_state.selected_query_id):
-            st.session_state.disable_step_2 = False
-        else:
-            st.session_state.disable_step_2 = True
+    
+    if wizard.lower() == "aws_glue_table": 
+        if input_key.lower() in ['txt_aws_glue_target_db', 'txt_aws_glue_update_freq']:
+            if all(v is not '' for v in [st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db]) and st.session_state.aws_glue_sync_wh_name != "Choose...":
+                st.session_state.disable_step_2 = False
+            else:
+                st.session_state.disable_step_2 = True
 
 
 def selectbox_callback(wizard, val, idx, list):
@@ -246,13 +307,19 @@ def selectbox_callback(wizard, val, idx, list):
        st.session_state[idx] = 0 
 
     #enable steps
-    if wizard.lower() in ("snowflake_table", "delta_table"):
+    if wizard.lower() in ["snowflake_table", "delta_table", "aws_glue_table"]:
         if st.session_state.current_step == 2:
             st.session_state.disable_step_3 = False
+            
+        if wizard.lower() == "aws_glue_table":
+            if all(v is not '' for v in [st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db]) and st.session_state[val]!= "Choose...":
+                st.session_state.disable_step_2 = False
+            else:
+                st.session_state.disable_step_2 = True
 
 
 def multiselect_callback(wizard, val, pair_idx, sch_idx):
-    if wizard.lower() in ("snowflake_table", "delta_table"):
+    if wizard.lower() in ["snowflake_table", "delta_table", "aws_glue_table"]:
         if val.lower() == "ms_snowflake_src_schemas":
             st.session_state.schema_list = st.session_state[val]
 
@@ -261,10 +328,22 @@ def multiselect_callback(wizard, val, pair_idx, sch_idx):
             
         if val.lower() == "ms_delta_tables":
             st.session_state.selected_delta_tables_list = st.session_state[val]
+            
+        if val.lower() == "ms_aws_glue_src_schemas":
+            st.session_state.aws_glue_schema_list = st.session_state[val]
+            
+        if val.startswith("ms_aws_glue_tables_"):
+            st.session_state[f"ms_aws_glue_tables_{pair_idx}_{sch_idx}_list"] = st.session_state[val]
+            
+        if wizard.lower() == "aws_glue_table":
+            if all(v is not '' for v in [st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db]) and st.session_state.aws_glue_sync_wh_name != "Choose...":
+                st.session_state.disable_step_2 = False
+            else:
+                st.session_state.disable_step_2 = True
 
 
 def checkbox_callback(wizard, val, ms_val, ms_flag, pair_idx, sch_idx):
-    if wizard.lower() in ("snowflake_table", "delta_table"):
+    if wizard.lower() in ["snowflake_table", "delta_table", "aws_glue_table"]:
         if ms_val.lower() == "ms_snowflake_src_schemas":
             if st.session_state[ms_val]:
                 st.session_state.schema_list = []
@@ -276,6 +355,29 @@ def checkbox_callback(wizard, val, ms_val, ms_flag, pair_idx, sch_idx):
                 st.session_state.schema_val = False
                 st.session_state[ms_flag] = False
 
+        if val.lower() == "snowflake_target_db_sch":
+            if st.session_state[val]:
+                st.session_state.snowflake_target_db_sch_value = True
+            else:
+                st.session_state.snowflake_target_db_sch_value = False
+                st.session_state.snowflake_target_db = None
+                st.session_state.snowflake_target_sch = None
+                
+        if val.startswith("cb_all_tables_"):
+            if st.session_state[val]:
+                st.session_state[f"cb_all_tables_{pair_idx}_{sch_idx}_value"] = True
+            else:
+                st.session_state[f"cb_all_tables_{pair_idx}_{sch_idx}_value"] = False
+            
+            if st.session_state[val]:
+                st.session_state.disable_step_2 = False
+
+            if not st.session_state[val]:
+                if not st.session_state.master_table_list:
+                    st.session_state.disable_step_2 = True
+                    st.rerun()
+        
+        
         if ms_val.lower() == "ms_delta_tables":
             if st.session_state[ms_val]:
                 st.session_state.selected_delta_tables_list = []
@@ -295,27 +397,34 @@ def checkbox_callback(wizard, val, ms_val, ms_flag, pair_idx, sch_idx):
                     st.session_state.disable_step_2 = True
                     st.rerun()
                     
-        if val.lower() == "snowflake_target_db_sch":
+                     
+        if ms_val.lower() == "ms_aws_glue_src_schemas":
+            if st.session_state[ms_val]:
+                st.session_state.aws_glue_schema_list = []
+                        
             if st.session_state[val]:
-                st.session_state.snowflake_target_db_sch_value = True
+                st.session_state.aws_glue_schema_val = True
+                st.session_state[ms_flag] = True
             else:
-                st.session_state.snowflake_target_db_sch_value = False
-                st.session_state.snowflake_target_db = None
-                st.session_state.snowflake_target_sch = None
-            
-        if val.startswith("cb_all_tables_"):
+                st.session_state.aws_glue_schema_val = False
+                st.session_state[ms_flag] = False
+                
+        if val.startswith("cb_aws_glue_all_tables_"):
             if st.session_state[val]:
-                st.session_state[f"cb_all_tables_{pair_idx}_{sch_idx}_value"] = True
+                st.session_state[f"cb_aws_glue_all_tables_{pair_idx}_{sch_idx}_value"] = True
             else:
-                st.session_state[f"cb_all_tables_{pair_idx}_{sch_idx}_value"] = False
-            
-            if st.session_state[val]:
-                st.session_state.disable_step_2 = False
+                st.session_state[f"cb_aws_glue_all_tables_{pair_idx}_{sch_idx}_value"] = False
 
             if not st.session_state[val]:
-                if not st.session_state.master_table_list:
+                if not st.session_state.aws_glue_master_table_list:
                     st.session_state.disable_step_2 = True
                     st.rerun()
+                    
+        if wizard.lower() == "aws_glue_table":
+            if all(v is not '' for v in [st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db]) and st.session_state.aws_glue_sync_wh_name != "Choose...":
+                st.session_state.disable_step_2 = False
+            else:
+                st.session_state.disable_step_2 = True
 
 
 def highlight_log_status(val):
@@ -374,7 +483,7 @@ def migration_log_check():
     st.markdown(df_run_status.style.set_table_styles([{'selector': 'th', 'props': [('font-size', '12px'),('background-color','#D3D3D3')]}]).set_properties(**{'color': '#000000','font-size': '12px','font-weight':'regular', 'width':'550px'}).hide(axis = 0).hide(axis = 0).applymap(highlight_log_status).to_html(), unsafe_allow_html = True)
 
 def manual_migration_log_check():
-    df_log_check = pd.DataFrame(session.sql(f"""WITH log_cte AS (
+    df_migration_log_check = pd.DataFrame(session.sql(f"""WITH log_cte AS (
                                                         select 
                                                             mt.table_instance_id table_id
                                                             ,mtl.run_id
@@ -394,12 +503,31 @@ def manual_migration_log_check():
                                                     )
                                                     
                                                     SELECT
-                                                        * exclude(row_number)
-                                                    FROM log_cte
-                                                    WHERE row_number = (SELECT MAX(row_number) FROM log_cte WHERE table_id = log_cte.table_id AND run_id = log_cte.run_id GROUP BY ALL);
+                                                        * EXCLUDE(row_number)
+                                                    FROM log_cte c1
+                                                    WHERE row_number = (SELECT MAX(row_number) FROM log_cte c2 WHERE c1.table_id = c2.table_id AND c1.run_id = c2.run_id GROUP BY ALL);
                                                     """).collect())
 
-    return df_log_check
+    return df_migration_log_check
+
+
+def manual_catalog_sync_log_check():
+    df_catalog_sync_log_check = pd.DataFrame(session.sql(f"""SELECT
+                                                                 CONCAT_WS('_', TABLE_INSTANCE_ID, TABLE_RUN_ID) AS ID
+                                                                ,CONCAT_WS('.', SOURCE_DATABASE, SOURCE_SCHEMA, SOURCE_TABLE) AS SOURCE_TABLE
+                                                                ,DESTINATION
+                                                                ,TARGET_DATABASE
+                                                                ,TARGET_SCHEMA
+                                                                ,UPDATE_FREQUENCY_MINS
+                                                                ,WAREHOUSE
+                                                                ,SYNC_STARTED
+                                                                ,TO_VARCHAR(UPDATED_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS') AS UPDATED_TIMESTAMP
+                                                                ,TO_VARCHAR(INSERT_DATE, 'YYYY-MM-DD HH24:MI:SS') AS INSERT_DATE 
+                                                            FROM ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            ORDER BY INSERT_DATE DESC
+                                                            """).collect())
+
+    return df_catalog_sync_log_check
 
 def run_sis_cmd(cmd, generate_results_flag):
     df_cmd_results = pd.DataFrame("Dataframe not generated", index=[0], columns=["Status"])
@@ -491,13 +619,13 @@ def render_sf_prereqs():
                 - {storage_name} in the ```{current_region}``` region to write the iceberg files  
             - **Snowflake:**
                 - Granted either the ```ACCOUNTADMIN``` role or a role with the ```CREATE EXTERNAL VOLUME``` privilege.
-                - An existing Snowflake EXTERNAL VOLUME registered to {storage_name} in the ```{current_region}``` region
-                    - This tool can be used to create the EXTERNAL VOLUME. 
+                - An existing Snowflake ```EXTERNAL VOLUME``` registered to {storage_name} in the ```{current_region}``` region
+                    - This tool can be used to create the ```EXTERNAL VOLUME```. 
                     - Visit {sf_ext_vol_url} for instructions for ```{current_region.split('_')[0]}```. 
                 - Schema to install the metadata tables, views and procedures 
                 - Warehouse that will be used for migration to iceberg 
             - **Role Permissions:**
-                - Ability to query and update all the object in the tool schema 
+                - Ability to query and update all the objects in the tool schema 
                 - Ability to query all the views in the tool schema 
                 - Ability to create and execute procedures in the tool schema
                 - Ability to use the warehouse for processing
@@ -521,14 +649,14 @@ def render_delta_prereqs():
                 - Table Delta files stored in cloud storage (S3, AZURE, or GCS)
             - **Snowflake:**
                 - Granted either the ```ACCOUNTADMIN``` role or a role with the ```CREATE EXTERNAL VOLUME``` privilege..
-                - An existing Snowflake EXTERNAL VOLUME
-                    - This tool can be used to create an EXTERNAL VOLUME. 
+                - An existing Snowflake ```EXTERNAL VOLUME```
+                    - This tool can be used to create an ```EXTERNAL VOLUME```. 
                     - Visit {sf_ext_vol_url} for instructions for the cloud storage where the Delta files reside. 
                     - :red[⚠︎ **NOTE:**] the External Volume's ```STORAGE_BASE_URL``` must contain directories for each table to migrate. Each table directory must contain that table's Delta files
                 - Granted either the ```ACCOUNTADMIN``` role or a role with the ```CREATE INTEGRATION``` privilege.
                 - Granted either the ```ACCOUNTADMIN``` role or a role with the ```CREATE STORAGE INTEGRATION``` privilege.
             - **Role Permissions:**
-                - Ability to query and update all the object in the tool schema 
+                - Ability to query and update all the objects in the tool schema 
                 - Ability to query all the views in the tool schema 
                 - Ability to create and execute procedures in the tool schema
                 - Ability to use the warehouse for processing
@@ -539,6 +667,34 @@ def render_delta_prereqs():
                 - Usage of Storage Integration
                 - Ability to create and drop objects in the databases and schemas that contain table to be modified 
                 - Ability to create Iceberg Tables in the target databases and schemas                
+        """
+    st.markdown(prereqs)
+
+@st.dialog("AWS Glue Prerequisites")
+def render_aws_glue_prereqs():
+    st.html("<span class='small-dialog'></span>")
+    prereqs = f"""
+        - Syncing Snowflake-managed Iceberg Tables to AWS Glue:
+            - **External:**
+                - An existing AWS Glue Data Catalog  
+            - **Snowflake:**
+                - At least ```SELECT``` privileges on existing Snowflake Iceberg tables
+                - At least ```USAGE``` privileges on an existing Snowflake ```EXTERNAL ACCESS INTEGRATION``` registered to the required AWS Glue region(s)
+                    - This tool can be used to create the ```EXTERNAL ACCESS INTEGRATION```, which requires either the ```ACCOUNTADMIN``` role or a role with the ```CREATE INTEGRATION``` and ```CREATE EXTERNAL ACCESS INTEGRATION``` privileges.
+                        - If creating an ```EXTERNAL ACCESS INTEGRATION```, at least ```USAGE``` privileges on an existing Snowflake ```NETWORK RULE``` is required. This tool can also be used to create one, which requires either the ```ACCOUNTADMIN```, ```SECURITYADMIN``` roles, ownership of the schema, or a role granted the ```CREATE NETWORK RULE``` privilege.
+                    - Visit https://docs.snowflake.com/en/developer-guide/external-network-access/creating-using-external-network-access for instructions for more details. 
+                - At least ```USAGE``` privileges on an existing Snowflake ```SECURITY INTEGRATION``` (if preferred to manage access to AWS Glue).
+                - At least ```USAGE``` privileges on an existing warehouse that will be used for tasks that will sync iceberg metadata to AWS Glue. 
+            - **Role Permissions:**
+                - Ability to query and update all the objects in the tool schema 
+                - Ability to query all the views in the tool schema 
+                - Ability to create and execute procedures in the tool schema
+                - Ability to use the warehouse for processing
+                - Ability to create, execute, monitor and drop tasks in the tool schema 
+                - Usage of the external volume
+                - Ability to create and drop objects in the databases and schemas that contain table to be modified 
+                - Ability to create objects in the target databases and schemas (if not replacing existing Snowflake tables)
+                - Ability to set permissions and change ownership of the newly created iceberg tables               
         """
     st.markdown(prereqs)
 
@@ -869,6 +1025,409 @@ def render_create_ci():
         st.success(f"Catalog Integration: **{txt_ci_name}** successfully created. 🎉")
 
 
+def render_create_eai():
+    if "eai_secrets_check" not in st.session_state:
+        st.session_state.eai_secrets_check = False
+
+    if "eai_secrets" not in st.session_state:
+        st.session_state.eai_secrets = pd.DataFrame()
+
+    if "eai_si_check" not in st.session_state:
+        st.session_state.eai_si_check = False
+
+    if "eai_si" not in st.session_state:
+        st.session_state.eai_si = pd.DataFrame()
+
+    if "eai_nr_check" not in st.session_state:
+        st.session_state.eai_nr_check = False
+
+    if "eai_nr" not in st.session_state:
+        st.session_state.eai_nr = pd.DataFrame()
+    
+    eai_secret = ""
+    sb_eai_secret_type = ""
+    create_secret_ddl = ""
+    flag_secret_selected = False
+    flag_create_secret = False
+    
+    eai_si = ""
+    create_si_ddl = ""
+    flag_si_selected = False
+    flag_create_si = False
+    
+
+    eai_nr = ""
+    eai_nr_values = ""
+    create_nr_ddl = ""
+    flag_nr_selected = False
+    flag_create_nr = False
+    
+    btn_create_eai = False
+    flag_create_eai = False
+    flag_disable_btn_create_eai = True
+    eai_created = False
+
+    st.subheader("**Create an External Access Integration**")
+    st.caption(":red[⚠︎ NOTE:  The current role should be either ACCOUNTADMIN or have been granted the `CREATE INTEGRATION` and `CREATE EXTERNAL ACCESS INTEGRATION` privileges.]")
+    st.write("")
+
+    #external access integration name
+    txt_eai_name = st.text_input('External Access Integration Name:'
+                                , key = "txt_eai_name"
+                                )
+    st.write("")
+    
+    #fetch existing secrets
+    with st.spinner("Fetching Secrets..."):
+        if not st.session_state.eai_secrets_check:
+            #call run_sis_cmd to get external access integration --SiS cannot execute this show command
+            st.session_state.eai_secrets = run_sis_cmd("SHOW SECRETS IN ACCOUNT", True)
+            st.session_state.eai_secrets_check = True
+
+        select_secrets_list = []
+        
+        if not st.session_state.eai_secrets.empty :
+            st.session_state.eai_secrets["fqn_name"] = st.session_state.eai_secrets["database_name"]+"."+st.session_state.eai_secrets["schema_name"]+"."+st.session_state.eai_secrets["name"]
+            select_secrets_list = ["Choose..."] + st.session_state.eai_secrets["fqn_name"].values.tolist() + ["Create new..."]
+        else:
+            select_secrets_list = ["Choose...", "Create new..."]
+        
+        sb_eai_secret = st.selectbox("Select Secret:"
+                                    , select_secrets_list
+                                    , key = "sb_eai_secrets"
+                                    )
+
+        if sb_eai_secret not in ["Choose...", "Create new..."]:
+            eai_secret = sb_eai_secret
+            flag_secret_selected = True
+
+        if sb_eai_secret == "Create new...":
+            st.write("")
+            st.write("")
+            st.write("")
+            st.markdown("<h6 style='text-align: left; color: black;'>Create New Secret</h6>", unsafe_allow_html=True)
+
+            secret_db = ""
+            secret_sch = ""
+
+            #choose database and schema to store secret
+            dbs = pd.DataFrame(session.sql("SHOW DATABASES").collect())
+            schemas = None
+            
+            if not dbs.empty:
+                secret_db = st.selectbox("Select Database:"
+                                            , dbs["name"]
+                                            , key = "sb_snowflake_src_db"
+                                        )
+                
+                schemas = pd.DataFrame(session.sql(f"""SHOW SCHEMAS IN DATABASE {secret_db}  WITH PRIVILEGES OWNERSHIP, USAGE""").collect())
+                
+            if not schemas.empty:
+                secret_sch = st.selectbox("Select Schema:"
+                                            , schemas["name"].values.tolist()
+                                            , key = "ms_snowflake_src_schemas"
+                                         )
+
+            #secret name
+            txt_secret_name = st.text_input('Secret Name:'
+                                        , key = "txt_secret_name"
+                                        )
+            #set secret type
+            secret_type_list = ["Choose...","password","cloud_provider_token"]
+
+            sb_eai_secret_type = st.selectbox("Select Secret Type:"
+                                    , secret_type_list
+                                    , key = "sb_eai_secret_type"
+                                    )
+
+            if sb_eai_secret_type == "password":
+                #username
+                txt_username = st.text_input('Username:'
+                                            , key = "txt_username"
+                                            )
+    
+                #password
+                txt_password = st.text_input('Password:'
+                                            , type="password"
+                                            , key = "txt_password"
+                                            )
+
+                if all(v != "" for v in [secret_db, secret_sch, txt_secret_name, txt_username, txt_password]):
+                    create_secret_ddl = f"""CREATE OR REPLACE SECRET {secret_db}.{secret_sch}.{txt_secret_name}
+                                          TYPE = PASSWORD
+                                          USERNAME = '{txt_username}'
+                                          PASSWORD = '{txt_password}';"""
+
+                    flag_secret_selected = True
+                    flag_create_secret = True
+            
+            if sb_eai_secret_type == "cloud_provider_token":
+                #fetch security integrations
+                with st.spinner("Fetching Security Integrations..."):
+                    if not st.session_state.eai_si_check:
+                        #call run_sis_cmd to get security integrations --SiS cannot execute this show command
+                        st.session_state.eai_si = run_sis_cmd("SHOW SECURITY INTEGRATIONS", True)
+                        st.session_state.eai_si_check = True
+
+                    filtered_eai_si = st.session_state.eai_si[st.session_state.eai_si["type"] == "API_AUTHENTICATION"]
+                    select_si_list = []
+                    
+                    if not st.session_state.eai_si.empty :
+                        select_si_list = ["Choose..."] + filtered_eai_si["name"].values.tolist() + ["Create new..."]
+                    else:
+                        select_si_list = ["Choose...", "Create new..."]
+
+                    sb_eai_si = st.selectbox("Select Security Integration:"
+                                            , select_si_list
+                                            , key = "sb_eai_si"
+                                            )
+                    
+                    if sb_eai_si not in ["Choose...", "Create new..."]:
+                        eai_si = sb_eai_si
+                        flag_si_selected = True
+                    
+                    if sb_eai_si == "Create new...":
+                        st.write("")
+                        st.write("")
+                        st.write("")
+                        st.markdown("<h6 style='text-align: left; color: black;'>Create New Security Integration</h6>", unsafe_allow_html=True)
+                        
+                        #security integration name
+                        txt_si_name = st.text_input('Security Integration Name:'
+                                                    , key = "txt_si_name"
+                                                    )
+                        
+                        #aws_role_arn
+                        txt_si_aws_role_arn = st.text_input('AWS Role ARN'
+                                                    , key = "txt_si_aws_role_arn"
+                                                    , help = "i.e.: arn:aws:iam::123456789012:role/myrole. This is the IAM role with the permissions described below."
+                                                    )
+                        
+                        #create security integration ddl
+                        if all(v != "" for v in [txt_si_name, txt_si_aws_role_arn]):
+                            create_si_ddl = f"""CREATE OR REPLACE SECURITY INTEGRATION {txt_si_name}
+                                                        TYPE = API_AUTHENTICATION
+                                                        AUTH_TYPE = AWS_IAM
+                                                        ENABLED = TRUE
+                                                        AWS_ROLE_ARN = '{txt_si_aws_role_arn}';"""
+                                                        
+                            eai_si = txt_si_name
+
+                            flag_si_selected = True
+                            flag_create_si = True
+                        
+                    
+                    txt_si_iam_role = """The Security Integration requires an IAM role with AWS Glue permissions. i.e.
+
+                    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "VisualEditor0",
+                "Effect": "Allow",
+                "Action": [
+                    "glue:CreateTable",
+                    "glue:UpdateTable",
+                    "glue:GetTable",
+                    "glue:CreateDatabase",
+                    "glue:GetDatabase"
+                ],
+                "Resource": [
+                    "arn:aws:glue:<region>:<aws_account_id>:catalog",
+            "arn:aws:glue:<region>:<aws_account_id>:catalog/*",
+                    "arn:aws:glue:<region>:<aws_account_id>:table/<my_athena_database>/*",
+                    "arn:aws:glue:<region>:<aws_account_id>:database/<my_athena_database>"
+                ]
+            }
+        ]
+    }
+
+- AWS documentation to create an IAM role: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html
+- Add permissions for AWS Glue: https://docs.aws.amazon.com/glue/latest/dg/set-up-iam.html
+- Add permissions for AWS Athena: https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html"""
+                    
+                    st.write("")
+                    st.warning(txt_si_iam_role, icon="⚠️")
+                    
+                    if all(v != "" for v in [secret_db, secret_sch, txt_secret_name, eai_si]):
+                        create_secret_ddl = f"""CREATE OR REPLACE SECRET {secret_db}.{secret_sch}.{txt_secret_name}
+                                          TYPE = CLOUD_PROVIDER_TOKEN
+                                          API_AUTHENTICATION = {eai_si};"""
+
+                        flag_secret_selected = True
+                        flag_create_secret = True
+
+            if flag_create_secret:
+                eai_secret = f"{secret_db}.{secret_sch}.{txt_secret_name}"
+            
+    st.write("")
+    st.write("")
+    st.write("")
+    st.markdown("<h6 style='text-align: left; color: black;'>Network Rules with AWS Glue/Athena access</h6>", unsafe_allow_html=True)
+    #fetch network rules
+    with st.spinner("Fetching Network Rules..."):
+        if not st.session_state.eai_nr_check:
+            #call run_sis_cmd to get network rules --SiS cannot execute this show command
+            st.session_state.eai_nr = run_sis_cmd("SHOW NETWORK RULES IN ACCOUNT", True)
+            st.session_state.eai_nr_check = True
+
+        filtered_eai_nr = st.session_state.eai_nr[st.session_state.eai_nr["type"] == "HOST_PORT"]
+        select_nr_list = []
+        
+        if not st.session_state.eai_nr.empty :
+            filtered_eai_nr["fqn_name"] = filtered_eai_nr["database_name"]+"."+filtered_eai_nr["schema_name"]+"."+filtered_eai_nr["name"]
+            select_nr_list = ["Choose..."] + filtered_eai_nr["fqn_name"].values.tolist() + ["Create new..."]
+        else:
+            select_nr_list = ["Choose...","Create new..."]
+
+        sb_eai_nr = st.selectbox("Select Network Rule:"
+                                , select_nr_list
+                                , key = "sb_eai_nr"
+                                )
+
+        if sb_eai_nr not in ["Choose...", "Create new..."]:
+            eai_nr = sb_eai_nr
+            flag_nr_selected = True
+
+        if sb_eai_nr == "Create new...":
+            nr_db = ""
+            nr_sch = ""
+            #choose database and schema to store network rule
+            dbs = pd.DataFrame(session.sql("SHOW DATABASES").collect())
+            schemas = None
+            
+            if not dbs.empty:
+                nr_db = st.selectbox("Select Database:"
+                                            , dbs["name"]
+                                            , key = "sb_nr_src_db"
+                                        )
+                
+                schemas = pd.DataFrame(session.sql(f"""SHOW SCHEMAS IN DATABASE {nr_db}  WITH PRIVILEGES OWNERSHIP, USAGE""").collect())
+                
+            if not schemas.empty:
+                nr_sch = st.selectbox("Select Schema:"
+                                            , schemas["name"].values.tolist()
+                                            , key = "ms_nr_src_schemas"
+                                     )
+
+            
+            nr_name = st.text_input('Network Rule Name:'
+                                        , key = "txt_nr_name"
+                                        )
+            st.write("")
+            eai_nr_values = st.text_area("Provide a comma-separated list of AWS Glue/Athena regions to be accessed", key="txt_eai_nr_values", help = "i.e.: glue.us-west-2.amazonaws.com, glue.us-west-2.api.aws")
+
+            eai_nr_values_split = eai_nr_values.split(",")
+            eai_nr_values_quoted = [f'"{item}"' for item in eai_nr_values_split]
+            eai_nr_values_final = ",".join(eai_nr_values_quoted)
+
+            if all(v != "" for v in [nr_name, eai_nr_values]):
+               create_nr_ddl = f"""CREATE OR REPLACE NETWORK RULE {nr_db}.{nr_sch}.{nr_name}
+                                      MODE = EGRESS
+                                      TYPE = HOST_PORT
+                                      VALUE_LIST = ({eai_nr_values_final}); """ 
+               flag_nr_selected = True
+               flag_create_nr = True 
+
+            if flag_create_nr:
+                eai_nr = f"{nr_db}.{nr_sch}.{nr_name}"
+
+    if txt_eai_name != '' and flag_secret_selected and flag_nr_selected:
+        flag_disable_btn_create_eai = False
+        
+    st.write("#")
+
+    #create external access integration
+    col1, col2, col3 = st.columns([3.5,3.5,0.975])
+
+    with col1:
+        st.write("")
+        st.write("")
+        st.button("Home", key="create_eai_home", type="secondary", on_click=set_page, args=["home"])
+
+    with col3:
+        st.write("")
+        st.write("")
+        btn_create_eai = st.button("Create", key="create_eai_btn", type="primary", disabled=flag_disable_btn_create_eai)
+
+    if btn_create_eai:
+        flag_create_eai = True
+
+    if flag_create_eai:
+        with st.spinner("Updating..."):
+            if flag_create_si:
+                session.sql(create_si_ddl).collect()
+            if flag_create_secret:
+                session.sql(create_secret_ddl).collect()
+            if flag_create_nr:
+                session.sql(create_nr_ddl).collect()
+    
+            session.sql(f"""CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION {txt_eai_name}
+                              ALLOWED_NETWORK_RULES = ({eai_nr})
+                              ALLOWED_AUTHENTICATION_SECRETS =({eai_secret})
+                              ENABLED = true;""").collect()
+            
+            #get ddl for update_glue_metadata_location_template proc
+            glue_proc_template_ddl = pd.DataFrame(session.sql(f"""SELECT GET_DDL('procedure'
+                                                     ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)'
+                                                     , TRUE);""").collect()).iloc[0,0]
+            
+            #set new glue proc name
+            glue_proc_name = f"UPDATE_GLUE_METADATA_LOCATION_{txt_eai_name}"
+
+            #replace the proc's name with the name for this EAI
+            template_proc_name_pattern = re.compile("ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE", re.IGNORECASE)
+            new_glue_proc_ddl = template_proc_name_pattern.sub(f"AWS_GLUE_SYNC.{glue_proc_name.upper()}", glue_proc_template_ddl)
+            
+            session.sql(f"""{new_glue_proc_ddl}""").collect()
+            
+            #set proc's EAI and secret
+            session.sql(f"""ALTER PROCEDURE ICEBERG_MIGRATOR_DB.AWS_GLUE_SYNC.{glue_proc_name.upper()}(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)
+                            SET EXTERNAL_ACCESS_INTEGRATIONS = ({txt_eai_name}), SECRETS = ('cred'={eai_secret});""").collect()
+            
+            eai_created = True            
+
+    if eai_created:
+        st.write("")
+        st.write("")
+        st.success(f"External Access Integration: **{txt_eai_name}** successfully created. 🎉")
+        
+        if sb_eai_secret_type == "cloud_provider_token":
+            api_aws_iam_user_arn = ""
+            api_aws_external_id = ""
+            txt_si_iam_user = ""
+            with st.spinner(f"Fetching Security Integration Details..."):
+                #describe the security integration chosen/created and inform the user to use the values to set the IAM User
+                desc_si = run_sis_cmd(f"DESCRIBE SECURITY INTEGRATION {eai_si}", True)
+                
+                if not desc_si.empty:
+                    api_aws_iam_user_arn = desc_si[desc_si["property"] == 'API_AWS_IAM_USER_ARN'].iloc[0,2]
+                    api_aws_external_id = desc_si[desc_si["property"] == 'API_AWS_EXTERNAL_ID'].iloc[0,2]
+                    
+                    txt_si_iam_user = f"""Follow **Step 5** in Option 1: Configuring a Snowflake storage integration to access Amazon S3 to grant the IAM user access to the Amazon S3 service: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
+
+Copy the values below for Security Integration: **{eai_si.upper()}**."""
+                        
+            st.write("")
+            st.warning(txt_si_iam_user, icon="⚠️")
+
+            with st.container(border=True):
+                st.write("")
+                col1, col2 = st.columns([0.9,1.9])
+                with col1:
+                    st.write("")
+                    st.markdown("**API_AWS_IAM_USER_ARN:**")
+                with col2:
+                    st.code(f"{api_aws_iam_user_arn}")
+    
+                col1, col2 = st.columns([0.9,1.9])
+                with col1:
+                    st.write("")
+                    st.markdown("**API_AWS_EXTERNAL_ID:**")
+                with col2:
+                    st.code(f"{api_aws_external_id}")
+
+
 def render_choose_snowflake_tables_wizard_view():
     if "current_step" not in st.session_state:
         st.session_state.current_step = 1
@@ -953,6 +1512,9 @@ def render_choose_snowflake_tables_wizard_view():
         
     if "snowflake_target_sch" not in st.session_state:
         st.session_state.snowflake_target_sch = None
+        
+    if "master_table_list" not in st.session_state:
+        st.session_state.master_table_list = None
 
     master_table_list = []
 
@@ -1300,7 +1862,7 @@ def render_choose_snowflake_tables_wizard_view():
     
         if convert_tables_flag:            
             with st.spinner("Running..."):
-                ins_stmt = 'INSERT INTO ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATION_TABLE(table_type, table_catalog, table_schema, table_name, target_table_catalog, target_table_schema) VALUES\n'
+                ins_stmt = 'INSERT INTO ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATION_TABLE(table_type, table_catalog, table_schema, table_name, target_type, target_table_catalog, target_table_schema, target_table_name) VALUES\n'
                 
                 #set target database/schema to null if empty/null
                 target_db = f"'{st.session_state.snowflake_target_db}'" if st.session_state.snowflake_target_db else 'NULL'
@@ -1308,9 +1870,9 @@ def render_choose_snowflake_tables_wizard_view():
                 
                 for index, row in enumerate(st.session_state.master_table_list):
                     if index == 0:
-                        ins_stmt += f"('snowflake', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', {target_db}, {target_sch})\n"
+                        ins_stmt += f"('snowflake_fdn', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', 'snowflake', {target_db}, {target_sch}, '{row['Table']}')\n"
                     else:
-                        ins_stmt += f",('snowflake', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', {target_db}, {target_sch})\n"
+                        ins_stmt += f",('snowflake_fdn', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', 'snowflake', {target_db}, {target_sch}, '{row['Table']}')\n"
 
                 ins_stmt = ins_stmt.rstrip("\n")+";"
                 
@@ -1740,37 +2302,492 @@ def render_choose_delta_tables_wizard_view():
     form_footer_cols[0].button("Home", key="footer_home", type="secondary", on_click=set_page, args=["home"])
     form_footer_cols[1].button("Back", key="footer_back", type="secondary", on_click=set_form_step, args=["Back"], disabled=disable_back_button)
     form_footer_cols[2].button("Next", key="footer_next", type="primary", on_click=set_form_step, args=["Next"], disabled=disable_next_button)
-    
 
-def render_migration_log_view():
-    st.markdown("<h2 style='text-align: center; color: black;'>Migration Log</h2>", unsafe_allow_html=True)
+
+def render_choose_iceberg_tables_aws_sync_wizard_view():
+    if "current_step" not in st.session_state:
+        st.session_state.current_step = 1
+        
+    if "disable_step_2" not in st.session_state:
+        st.session_state.disable_step_2 = True
+    
+    if "disable_step_3" not in st.session_state:
+        st.session_state.disable_step_3 = True
+
+    if "aws_glue_eai_check" not in st.session_state:
+        st.session_state.aws_glue_eai_check = False
+
+    if "aws_glue_eais" not in st.session_state:
+        st.session_state.aws_glue_eais = pd.DataFrame()
+
+    if "aws_glue_eai_idx" not in st.session_state:
+        st.session_state.aws_glue_eai_idx = 0
+
+    if "aws_glue_eai_name" not in st.session_state:
+        st.session_state.aws_glue_eai_name = ""
+
+    if "aws_glue_src_db_idx" not in st.session_state:
+        st.session_state.aws_glue_src_db_idx = 0
+        
+    if "aws_glue_src_db" not in st.session_state:
+        st.session_state.aws_glue_src_db = ""
+
+    if "aws_glue_disable_schemas_ms" not in st.session_state:
+        st.session_state.aws_glue_disable_schemas_ms = False
+
+    if "aws_glue_schema_val" not in st.session_state:
+        st.session_state.aws_glue_schema_val = False
+
+    if "aws_glue_schema_list" not in st.session_state:
+        st.session_state.aws_glue_schema_list = []
+        
+    if "aws_glue_src_schemas" not in st.session_state:
+        st.session_state.aws_glue_src_schemas = []
+        
+    if "aws_glue_target_db" not in st.session_state:
+        st.session_state.aws_glue_target_db = ""
+        
+    if "aws_glue_update_freq" not in st.session_state:
+        st.session_state.aws_glue_update_freq = None
+
+    if "aws_glue_sync_wh_check" not in st.session_state:
+        st.session_state.aws_glue_sync_wh_check = False
+
+    if "aws_glue_sync_whs" not in st.session_state:
+        st.session_state.aws_glue_sync_whs = pd.DataFrame()
+        
+    if "aws_glue_sync_wh_idx" not in st.session_state:
+        st.session_state.aws_glue_sync_wh_idx = 0
+        
+    if "aws_glue_sync_wh_name" not in st.session_state:
+        st.session_state.aws_glue_sync_wh_name = ""
+
+    aws_glue_master_table_list = []
+
+
+    st.markdown("<h2 style='text-align: center; color: black;'>Sync Snowflake-managed Iceberg Tables</h2>", unsafe_allow_html=True)    
+
+    ###### Top Navigation ######
+    btn_ev_type = "primary" if st.session_state.current_step == 1 else "secondary"
+    btn_tbl_type = "primary" if st.session_state.current_step == 2 else "secondary"
+    btn_ib_tbl_type = "primary" if st.session_state.current_step == 3 else "secondary"
+
+    if st.session_state.current_step == 2:
+        st.session_state.disable_step_3 = False
+
     st.write("")
-    st.write("The table below provides details of each Iceberg migration run")
+    st.write("")  
+    step_cols = st.columns([0.65, .55, .55, .55, 0.5])
+    step_cols[1].button("STEP 1", key="nav_step1", on_click=set_form_step, args=["Jump", 1], type=btn_ev_type, disabled=False)
+    step_cols[2].button("STEP 2", key="nav_step2", on_click=set_form_step, args=["Jump", 2], type=btn_tbl_type, disabled=st.session_state.disable_step_2)        
+    step_cols[3].button("STEP 3", key="nav_step3", on_click=set_form_step, args=["Jump", 3], type=btn_ib_tbl_type, disabled=st.session_state.disable_step_3)
     st.write("")
+    st.write("")                       
     
-    btn_check_log = st.button("Check Log", type="primary")
-    st.write("")
-    
-    df_transcode_log = manual_migration_log_check()
-    
-    if btn_check_log:
-        df_transcode_log = manual_migration_log_check()
-    
+    ###### Step 1: Select Tables ######
+    if st.session_state.current_step == 1:                     
+        st.subheader("**STEP 1: Select Iceberg Tables**")
+        st.write("")
 
-    if not df_transcode_log.empty:
-        st.markdown(df_transcode_log.style.set_table_styles([{'selector': 'th', 'props': [('font-size', '12px'),('background-color','#D3D3D3')]}]).set_properties(**{'color': '#000000','font-size': '12px','font-weight':'regular', 'width':'550px'}).hide(axis = 0).hide(axis = 0).applymap(highlight_log_status).to_html(), unsafe_allow_html = True)
-        #u.paginate_data(df_transcode_log.style.set_table_styles([{'selector': 'th', 'props': [('font-size', '12px'),('background-color','#D3D3D3')]}]).set_properties(**{'color': '#000000','font-size': '12px','font-weight':'regular', 'width':'550px'}).hide(axis = 0).hide(axis = 0).applymap(highlight_log_status).to_html(), unsafe_allow_html = True)
-    else:
-        st.markdown("***No results available.***")
-    st.write("#")
-
-    #home button
-    col1, col2, col3 = st.columns([3.5,3.5,0.975])
-
-    with col1:
+        #select EAI
+        st.markdown("<h6 style='text-align: left; color: black;'>Please choose the External Access Integration that points to the relevant AWS Glue/Athena regions</h6>", unsafe_allow_html=True)
+        st.caption(":red[⚠︎ NOTE:  If an External Access Integration does not exist, use the app's **CREATE EXTERNAL ACCESS INTEGRATION** tool to create one.]")
+        st.write("")
+        
+        with st.spinner("Fetching External Access Integrations..."):
+            if not st.session_state.aws_glue_eai_check:
+                #call run_sis_cmd to get external volumes --SiS cannot execute this show command
+                st.session_state.aws_glue_eais = run_sis_cmd("SHOW EXTERNAL ACCESS INTEGRATIONS", True)
+                st.session_state.aws_glue_eai_check = True
+                    
+            select_eai_list = []
+            
+            if not st.session_state.aws_glue_eais.empty :
+                select_eai_list = ["Choose..."] + st.session_state.aws_glue_eais["name"].values.tolist()
+            else:
+                select_eai_list = ["Choose..."]
+        
+            st.session_state.aws_glue_eai_name = st.selectbox("Select External Access Integration:"
+                                                            , select_eai_list
+                                                            , index = st.session_state.aws_glue_eai_idx
+                                                            , key = "sb_aws_glue_eai"
+                                                            , on_change = selectbox_callback
+                                                            , args = ("aws_glue_table", "sb_aws_glue_eai", "aws_glue_eai_idx", select_eai_list)
+                                                            )
         st.write("")
         st.write("")
-        st.button("Home", type="secondary", on_click=set_page, args=["home"])
+        
+        if st.session_state.aws_glue_eai_name != "Choose...":
+            dbs = pd.DataFrame(session.sql("SHOW DATABASES").collect())
+            schemas = None
+            tables = None
+            
+            if not dbs.empty:
+                st.session_state.aws_glue_src_db = st.selectbox("Select Source Database:"
+                                                                    , dbs["name"]
+                                                                    , index = st.session_state.aws_glue_src_db_idx
+                                                                    , key = "sb_aws_glue_src_db"
+                                                                    , on_change = selectbox_callback                            
+                                                                    , args = ("aws_glue_table", "sb_aws_glue_src_db", "aws_glue_src_db_idx", dbs["name"].values.tolist())
+                                                                    )
+                schemas = pd.DataFrame(session.sql(f"""SHOW SCHEMAS IN DATABASE {st.session_state.aws_glue_src_db}  WITH PRIVILEGES OWNERSHIP, USAGE""").collect())
+                
+            if not schemas.empty:
+                st.session_state.aws_glue_src_schemas = st.multiselect("Select Source Schema(s):"
+                                                                        , schemas["name"].values.tolist()
+                                                                        , default = st.session_state.aws_glue_schema_list
+                                                                        , key = "ms_aws_glue_src_schemas"
+                                                                        , disabled = st.session_state.aws_glue_disable_schemas_ms
+                                                                        , on_change= multiselect_callback
+                                                                        , args = ("aws_glue_table", f"ms_aws_glue_src_schemas", None, None)
+                                                                        )
+                cb_all_schemas = st.checkbox("All Schemas"
+                                            , key = "cb_all_schemas"
+                                            , value = st.session_state.aws_glue_schema_val
+                                            , on_change = checkbox_callback
+                                            , args = ("aws_glue_table", "cb_all_schemas", "ms_aws_glue_src_schemas", "aws_glue_disable_schemas_ms", None, None))
+
+                if cb_all_schemas:
+                    schemas = pd.DataFrame(session.sql(f"""SHOW SCHEMAS IN DATABASE {st.session_state.aws_glue_src_db}  WITH PRIVILEGES OWNERSHIP, USAGE""").collect())
+                    st.session_state.aws_glue_src_schemas = pd.DataFrame(session.sql(f"""SELECT "name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))""").collect())['name'].values.tolist()
+
+            st.divider()
+            st.markdown("<h4 style='text-align: left; color: black;'>Schemas</h4>", unsafe_allow_html=True)
+
+            #create a list of schema pairs (tuples)
+            sch_pair = create_pairs(st.session_state.aws_glue_src_schemas)
+            
+            for p_index, pair in enumerate(sch_pair):
+                p_idx = p_index + 1
+
+                #create two columns per pair
+                col1, col2 = st.columns(2)
+                
+                for s_index, sch in enumerate(pair):
+                    if sch is not None:
+                        table_list = []
+                        s_idx = s_index + 1
+                        
+                        if f"ms_aws_glue_tables_{p_idx}_{s_idx}_list" not in st.session_state:
+                            st.session_state[f"ms_aws_glue_tables_{p_idx}_{s_idx}_list"] = []
+                            
+                        if f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}" not in st.session_state:
+                            st.session_state[f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}"] = False
+
+                        if f"cb_aws_glue_all_tables_{p_idx}_{s_idx}_value" not in st.session_state:
+                            st.session_state[f"cb_aws_glue_all_tables_{p_idx}_{s_idx}_value"] = False
+                                
+                        session.sql(f"""SHOW OBJECTS IN SCHEMA {st.session_state.aws_glue_src_db}.{sch}""").collect()
+                        tables = pd.DataFrame(session.sql(f"""SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE LOWER(\"kind\") = 'table' AND LOWER(\"is_iceberg\") = 'y'""").collect())
+        
+                        if s_idx == 1:
+                            ms_tables_1 = []
+                            cb_all_tables_1_flag = True
+                            
+                            with col1:
+                                with st.container(border=True):
+                                    st.markdown(f"**Schema:** {sch}")
+                                    
+                                    if not tables.empty:
+                                        table_list = tables["name"].values.tolist()
+                                        cb_all_tables_1_flag = False
+                                        
+                                    ms_tables_1 = st.multiselect("Select Iceberg Table(s):"
+                                        , table_list
+                                        , default = st.session_state[f"ms_aws_glue_tables_{p_idx}_{s_idx}_list"] 
+                                        , key = f"ms_aws_glue_tables_{p_idx}_{s_idx}"
+                                        , disabled = st.session_state[f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}"]
+                                        , on_change= multiselect_callback
+                                        , args = ("aws_glue_table", f"ms_aws_glue_tables_{p_idx}_{s_idx}", p_idx, s_idx)
+                                        )
+        
+                                    cb_all_tables_1 = st.checkbox("All Tables"
+                                            , value = st.session_state[f"cb_aws_glue_all_tables_{p_idx}_{s_idx}_value"] 
+                                            , key = f"cb_aws_glue_all_tables_{p_idx}_{s_idx}"
+                                            , disabled = cb_all_tables_1_flag
+                                            , on_change = checkbox_callback
+                                            , args = ("aws_glue_table", f"cb_aws_glue_all_tables_{p_idx}_{s_idx}", "ms_tables_1", f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}", p_idx, s_idx)
+                                    )
+                                    
+                                    if cb_all_tables_1:
+                                        ms_tables_1 = table_list
+
+                                    
+                                    for tbl in ms_tables_1:
+                                        if {"Database": f"{st.session_state.aws_glue_src_db}", "Schema": f"{sch}", "Table": f"{tbl}"} not in aws_glue_master_table_list:
+                                            aws_glue_master_table_list.append({"Source Database": f"{st.session_state.aws_glue_src_db}", "Source Schema": f"{sch}", "Table": f"{tbl}", "Target Database": "", "Target Table": f"{tbl}", "Update Frequency": "", "Warehouse": ""})
+                                            
+                        if s_idx == 2:
+                            ms_tables_2 = []
+                            cb_all_tables_2_flag = True
+                            
+                            with col2:
+                                with st.container(border=True):
+                                    st.markdown(f"**Schema:** {sch}")
+                                    
+                                    if not tables.empty:
+                                        table_list = tables["name"].values.tolist()
+                                        cb_all_tables_2_flag = False
+                                        
+                                    ms_tables_2 = st.multiselect("Select Iceberg Table(s):"
+                                            , table_list
+                                            , default = st.session_state[f"ms_aws_glue_tables_{p_idx}_{s_idx}_list"] 
+                                            , key = f"ms_aws_glue_tables_{p_idx}_{s_idx}"
+                                            , disabled = st.session_state[f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}"]
+                                            , on_change= multiselect_callback
+                                            , args = ("aws_glue_table", f"ms_aws_glue_tables_{p_idx}_{s_idx}",p_idx, s_idx )
+                                        )
+        
+                                    cb_all_tables_2 = st.checkbox("All Tables"
+                                            , value = st.session_state[f"cb_aws_glue_all_tables_{p_idx}_{s_idx}_value"] 
+                                            , key = f"cb_aws_glue_all_tables_{p_idx}_{s_idx}"
+                                            , disabled = cb_all_tables_2_flag
+                                            , on_change = checkbox_callback
+                                            , args = ("aws_glue_table", f"cb_aws_glue_all_tables_{p_idx}_{s_idx}", "ms_tables_2", f"disable_aws_glue_tables_ms_{p_idx}_{s_idx}", p_idx, s_idx)
+                                    )
+
+                                    if cb_all_tables_2:
+                                        ms_tables_2 = table_list
+
+                                    for tbl in ms_tables_2:
+                                        if {"Database": f"{st.session_state.aws_glue_src_db}", "Schema": f"{sch}", "Table": f"{tbl}"} not in aws_glue_master_table_list:
+                                            aws_glue_master_table_list.append({"Source Database": f"{st.session_state.aws_glue_src_db}", "Source Schema": f"{sch}", "Table": f"{tbl}", "Target Database": "", "Target Table": f"{tbl}", "Update Frequency": "", "Warehouse": ""})
+
+            st.write("")
+            st.divider()
+            if aws_glue_master_table_list:
+                st.markdown("<h4 style='text-align: left; color: black;'>AWS Glue Sync Details</h4>", unsafe_allow_html=True)
+                
+                with st.spinner("Fetching Warehouses..."):
+                    if not st.session_state.aws_glue_sync_wh_check:
+                        #call run_sis_cmd to get warehouses volumes --SiS cannot execute this show command
+                        st.session_state.aws_glue_sync_whs = run_sis_cmd("SHOW WAREHOUSES", True)
+                        st.session_state.aws_glue_sync_wh_check = True
+                            
+                    select_aws_glue_sync_wh_list = []
+                    
+                    if not st.session_state.aws_glue_sync_whs.empty :
+                        select_aws_glue_sync_wh_list = ["Choose..."] + st.session_state.aws_glue_sync_whs["name"].values.tolist()
+                    else:
+                        select_aws_glue_sync_wh_list = ["Choose..."]
+
+                    #enter target Athena Database, Update frequency
+                    st.session_state.aws_glue_target_db = st.text_input("Enter Target Athena Database:"
+                                                                        , key = "txt_aws_glue_target_db"
+                                                                        , help = "the name of the Athena database to sync the tables to. **NOTE:** the tables selected will be synced to AWS Glue with the same name"
+                                                                        , on_change = input_callback
+                                                                        , args = ("aws_glue_table", "aws_glue_target_db", "txt_aws_glue_target_db"))
+                
+                    st.session_state.aws_glue_update_freq = st.text_input("Enter Update Frequency (mins):"
+                                                                        , key = "txt_aws_glue_update_freq"
+                                                                        , help = "the frequency in minutes in which the Iceberg table's metadata is synced with AWS Glue"
+                                                                        , on_change = input_callback
+                                                                        , args = ("aws_glue_table", "aws_glue_update_freq", "txt_aws_glue_update_freq"))
+
+                    #select warehouse
+                    st.session_state.aws_glue_sync_wh_name = st.selectbox("Select Warehouse:"
+                                                                , select_aws_glue_sync_wh_list
+                                                                , index = st.session_state.aws_glue_sync_wh_idx
+                                                                , key = "sb_aws_glue_sync_wh_name"
+                                                                , on_change = selectbox_callback
+                                                                , args = ("aws_glue_table", "sb_aws_glue_sync_wh_name", "aws_glue_sync_wh_idx", select_aws_glue_sync_wh_list)
+                                                                )
+
+                #update target db and table
+                for t in aws_glue_master_table_list:
+                    t.update((k, f"{st.session_state.aws_glue_target_db}") for k, v in t.items() if k == "Target Database")
+                    t.update((k, f"{st.session_state.aws_glue_update_freq}") for k, v in t.items() if k == "Update Frequency")
+                    t.update((k, f"{st.session_state.aws_glue_sync_wh_name}") for k, v in t.items() if k == "Warehouse")
+                
+
+        st.divider()        
+        st.markdown("<h4 style='text-align: left; color: black;'>Selected Tables</h4>", unsafe_allow_html=True)
+
+        st.session_state.aws_glue_master_table_list = aws_glue_master_table_list
+
+        if st.session_state.aws_glue_master_table_list:
+            df_aws_glue_master_table_list = pd.DataFrame(st.session_state.aws_glue_master_table_list)
+            u.paginate_data(df_aws_glue_master_table_list)
+        
+        if st.session_state.aws_glue_master_table_list and all(v is not '' for v in [st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db, st.session_state.aws_glue_target_db]) and st.session_state.aws_glue_sync_wh_name != "Choose...":
+            st.session_state.disable_step_2 = False
+        else:
+            st.session_state.disable_step_2 = True
+        
+
+    ###### Step 2: Confirm Settings ######            
+    if st.session_state.current_step == 2:
+        #update SNOWFLAKE_TOOL_CONFIG with selected EV and CI from Step 1
+        session.sql(f"""UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.SNOWFLAKE_TOOL_CONFIG SET
+                            tool_value = '{st.session_state.aws_glue_eai_name}'
+                        WHERE LOWER(tool_name) = 'iceberg_migrator' AND LOWER(tool_parameter) = 'aws_glue_external_access_integration'""").collect()
+        
+        st.subheader("**STEP 2: Verify/Update Settings**")
+        st.write("Verify the settings below. Update as needed.")
+
+        update_config_flag = False
+        config_updates = {}
+    
+        df_configuration_settings = pd.DataFrame(session.sql(f"""SELECT
+                                                                    tool_parameter
+                                                                    ,tool_value
+                                                                FROM ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.SNOWFLAKE_TOOL_CONFIG WHERE LOWER(tool_name) = 'iceberg_migrator'""").collect())
+    
+        for index, row in df_configuration_settings.iterrows():
+            parameter = str(row["TOOL_PARAMETER"])
+            value = row["TOOL_VALUE"]
+    
+            if value == "":
+                prefix = "<No Value Defined>"  
+            else:
+                prefix = "Current: "
+    
+            col1, col2 = st.columns(2, gap="small")
+                        
+            with col1:
+                st.text_input("Parameter:", parameter, key=f"parameter_{index}", disabled=True)
+            with col2:
+                updated_value = value
+                st.text_input("Value:", key=f"value_{index}", placeholder=f"{prefix}{value}")
+                
+                if st.session_state[f"value_{index}"] != "":
+                    updated_value = st.session_state[f"value_{index}"]
+                    
+                config_updates.update({parameter:updated_value})
+    
+        st.write("")
+        st.write("")
+    
+        #update button
+        col1, col2, col3 = st.columns([3.5,3.25,1])
+    
+        with col3:
+            st.write("")
+            st.write("")
+            btn_update_config = st.button("Update", type="primary", key=f"btn_update_config")
+    
+            if btn_update_config:
+                update_config_flag = True
+    
+        if update_config_flag:
+            with st.spinner("Updating..."):
+                for key, value in config_updates.items():
+                    session.sql(f"UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.SNOWFLAKE_TOOL_CONFIG SET tool_value = '{value}' WHERE LOWER(tool_name) = 'iceberg_migrator' AND LOWER(tool_parameter) = ('{key}');").collect()
+            
+            st.success(f"Settings updated successfully 🎉")
+
+    ###### Step 3: Confirm Settings ######            
+    if st.session_state.current_step == 3:
+        sync_tables_flag = False
+        show_log_flag = False
+        
+        st.subheader("**STEP 3: Sync Iceberg Tables**")
+        st.write("Confirm the selected Iceberg tables and sync settings.")
+        st.write("")
+        st.markdown("<h4 style='text-align: left; color: black;'>Selected Iceberg Tables</h4>", unsafe_allow_html=True)
+        st.write("")
+
+        if st.session_state.aws_glue_master_table_list:
+            df_aws_glue_master_table_list = pd.DataFrame(st.session_state.aws_glue_master_table_list)
+            u.paginate_data(df_aws_glue_master_table_list)
+            
+        st.write("")
+        st.markdown("<h4 style='text-align: left; color: black;'>Sync Settings</h4>", unsafe_allow_html=True)
+        st.write("")
+
+        df_configuration_settings = pd.DataFrame(session.sql(f"""SELECT
+                                                                    tool_parameter
+                                                                    ,tool_value
+                                                                FROM ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.SNOWFLAKE_TOOL_CONFIG WHERE LOWER(tool_name) = 'iceberg_migrator'""").collect())
+
+        st.markdown(df_configuration_settings.style.format(precision=1, subset=list(df_configuration_settings.columns)).set_properties(**{'background-color': '#D3D3D3', 'font-weight': 'bold'}, subset=['TOOL_PARAMETER']).hide(axis = 0).hide(axis = 1).to_html(), unsafe_allow_html = True)
+        st.write("#")
+    
+        #update button
+        col1, col2, col3 = st.columns([3.5,3.25,1.05])
+    
+        with col3:
+            btn_sync_tables = st.button("Sync", type="primary", key=f"btn_convert_tables")
+    
+            if btn_sync_tables:
+                sync_tables_flag = True
+    
+        if sync_tables_flag:            
+            with st.spinner("Running..."):
+                #TODO: check if the update_glue_metadata_location_{aws_glue_eai_name} proc already exists
+                glue_proc_name = f"UPDATE_GLUE_METADATA_LOCATION_{st.session_state.aws_glue_eai_name}"
+                glue_proc_exists = pd.DataFrame(session.sql(f"""SELECT EXISTS (
+                                                                    SELECT 1
+                                                                    FROM ICEBERG_MIGRATOR_DB.INFORMATION_SCHEMA.PROCEDURES
+                                                                    WHERE PROCEDURE_SCHEMA = 'AWS_GLUE_SYNC'
+                                                                    AND LOWER(PROCEDURE_NAME) = '{glue_proc_name.lower()}'
+                                                                );""").collect()).iloc[0,0]
+                
+                if not glue_proc_exists:
+                    first_secret = ""
+                    #describe the EAI to get secret
+                    desc_eai = run_sis_cmd(f"DESCRIBE EXTERNAL ACCESS INTEGRATION {st.session_state.aws_glue_eai_name}", True)
+                        
+                    if not desc_eai.empty:
+                        property_value = pd.DataFrame(session.sql(f"""SELECT "property_value" 
+                                                                FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) 
+                                                                WHERE LOWER("property") = 'allowed_authentication_secrets'""").collect()).iloc[0,0]
+            
+                        if property_value:
+                            allowed_secrets = property_value.strip("[").strip("]")
+                            allowed_secrets_list = allowed_secrets.split(",")
+                            first_secret = allowed_secrets_list[0]
+
+                        #get the proc using the template ddl
+                        glue_proc_template_ddl = pd.DataFrame(session.sql(f"""SELECT GET_DDL('procedure'
+                                                                                            ,'ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE(FLOAT,FLOAT,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR)'
+                                                                                            ,TRUE
+                                                                                            );""").collect()).iloc[0,0]
+                        
+                        #replace the proc's name with the name for this EAI
+                        template_proc_name_pattern = re.compile("ICEBERG_MIGRATOR.UPDATE_GLUE_METADATA_LOCATION_TEMPLATE", re.IGNORECASE)
+                        new_glue_proc_ddl = template_proc_name_pattern.sub(f"AWS_GLUE_SYNC.{glue_proc_name.upper()}", glue_proc_template_ddl)
+                        
+                        #create the proc for this EAI
+                        session.sql(new_glue_proc_ddl).collect()
+                        
+                        #alter the proc to set the EAI and Secret
+                        session.sql(f"""ALTER PROCEDURE ICEBERG_MIGRATOR_DB.AWS_GLUE_SYNC.{glue_proc_name.upper()}(FLOAT,FLOAT,STRING,STRING,STRING,STRING,STRING)
+                                        SET EXTERNAL_ACCESS_INTEGRATIONS = ({st.session_state.aws_glue_eai_name})
+                                        ,SECRETS = ('cred'={first_secret});""").collect()
+                
+                
+                
+                
+                #insert tables into migration table
+                ins_stmt = 'INSERT INTO ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATION_TABLE(table_type, table_catalog, table_schema, table_name, target_type, target_table_catalog, target_table_name, update_frequency_mins, warehouse) VALUES\n'
+                
+                for index, row in enumerate(st.session_state.aws_glue_master_table_list):
+                    if index == 0:
+                        ins_stmt += f"('snowflake_iceberg', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', 'aws_glue', '{row['Target Database']}', '{row['Target Table']}', {row['Update Frequency']}, '{row['Warehouse']}')\n"
+                    else:
+                        ins_stmt += f",('snowflake_iceberg', '{row['Source Database']}', '{row['Source Schema']}', '{row['Table']}', 'aws_glue', '{row['Target Database']}', '{row['Target Table']}', {row['Update Frequency']}, '{row['Warehouse']}')\n"
+
+                ins_stmt = ins_stmt.rstrip("\n")+";"
+                
+                session.sql(ins_stmt).collect()                
+                
+                #call ICEBERG_MIGRATION_DISPATCHER proc
+                session.sql(f"CALL ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_MIGRATION_DISPATCHER()").collect()
+
+            st.success(f"Iceberg sync has started. Check the **Catalog Sync Log** page of the app for updates.")
+        
+
+    ###### Bottom Navigation ###### 
+    st.divider()
+    disable_back_button = True if st.session_state.current_step == 1 else False
+    disable_next_button = True if st.session_state.current_step == 3 or (st.session_state.current_step == 1 and st.session_state.disable_step_2) or (st.session_state.current_step == 2 and st.session_state.disable_step_3) else False
+
+    form_footer_cols = st.columns([14,1.875,1.875])
+
+    form_footer_cols[0].button("Home", key="footer_home", type="secondary", on_click=set_page, args=["home"])
+    form_footer_cols[1].button("Back", key="footer_back", type="secondary", on_click=set_form_step, args=["Back"], disabled=disable_back_button)
+    form_footer_cols[2].button("Next", key="footer_next", type="primary", on_click=set_form_step, args=["Next"], disabled=disable_next_button)
 
 
 def render_configuration_view():
@@ -1837,6 +2854,192 @@ def render_configuration_view():
         st.rerun()
 
 
+def render_migration_log_view():
+    st.markdown("<h2 style='text-align: center; color: black;'>Migration Log</h2>", unsafe_allow_html=True)
+    st.write("")
+    st.write("The table below provides details of each Iceberg migration run")
+    st.write("")
+    
+    btn_check_log = st.button("Check Log", type="primary")
+    st.write("")
+    
+    df_transcode_log = manual_migration_log_check()
+    
+    if btn_check_log:
+        df_transcode_log = manual_migration_log_check()
+    
+
+    if not df_transcode_log.empty:
+        st.markdown(df_transcode_log.style.set_table_styles([{'selector': 'th', 'props': [('font-size', '12px'),('background-color','#D3D3D3')]}]).set_properties(**{'color': '#000000','font-size': '12px','font-weight':'regular', 'width':'550px'}).hide(axis = 0).hide(axis = 0).applymap(highlight_log_status).to_html(), unsafe_allow_html = True)
+        #u.paginate_data(df_transcode_log.style.set_table_styles([{'selector': 'th', 'props': [('font-size', '12px'),('background-color','#D3D3D3')]}]).set_properties(**{'color': '#000000','font-size': '12px','font-weight':'regular', 'width':'550px'}).hide(axis = 0).hide(axis = 0).applymap(highlight_log_status).to_html(), unsafe_allow_html = True)
+    else:
+        st.markdown("***No results available.***")
+    st.write("#")
+
+    #home button
+    col1, col2, col3 = st.columns([3.5,3.5,0.975])
+
+    with col1:
+        st.write("")
+        st.write("")
+        st.button("Home", type="secondary", on_click=set_page, args=["home"])
+ 
+
+def render_catalog_sync_log_view():
+    if "btn_sync_task_details" not in st.session_state:
+        st.session_state.btn_sync_task_details = {}
+
+    if "alter_task_msg" not in st.session_state:
+        st.session_state.alter_task_msg = ""
+
+    if "display_alter_task_msg" not in st.session_state:
+        st.session_state.display_alter_task_msg = False
+        
+    st.markdown("<h2 style='text-align: center; color: black;'>Catalog Sync Log</h2>", unsafe_allow_html=True)
+    st.write("")
+    st.write("The table below provides details of each Snowflake-managed Iceberg table's sync to an external catalog.")
+    st.write("")
+    
+    btn_check_log = st.button("Check Log", type="primary")
+    st.write("")
+    
+    df_catalog_sync_log = manual_catalog_sync_log_check()
+    
+    if btn_check_log:
+        df_catalog_sync_log = manual_catalog_sync_log_check()
+    
+    if not df_catalog_sync_log.empty:
+        #create table header
+        col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12 = st.columns([0.75,2.5,0.75,1,1,0.75,1,1,1.5,1.5,1.15,1.15])
+    
+        col1.markdown('<span style="font-size: 14px;">**ID**</span>', unsafe_allow_html=True)
+        col2.markdown('<span style="font-size: 14px;">**Source Table**</span>', unsafe_allow_html=True)
+        col3.markdown('<span style="font-size: 14px;">**Catalog**</span>', unsafe_allow_html=True)
+        col4.markdown('<span style="font-size: 14px;">**Target DB**</span>', unsafe_allow_html=True)
+        col5.markdown('<span style="font-size: 14px;">**Target Sch**</span>', unsafe_allow_html=True)
+        col6.markdown('<span style="font-size: 14px; margin:auto; display:table;">**Cycle**</span>', unsafe_allow_html=True)
+        col7.markdown('<span style="font-size: 14px;">**Warehouse**</span>', unsafe_allow_html=True)
+        col8.markdown('<span style="font-size: 14px; margin:auto; display:table;">**Synced**</span>', unsafe_allow_html=True)
+        col9.markdown('<span style="font-size: 14px;">**Updated**</span>', unsafe_allow_html=True)
+        col10.markdown('<span style="font-size: 14px;">**Inserted**</span>', unsafe_allow_html=True)
+        col11.markdown('<span style="font-size: 14px;">**Alter Task**</span>', unsafe_allow_html=True)
+        
+        for index, row in df_catalog_sync_log.iterrows():
+            id = str(row["ID"])
+            table_instance_id = id.split("_")[0]
+            table_run_id = id.split("_")[1]
+            source_table = str(row["SOURCE_TABLE"])
+            destination = str(row["DESTINATION"])
+            target_database = str(row["TARGET_DATABASE"])
+            target_schema = str(row["TARGET_SCHEMA"])
+            update_frequency_mins = str(row["UPDATE_FREQUENCY_MINS"])
+            warehouse = str(row["WAREHOUSE"])
+            sync_started = str(row["SYNC_STARTED"])
+            updated_timestamp = row["UPDATED_TIMESTAMP"]
+            insert_date = row["INSERT_DATE"]
+            
+            col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12 = st.columns([0.75,2.5,0.75,1,1,0.75,1,1,1.5,1.5,1.15,1.15])
+
+            col1.markdown(f'<span style="font-size: 12px;">{id}</span>', unsafe_allow_html=True)
+            col2.markdown(f'<span style="font-size: 12px;">{source_table}</span>', unsafe_allow_html=True)
+            col3.markdown(f'<span style="font-size: 12px;">{destination}</span>', unsafe_allow_html=True)
+            col4.markdown(f'<span style="font-size: 12px;">{target_database}</span>', unsafe_allow_html=True)
+            col5.markdown(f'<span style="font-size: 12px;">{target_schema}</span>', unsafe_allow_html=True)
+            col6.markdown(f'<div style="text-align: center;"><span style="font-size: 12px;">{update_frequency_mins}</span></div>', unsafe_allow_html=True)
+            col7.markdown(f'<span style="font-size: 12px;">{warehouse}</span>', unsafe_allow_html=True)
+            col8.markdown(f'<div style="text-align: center;"><span style="font-size: 12px;">{sync_started}</span></div>', unsafe_allow_html=True)
+            col9.markdown(f'<span style="font-size: 12px;">{updated_timestamp}</span>', unsafe_allow_html=True)
+            col10.markdown(f'<span style="font-size: 12px;">{insert_date}</span>', unsafe_allow_html=True)
+
+            #add convert button if type is query
+            with col11:
+                if f"btn_{id}" not in st.session_state.btn_sync_task_details:
+                    st.session_state.btn_sync_task_details[f"btn_{id}"] = {}
+                    
+                if sync_started.lower() == 'y':
+                    st.session_state.btn_sync_task_details[f"btn_{id}"].update({"label":"Suspend"})
+                if sync_started.lower() == 'n':
+                    st.session_state.btn_sync_task_details[f"btn_{id}"].update({"label":"Resume"})
+                    
+                st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":False})
+                
+                if st.button(st.session_state.btn_sync_task_details[f"btn_{id}"]["label"], type="primary", key=f"btn_{id}"):
+                    st.session_state.btn_sync_task_details[f"btn_{id}"].update({"alter_task":True})
+
+            with col12:
+                #command to either suspend or resume the applicable task
+                if st.session_state.btn_sync_task_details[f"btn_{id}"]["alter_task"]:
+                    src_tbl_name = source_table.split(".")[2]
+                    task_name = f"{src_tbl_name}_GLUE_SYNC_TASK_{id}"
+                    task_fqn = f"ICEBERG_MIGRATOR_DB.AWS_GLUE_SYNC.{src_tbl_name}_GLUE_SYNC_TASK_{id}"
+                    task_action = st.session_state.btn_sync_task_details[f"btn_{id}"]["label"]
+                    
+                    #get task status
+                    with st.spinner("running..."):
+                        df_current_task_status = run_sis_cmd(f"SHOW TASKS LIKE '{task_name}' IN DATABASE ICEBERG_MIGRATOR_DB", True)
+    
+                        if not df_current_task_status.empty:
+                            current_task_status = str(df_current_task_status.iloc[0]['state'])
+        
+                            if task_action == 'Suspend':
+                                #update sync log statement
+                                update_sync_log_sync_n_stmt = f"""UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            SET SYNC_STARTED = 'N'
+                                                            WHERE TABLE_INSTANCE_ID = {table_instance_id} AND TABLE_RUN_ID = {table_run_id};"""
+
+                                if current_task_status.lower() == 'started':
+                                    run_sis_cmd(f"ALTER TASK {task_fqn} {task_action}", False)
+                                    session.sql(update_sync_log_sync_n_stmt).collect()
+                                    st.session_state.alter_task_msg = f"Task: **{task_fqn}** successfully **suspended.**"
+                                    st.session_state.display_alter_task_msg = True
+        
+                                if current_task_status.lower() == 'suspended':
+                                    session.sql(update_sync_log_sync_n_stmt).collect()
+                                    st.session_state.alter_task_msg = f"Task: **{task_fqn}** already suspended. **No action taken.**"
+                                    st.session_state.display_alter_task_msg = True
+        
+                                #reset the button label
+                                st.session_state.btn_sync_task_details[f"btn_{id}"]["label"] = "Resume"
+                                st.session_state.btn_sync_task_details[f"btn_{id}"]["alter_task"] = False
+                                st.rerun()
+        
+                            if task_action == 'Resume':
+                                #update sync log statement
+                                update_sync_log_sync_y_stmt = f"""UPDATE ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC
+                                                            SET SYNC_STARTED = 'Y'
+                                                            WHERE TABLE_INSTANCE_ID = {table_instance_id} AND TABLE_RUN_ID = {table_run_id};"""
+                                if current_task_status.lower() == 'suspended':
+                                    run_sis_cmd(f"ALTER TASK {task_fqn} {task_action}", False)
+                                    session.sql(update_sync_log_sync_y_stmt).collect()
+                                    st.session_state.alter_task_msg = f"Task: **{task_fqn}** successfully **started.**"
+                                    st.session_state.display_alter_task_msg = True
+        
+                                if current_task_status.lower() == 'started':
+                                    session.sql(update_sync_log_sync_y_stmt).collect()
+                                    st.session_state.alter_task_msg = f"Task: **{task_fqn}** already started. **No action taken.**"
+                                    st.session_state.display_alter_task_msg = True
+        
+                                #reset the button label
+                                st.session_state.btn_sync_task_details[f"btn_{id}"]["label"] = "Suspend"
+                                st.session_state.btn_sync_task_details[f"btn_{id}"]["alter_task"] = False
+                                st.rerun()
+
+        if st.session_state.display_alter_task_msg:
+            st.warning(st.session_state.alter_task_msg, icon="⚠️")
+
+    else:
+        st.markdown("***No results available.***")
+    st.write("#")
+
+    #home button
+    col1, col2, col3 = st.columns([3.5,3.5,0.975])
+
+    with col1:
+        st.write("")
+        st.write("")
+        st.button("Home", type="secondary", on_click=set_page, args=["home"])
+        
+
 def set_page(page: str):
     st.session_state.page = page
 
@@ -1856,11 +3059,174 @@ class BasePage(Page):
         pass
     
     def print_page(self):
-        u.render_image("img/snowflake-logo-color-rgb@2x.png")
+        with st.sidebar:
+            #logo
+            col1, col2, col3 = st.columns([0.5,1,0.5])
+            with col2:
+                u.render_image_menu("img/snowflake-logo-color-rgb@2x.png")
+
+            #header
+            col1, col2, col3 = st.columns([0.5,1.75,0.25])
+            with col2:
+                st.header("ICEBERG MIGRATOR")
+
+            #set menu header css
+            st.markdown(
+                """
+                <style>
+                .sidebar-divider-text {
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    color: #555;
+                    text-align: center;
+                    margin-top: 10px;
+                    margin-bottom: 5px;
+                }
+                .sidebar-divider {
+                    border-bottom: 1px solid #ccc;
+                    margin-bottom: 15px;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+
+            #Prerequisites
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Home</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.button("Home", use_container_width=True, key="sb_home", type="primary" if st.session_state.page == "home" else "secondary", on_click=set_page, args=["home"])
+            
+            #Prerequisites
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Prerequisites</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("Snowflake Prerequisites", use_container_width=True, type="secondary", key="sb_snowflake_prereqs"):
+                render_sf_prereqs()
+
+            if st.button("Delta Prerequisites", use_container_width=True, type="secondary", key="sb_delta_prereqs"):
+                render_delta_prereqs()
+
+            if st.button("AWS Glue Sync Prerequisites", use_container_width=True, type="secondary", key="sb_aws_glue_prereqs"):
+                render_aws_glue_prereqs()
+
+            #Create
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Create</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("Create External Volume", use_container_width=True, type="primary" if st.session_state.page == "create_ev" else "secondary", key="sb_create_ev"): 
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_ev")
+                
+            if st.button("Create Catalog Integration", use_container_width=True, type="primary" if st.session_state.page == "create_ci" else "secondary", key="sb_create_ci"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_ci")
+                
+            if st.button("Create External Access Integration", use_container_width=True, type="primary" if st.session_state.page == "create_eai" else "secondary", key="sb_external_access_aws_glue"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("create_eai")
+
+            #Migrate/Sync
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Migrate/Sync</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("Choose Snowflake Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_snowflake_tables" else "secondary", key="sb_choose_fdn"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("choose_snowflake_tables")
+                
+            if st.button("Choose Delta Tables", use_container_width=True, type="primary" if st.session_state.page == "choose_delta_tables" else "secondary", key="sb_choose_delta"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("choose_delta_tables")
+                
+            if st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary" if st.session_state.page == "sync_iceberg_to_aws_glue" else "secondary", key="sb_sync_iceberg_to_aws_glue"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("sync_iceberg_to_aws_glue")
+
+            #Logs
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Logs</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("View Migration Log", use_container_width=True, type="primary" if st.session_state.page == "migration_log" else "secondary", key="sb_migration_log"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("migration_log")
+                
+            if st.button("View Catalog Sync Log", use_container_width=True, type="primary" if st.session_state.page == "catalog_sync_log" else "secondary", key="sb_catalog_sync_log"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("catalog_sync_log")
+
+            #Config
+            st.markdown(
+                """
+                <div class="sidebar-divider-text">Config</div>
+                <div class="sidebar-divider"></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if st.button("View Tool Configuration", use_container_width=True, type="primary" if st.session_state.page == "configuration" else "secondary", key="sb_configuration"):
+                #clear any previously set vars from session_state
+                clear_c2i_session_vars()
+                
+                #go to page
+                set_page("configuration")
+
+        col1, col2, col3 = st.columns([0.28,1,0.25])
+
+        with col2:
+            u.render_image("img/snowflake-logo-color-rgb@2x.png")
         
         st.markdown("<h1 style='text-align: center; color: black;'>ICEBERG MIGRATOR</h1>", unsafe_allow_html=True)
         st.write("")
-        st.write("The Iceberg Migrator tool allows a customer to perform bulk migrations of native Snowflake and Delta tables to Iceberg tables.")
+        st.write("The Iceberg Migrator tool allows users to perform bulk migrations of native Snowflake and Delta tables to Iceberg tables. This tool also supports the ability to sync Snowflake-managed Iceberg table metadata to an AWS Glue catalog.")
         st.divider()
 
 
@@ -1871,45 +3237,59 @@ class home(BasePage):
     def print_page(self):
         super().print_page()
 
-        #clear session_state when at home screen
+        #clear any previously set vars from session_state
         clear_c2i_session_vars()
+
+        st.markdown(
+            """
+            <style>
+            .block-container {
+                max-width: 1000px; /* Adjust this value to your desired width */
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        prereq_menu = st.container()
+
+        with prereq_menu:
+            col1, col2, col3 = st.columns([1.1,1,1])
+            with col2:
+                st.markdown("<h3 style='text-align: center; color: black;'>Prerequisites</h3>", unsafe_allow_html=True)
+    
+            col1, col2, col3 = st.columns(3)    
+            with col1:
+                st.write("")
+                if st.button("Snowflake Prerequisites", use_container_width=True, type="primary"):
+                    render_sf_prereqs()
+                    
+            with col2:
+                st.write("")
+                if st.button("Delta Prerequisites", use_container_width=True, type="primary"):
+                    render_delta_prereqs()
+    
+            with col3:
+                st.write("")
+                if st.button("AWS Glue Sync Prerequisites", use_container_width=True, type="primary"):
+                    render_aws_glue_prereqs()
         
-        #st.write("")        
-        #col1, col2, col3 = st.columns([1,1,1])
-
-        #with col2:
-        #    st.write("")
-        #    if st.button("Prerequisites", type="primary"):
-        #        render_prereqs()
-
-        col1, col2, col3, col4 = st.columns([1.0,0.85,0.85,1.25])
-
-        with col2:
-            st.write("")
-            if st.button("Snowflake Prerequisites", type="primary"):
-                render_sf_prereqs()
-                
-        with col3:
-            st.write("")
-            if st.button("Delta Prerequisites", type="primary"):
-                render_delta_prereqs()
-
+        st.write("")
         st.divider()
 
-        col1, col2 = st.columns(2, gap="small")
+
+        
+        col1, col2, col3 = st.columns(3, gap="small")
         with col1:
            st.markdown("<h3 style='text-align: center; color: black;'>External Volume</h3>", unsafe_allow_html=True)
            ev_col1, ev_col2, ev_col3 = st.columns([0.275,0.75,0.25], gap="small")
            with ev_col2:
                u.render_image_menu("img/ra_volume.png")
            st.markdown("""
-                        Create a new External Volume to use for your Iceberg tables.
+                        Create a new External Volume to use for Iceberg tables (if one doesn't exist).
                         """)
            st.write("")
-
-           ev_col1, ev_col2, ev_col3 = st.columns([0.25,0.55,0.25], gap="small")
-           with ev_col2:
-            st.button("Create Volume", type="primary", on_click=set_page,args=("create_ev",), key="btn_create_ev")
+           st.button("Create External Volume", use_container_width=True, type="primary", on_click=set_page,args=("create_ev",), key="btn_create_ev")
 
         with col2:
            st.markdown("<h3 style='text-align: center; color: black;'>Catalog Integration</h3>", unsafe_allow_html=True)
@@ -1919,58 +3299,71 @@ class home(BasePage):
                st.write("")
                u.render_image_menu("img/metadata.png")
            st.markdown("""
-                        Create a new Catalog Integration for your Delta files in object storage.
+                        Create a new Catalog Integration for Delta files in object storage (if one doesn't exist).
                         """)
            st.write("")
+           st.button("Create Catalog Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_ci",), key="btn_create_ci")
 
-           ci_col1, ci_col2, ctiol3 = st.columns([0.25,0.55,0.25], gap="small")
-           with ci_col2:
-                st.button("Create Integration", type="primary", on_click=set_page,args=("create_ci",), key="btn_create_ci") 
+        with col3:
+            st.markdown("<h3 style='text-align: center; color: black;'>External Access</h3>", unsafe_allow_html=True)
+            qc_col1, qc_col2, qc_col3 = st.columns([0.6,1.5,0.5], gap="small")
+            with qc_col2:  
+                u.render_image_menu("img/services.png")
+            st.markdown("""
+                        Create an External Access Integration to access AWS Glue (if one doesn't exist).
+                        """)
+            st.write("") 
+            st.button("Create External Access Integration", use_container_width=True, type="primary", on_click=set_page,args=("create_eai",), key="btn_external_access_aws_glue")
 
         st.write("")
         st.write("")
         st.write("")
         st.write("")
         
-        col1, col2 = st.columns(2, gap="small")
+        col1, col2, col3 = st.columns(3, gap="small")
         with col1:
            st.markdown("<h3 style='text-align: center; color: black;'>Snowflake Tables</h3>", unsafe_allow_html=True)
            cs_col1, cs_col2, cs_col3 = st.columns([0.30,0.75,0.25], gap="small")
             
            with cs_col2:
-               st.write("")
+               #st.write("")
                u.render_image_menu("img/ra_table.png")
            st.markdown("""
                         Choose existing FDN tables to migrate to Iceberg.
                         """)
            st.write("")
-
-           cs_col1, cs_col2, cs_col3 = st.columns([0.2125,0.95,0.3], gap="small")
-           with cs_col2:
-                st.button("Choose Snowflake Tables", type="primary", on_click=set_page,args=("choose_snowflake_tables",), key="btn_choose_fdn")
+           st.button("Choose Snowflake Tables", use_container_width=True, type="primary", on_click=set_page,args=("choose_snowflake_tables",), key="btn_choose_fdn")
 
         with col2:
            st.markdown("<h3 style='text-align: center; color: black;'>Delta Tables</h3>", unsafe_allow_html=True)
            cd_col1, cd_col2, cd_col3 = st.columns([0.3,0.75,0.25], gap="small")
             
            with cd_col2:
-               st.write("")
+               #st.write("")
                u.render_image_menu("img/delta_tables.png")
            st.markdown("""
-                        Choose existing Delta table files from object storage to migrate to Iceberg.
+                        Choose existing Delta table files to migrate to Iceberg.
                         """)
            st.write("")
-
-           cd_col1, cd_col2, cd_col3 = st.columns([0.215,0.6,0.30], gap="small")
-           with cd_col2:
-                st.button("Choose Delta Tables", type="primary", on_click=set_page,args=("choose_delta_tables",), key="btn_choose_delta")
-
+           st.button("Choose Delta Tables", use_container_width=True, type="primary", on_click=set_page,args=("choose_delta_tables",), key="btn_choose_delta")   
+        
+        with col3:
+           st.markdown("<h3 style='text-align: center; color: black;'>Sync to AWS Glue</h3>", unsafe_allow_html=True)
+           cq_col1, cq_col2, cq_col3 = st.columns([0.25,0.55,0.25], gap="small")
+           with cq_col2:  
+               u.render_image_menu("img/documentation.png")
+           st.markdown("""
+                        Sync Snowflake-Managed Iceberg Tables to AWS Glue. 
+                        """)
+           st.write("")
+           st.button("Sync Iceberg to AWS Glue", use_container_width=True, type="primary", on_click=set_page,args=("sync_iceberg_to_aws_glue",), key="btn_sync_iceberg_to_aws_glue") 
+        
         st.write("")
         st.write("")
         st.write("")
         st.write("")
         
-        col1, col2 = st.columns(2, gap="small")
+        col1, col2, col3 = st.columns(3, gap="small")
         with col1:
            st.markdown("<h3 style='text-align: center; color: black;'>Migration Log</h3>", unsafe_allow_html=True)
            cq_col1, cq_col2, cq_col3 = st.columns([0.25,0.55,0.25], gap="small")
@@ -1980,12 +3373,21 @@ class home(BasePage):
                         View the logs and status of each Iceberg migration run. 
                         """)
            st.write("")
-
-           cq_col1, cq_col2, cq_col3 = st.columns([0.2,0.55,0.25], gap="small")
-           with cq_col2: 
-               st.button("View Migration Log", type="primary", on_click=set_page,args=("migration_log",), key="btn_migration_log") 
-        
+           st.button("View Migration Log", use_container_width=True, type="primary", on_click=set_page,args=("migration_log",), key="btn_migration_log")
+ 
         with col2:
+           st.markdown("<h3 style='text-align: center; color: black;'>Catalog Sync Log</h3>", unsafe_allow_html=True)
+           cq_col1, cq_col2, cq_col3 = st.columns([0.25,0.55,0.25], gap="small")
+           with cq_col2:  
+               u.render_image_menu("img/documentation.png")
+           st.markdown("""
+                        View the status of each Iceberg table synced to an external catalog. 
+                        """)
+           st.write("")
+           st.button("View Catalog Sync Log", use_container_width=True, type="primary", on_click=set_page,args=("catalog_sync_log",), key="btn_catalog_sync_log")
+        
+        
+        with col3:
            st.markdown("<h3 style='text-align: center; color: black;'>Configuration</h3>", unsafe_allow_html=True)
            qc_col1, qc_col2, qc_col3 = st.columns([0.6,1.5,0.5], gap="small")
            with qc_col2:  
@@ -1994,12 +3396,9 @@ class home(BasePage):
                         View and/or update the tool's configuration settings.
                         """)
            st.write("") 
+           st.button("View Tool Configuration", use_container_width=True, type="primary", on_click=set_page,args=("configuration",), key="btn_configuration")
 
-           qc_col1, qc_col2, qc_col3 = st.columns([0.5,1.5,0.5], gap="small")
-           with qc_col2:
-                st.button("View Configuration", type="primary", on_click=set_page,args=("configuration",), key="btn_configuration")
         
-
 
 
 ########################################################################### Create External Volume
@@ -2026,6 +3425,18 @@ class create_ci_page(BasePage):
         #render create new Catalog Integration page
         render_create_ci()
 
+########################################################################### Create External Access Integration
+
+class create_eai_page(BasePage):
+    def __init__(self):
+        self.name="create_eai"
+        
+    def print_page(self):
+        super().print_page()
+
+        #render create new External Access Integration page
+        render_create_eai()
+
 ########################################################################### Choose Snowflake Tables
 
 class choose_snowflake_tables_page(BasePage):
@@ -2035,7 +3446,7 @@ class choose_snowflake_tables_page(BasePage):
     def print_page(self):
         super().print_page()
 
-        #render create Iceberg tables wizard
+        #render Choose Snowflake FDN tables wizard
         render_choose_snowflake_tables_wizard_view()
 
 ########################################################################### Choose Delta Tables
@@ -2047,8 +3458,20 @@ class choose_delta_tables_page(BasePage):
     def print_page(self):
         super().print_page()
 
-        #render create Iceberg tables wizard
+        #render Choose Delta Tables wizard
         render_choose_delta_tables_wizard_view()
+        
+########################################################################### Sync Iceberg to AWS Glue
+
+class sync_iceberg_to_aws_glue_page(BasePage):
+    def __init__(self):
+        self.name="sync_iceberg_to_aws_glue"
+        
+    def print_page(self):
+        super().print_page()
+
+        #render sync Iceberg tables to AWS Glue wizard
+        render_choose_iceberg_tables_aws_sync_wizard_view()
 
 ########################################################################### Migration Log
 
@@ -2059,12 +3482,24 @@ class migration_log(BasePage):
     def print_page(self):
         super().print_page()
 
-        #render Choose Query wizard
+        #render Migration Log
         render_migration_log_view()
+        
+########################################################################### Catalog Sync Log
+
+class catalog_sync_log(BasePage):
+    def __init__(self):
+        self.name="catalog_sync_log"
+        
+    def print_page(self):
+        super().print_page()
+
+        #render Catalog Sync Log
+        render_catalog_sync_log_view()
 
 ########################################################################### Configuration
 
-class query_configuration_page(BasePage):
+class configuration_page(BasePage):
     def __init__(self):
         self.name="configuration"
         
@@ -2076,18 +3511,18 @@ class query_configuration_page(BasePage):
 
 ############################################################################## Main ####################################################################################################
 
-pages = [home(), create_ev_page(), create_ci_page(), choose_snowflake_tables_page(), choose_delta_tables_page(), migration_log(), query_configuration_page()]
+pages = [home(), create_ev_page(), create_ci_page(), create_eai_page(), choose_snowflake_tables_page(), choose_delta_tables_page(), sync_iceberg_to_aws_glue_page(), migration_log(), catalog_sync_log(), configuration_page()]
 
 session = get_active_session()
 
 def main():
     for page in pages:
         if page.name == st.session_state.page:
-            if page.name in ["migration_log"]:
+            if page.name in ["migration_log", "catalog_sync_log"]:
                 st.session_state.layout="wide"
             else:
                 st.session_state.layout="centered"
             
-            page.print_page();
+            page.print_page()
 
 main()

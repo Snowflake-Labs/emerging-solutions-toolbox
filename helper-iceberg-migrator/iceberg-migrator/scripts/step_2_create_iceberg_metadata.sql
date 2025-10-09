@@ -5,6 +5,7 @@ SET T2I_MAX_PAR_TASKS = '3';
 SET T2I_MAX_TBLS = '50';
 SET T2I_EV = '';
 SET T2I_CI = '';
+SET T2I_EAI = '';
 
 USE ROLE IDENTIFIER($T2I_ROLE);
 USE WAREHOUSE IDENTIFIER($T2I_WH);
@@ -28,7 +29,7 @@ CREATE OR REPLACE TABLE MIGRATION_RUN_LOG
  END_TIME        timestamp              COMMENT 'End time of the iceberg migration',
  CONSTRAINT PK_1 PRIMARY KEY ( RUN_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Runtime information for the complete execution of a group of tables"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Runtime information for the complete execution of a group of tables"}';
 
 --  MIGRATION_TABLE
 CREATE OR REPLACE TABLE MIGRATION_TABLE
@@ -39,13 +40,17 @@ CREATE OR REPLACE TABLE MIGRATION_TABLE
  TABLE_CATALOG         varchar      NULL COMMENT 'Database that the source table belongs to',
  TABLE_SCHEMA          varchar      NULL COMMENT 'Schema that the source table belongs to.',
  TABLE_NAME            varchar      NOT NULL COMMENT 'Name of source table',
+ TARGET_TYPE           varchar      NOT NULL COMMENT 'Where the iceberg table will be queried from',
  TARGET_TABLE_CATALOG  varchar      NULL COMMENT 'Database that the target table belongs to, null if conversion of source table in place',
  TARGET_TABLE_SCHEMA   varchar      NULL COMMENT 'Schema that the target table belongs to, null if conversion of source table in place',
+ TARGET_TABLE_NAME     varchar      NOT NULL COMMENT 'The name of the target table',
+ UPDATE_FREQUENCY_MINS integer      NULL COMMENT 'The frequency at which to sync Snowflake-managed metadata to another catalog',
+ WAREHOUSE             varchar      NULL COMMENT 'The warehouse used to sync Snowflake-managed metadata to another catalog',
  TABLE_CONFIGURATION   variant      NULL COMMENT 'Additional table configuration parameters',
  INSERT_DATE           timestamp    NOT NULL DEFAULT current_timestamp(),
  CONSTRAINT PK_1 PRIMARY KEY ( TABLE_INSTANCE_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Queue of tables to migrate to iceberg"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Queue of tables to migrate to iceberg"}';
 
 --  MIGRATION_LOG
 CREATE OR REPLACE TABLE MIGRATION_TABLE_LOG
@@ -60,7 +65,7 @@ CREATE OR REPLACE TABLE MIGRATION_TABLE_LOG
  CONSTRAINT FK_1 FOREIGN KEY ( RUN_ID )             REFERENCES MIGRATION_RUN_LOG    ( RUN_ID ),
  CONSTRAINT FK_2 FOREIGN KEY ( TABLE_INSTANCE_ID )  REFERENCES MIGRATION_TABLE      ( TABLE_INSTANCE_ID )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"Runtime information for a table load"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Runtime information for a table load"}';
 
 --  SNOWFLAKE_TOOL_CONFIG
 CREATE OR REPLACE TABLE SNOWFLAKE_TOOL_CONFIG
@@ -71,7 +76,7 @@ CREATE OR REPLACE TABLE SNOWFLAKE_TOOL_CONFIG
 
  CONSTRAINT PK_1 PRIMARY KEY ( TOOL_NAME, TOOL_PARAMETER )
 )
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}, "description":"The configuration table contains customer specific configuration information used by various PS developed tools"}';
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"The configuration table contains customer specific configuration information used by various PS developed tools"}';
 
 
 -- Populate the SNOWFLAKE_TOOL_CONFIG table
@@ -83,11 +88,36 @@ VALUES
     ('ICEBERG_MIGRATOR', 'max_tables_run',$T2I_MAX_TBLS),
     ('ICEBERG_MIGRATOR', 'external_volume',$T2I_EV),
     ('ICEBERG_MIGRATOR', 'delta_catalog_integration',$T2I_CI),
+    ('ICEBERG_MIGRATOR', 'aws_glue_external_access_integration',$T2I_EAI),
     ('ICEBERG_MIGRATOR', 'location_pattern','${TABLE_CATALOG}/${TABLE_SCHEMA}/${TABLE_NAME}'),
     ('ICEBERG_MIGRATOR', 'truncate_time','TRUE'),
     ('ICEBERG_MIGRATOR', 'timezone_conversion','NONE'),
     ('ICEBERG_MIGRATOR', 'count_only_validation', 'FALSE'),
     ('ICEBERG_MIGRATOR', 'version','1.2');
 
+
+--  ICEBERG_METADATA_SYNC
+CREATE OR REPLACE TABLE ICEBERG_METADATA_SYNC
+(
+ TABLE_INSTANCE_ID              integer      NOT NULL COMMENT 'Table Identifier of iceberg table to sync - from the migration_table_log',
+ TABLE_RUN_ID                   integer      NOT NULL COMMENT 'Run Identifier of iceberg table to sync - from the migration_table_log',
+ SOURCE_DATABASE                varchar      NOT NULL COMMENT 'The source database',
+ SOURCE_SCHEMA                  varchar      NOT NULL COMMENT 'The source schema',
+ SOURCE_TABLE                   varchar      NOT NULL COMMENT 'The iceberg table name',
+ DESTINATION                    varchar      NOT NULL COMMENT 'Where the iceberg metadata will be synced to',
+ TARGET_DATABASE                varchar      NOT NULL COMMENT 'Target database at destination',
+ TARGET_SCHEMA                  varchar      NULL COMMENT 'Target schema at destination',
+ TARGET_TABLE                   varchar      NOT NULL COMMENT 'Target table at destination',
+ UPDATE_FREQUENCY_MINS          integer      NOT NULL COMMENT 'The frequency at which to sync Snowflake-managed metadata to another catalog',
+ WAREHOUSE                      varchar      NOT NULL COMMENT 'The warehouse used to sync Snowflake-managed metadata to another catalog',
+ EXTERNAL_ACCESS_INTEGRATION    varchar      NOT NULL COMMENT 'The EAI to use to access the relevant external catalog',
+ SYNC_STARTED                   varchar      NOT NULL COMMENT 'Y/N flag indicating whether the sync has started',
+ UPDATED_TIMESTAMP              datetime     NULL COMMENT 'The datetime of the last sync',
+ INSERT_DATE                    timestamp    NOT NULL DEFAULT current_timestamp(),
+ CONSTRAINT PK_1 PRIMARY KEY ( TABLE_INSTANCE_ID,  TABLE_RUN_ID)
+)
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}, "description":"Queue of iceberg tables to sync to external catalog"}';
+
+
 --unset vars
-UNSET (T2I_ROLE, T2I_SCH, T2I_WH, T2I_MAX_PAR_TASKS, T2I_MAX_TBLS, T2I_EV, T2I_CI);
+UNSET (T2I_ROLE, T2I_SCH, T2I_WH, T2I_MAX_PAR_TASKS, T2I_MAX_TBLS, T2I_EV, T2I_CI, T2I_EAI);

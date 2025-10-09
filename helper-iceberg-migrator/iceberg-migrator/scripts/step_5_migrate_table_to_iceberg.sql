@@ -16,11 +16,16 @@ CREATE OR REPLACE PROCEDURE migrate_table_to_iceberg
 	TABLE_CATALOG TEXT, 
 	TABLE_SCHEMA TEXT, 
 	TABLE_NAME TEXT,
+	TARGET_TYPE TEXT,
 	TARGET_TABLE_CATALOG TEXT, 
-	TARGET_TABLE_SCHEMA TEXT, 
+	TARGET_TABLE_SCHEMA TEXT,
+	TARGET_TABLE_NAME TEXT,
+	UPDATE_FREQUENCY_MINS FLOAT,
+	WAREHOUSE TEXT, 
 	EXTERNAL_VOLUME TEXT,
 	CATALOG_INTEGRATION TEXT, 
 	LOCATION_PATTERN TEXT,
+	EXTERNAL_ACCESS_INTEGRATION TEXT,
 	TABLE_CONFIGURATION VARIANT, 
 	TRUNCATE_TIME BOOLEAN DEFAULT FALSE, 
 	TIMEZONE_CONVERSION TEXT DEFAULT 'NONE', 
@@ -75,9 +80,10 @@ $$
 	// 05/14/2025   S Ramsey    Add support for clustering target table
 	// 05/15/2025	M Henderson	Add support to migrate other table types to Iceberg. Currently, only
 	//							Snowflake (FDN) and Delta tables are supported.
+	// 09/17/2025	M Henderson Add support for syncing Snowflake iceberg table metadata to AWS Glue
     // ---------------------------------------------------------------------------------------------
     // ----- Standard tag 
-    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 2}}
+    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 3}}
 
     // ----- Define return value
     var ret = {}
@@ -91,20 +97,6 @@ $$
     var sql_pk_drp_tbl = ""
 	var errorModule = "Main"
 	var sql_txt = ""
-	
-	var v_replace =  (typeof TARGET_TABLE_CATALOG === 'undefined') 
-	if ( v_replace ) {
-		var v_icename = `"${TABLE_CATALOG}"."${TABLE_SCHEMA}"."${TABLE_NAME}_${RUN_ID}_tmp"`
-	}
-	else {
-		var v_icename = `"${TARGET_TABLE_CATALOG}"."${TARGET_TABLE_SCHEMA}"."${TABLE_NAME}"`
-	}
-
-	if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
-		v_icename = v_icename.replace(/"/g, '');
-	}
-	
-	var v_location = ""
 	
 	// ---- Set the query tag so we can identify all the SQL executing in the procedure
     var tags = {}
@@ -138,195 +130,247 @@ $$
     {
 		// ---- Create row in table log
     	snowflake.execute({sqlText: `insert into ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.migration_table_log (table_instance_id, run_id, state_code, log_time, log_message) values (:1, :2, 'RUNNING', current_timestamp(), null)`, binds:[TABLE_INSTANCE_ID, RUN_ID]})
-
+		
 		let table_catalog = TABLE_CATALOG;
 		let table_schema = TABLE_SCHEMA;
-
-        //TODO: If TABLE_TYPE is DELTA, create a "temp" external table to validate
-		if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
-			//get current cloud
-			let cloud = "";
-			let storage_base_url = "";
-			let credential_str = "";
-
-			//describe external volume to get necessary details
-			snowflake.execute({sqlText: `DESCRIBE EXTERNAL VOLUME ${EXTERNAL_VOLUME};`});
-
-			let rset = snowflake.execute({sqlText: `SELECT "property_value" 
-													FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) 
-													WHERE LOWER("property") = 'storage_location_1';`});
-
-			while (rset.next()) {
-				property_value = JSON.parse(rset.getColumnValue(1));
-				cloud = property_value['STORAGE_PROVIDER'];
-				storage_base_url = property_value['STORAGE_BASE_URL'];
-				
-				if (cloud == "S3") {
-					let storage_aws_role_arn = property_value['STORAGE_AWS_ROLE_ARN'];
-					credential_str = `STORAGE_AWS_ROLE_ARN = '${storage_aws_role_arn}'`;
-				}
-
-				if (cloud == "AZURE") {
-					let azure_tenant_id = property_value['AZURE_TENANT_ID'];
-					credential_str = `AZURE_TENANT_ID = '${azure_tenant_id}'`;
-				}
-			}
 			
-			//create storage location, if it doesn't exist
-			snowflake.execute({sqlText: `CREATE STORAGE INTEGRATION IF NOT EXISTS SI_${EXTERNAL_VOLUME}
-											TYPE = EXTERNAL_STAGE
-											STORAGE_PROVIDER = '${cloud}'
-											ENABLED = TRUE
-											${credential_str}
-											STORAGE_ALLOWED_LOCATIONS = ('${storage_base_url}')
-											COMMENT = '${JSON.stringify(std_tag)}';`});
+		if (TARGET_TYPE.toLocaleLowerCase() == 'snowflake'){
+			var v_replace =  (typeof TARGET_TABLE_CATALOG === 'undefined') 
+			if ( v_replace ) {
+				var v_icename = `"${TABLE_CATALOG}"."${TABLE_SCHEMA}"."${TABLE_NAME}_${RUN_ID}_tmp"`
+			}
+			else {
+				var v_icename = `"${TARGET_TABLE_CATALOG}"."${TARGET_TABLE_SCHEMA}"."${TABLE_NAME}"`
+			}
 
-			//create stage
-			snowflake.execute({sqlText: `CREATE STAGE IF NOT EXISTS ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}
-											URL = '${storage_base_url}'
-											STORAGE_INTEGRATION = SI_${EXTERNAL_VOLUME}
-											DIRECTORY = (
-												ENABLE = true
-											)
-											COMMENT = '${JSON.stringify(std_tag)}';`});
+			var v_location = ""
 
-			//create file format, if it doesn't exist
-			snowflake.execute({sqlText: `CREATE FILE FORMAT IF NOT EXISTS ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.FF_PARQUET TYPE = parquet COMMENT = '${JSON.stringify(std_tag)}';`});
+			//if TABLE_TYPE is DELTA, create a "temp" external table to validate
+			if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
+				v_icename = v_icename.replace(/"/g, '');
 
-			//create "temp" external table - this is used to validate the delta table before creating the iceberg table
-			snowflake.execute({sqlText: `CREATE OR REPLACE EXTERNAL TABLE ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.${TABLE_NAME}
-											USING TEMPLATE(
-												SELECT ARRAY_AGG(OBJECT_CONSTRUCT('COLUMN_NAME',COLUMN_NAME, 'TYPE',TYPE, 'NULLABLE', NULLABLE, 'EXPRESSION',EXPRESSION))
-												FROM TABLE(
-													INFER_SCHEMA(
-														LOCATION=>'@ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}/${TABLE_NAME}/',
-														FILE_FORMAT=>'ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.FF_PARQUET'
+				//get current cloud
+				let cloud = "";
+				let storage_base_url = "";
+				let credential_str = "";
+
+				//describe external volume to get necessary details
+				snowflake.execute({sqlText: `DESCRIBE EXTERNAL VOLUME ${EXTERNAL_VOLUME};`});
+
+				let rset = snowflake.execute({sqlText: `SELECT "property_value" 
+														FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) 
+														WHERE LOWER("property") = 'storage_location_1';`});
+
+				while (rset.next()) {
+					property_value = JSON.parse(rset.getColumnValue(1));
+					cloud = property_value['STORAGE_PROVIDER'];
+					storage_base_url = property_value['STORAGE_BASE_URL'];
+					
+					if (cloud == "S3") {
+						let storage_aws_role_arn = property_value['STORAGE_AWS_ROLE_ARN'];
+						credential_str = `STORAGE_AWS_ROLE_ARN = '${storage_aws_role_arn}'`;
+					}
+
+					if (cloud == "AZURE") {
+						let azure_tenant_id = property_value['AZURE_TENANT_ID'];
+						credential_str = `AZURE_TENANT_ID = '${azure_tenant_id}'`;
+					}
+				}
+				
+				//create storage location, if it doesn't exist
+				snowflake.execute({sqlText: `CREATE STORAGE INTEGRATION IF NOT EXISTS SI_${EXTERNAL_VOLUME}
+												TYPE = EXTERNAL_STAGE
+												STORAGE_PROVIDER = '${cloud}'
+												ENABLED = TRUE
+												${credential_str}
+												STORAGE_ALLOWED_LOCATIONS = ('${storage_base_url}')
+												COMMENT = '${JSON.stringify(std_tag)}';`});
+
+				//create stage
+				snowflake.execute({sqlText: `CREATE STAGE IF NOT EXISTS ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}
+												URL = '${storage_base_url}'
+												STORAGE_INTEGRATION = SI_${EXTERNAL_VOLUME}
+												DIRECTORY = (
+													ENABLE = true
+												)
+												COMMENT = '${JSON.stringify(std_tag)}';`});
+
+				//create file format, if it doesn't exist
+				snowflake.execute({sqlText: `CREATE FILE FORMAT IF NOT EXISTS ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.FF_PARQUET TYPE = parquet COMMENT = '${JSON.stringify(std_tag)}';`});
+
+				//create "temp" external table - this is used to validate the delta table before creating the iceberg table
+				snowflake.execute({sqlText: `CREATE OR REPLACE EXTERNAL TABLE ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.${TABLE_NAME}
+												USING TEMPLATE(
+													SELECT ARRAY_AGG(OBJECT_CONSTRUCT('COLUMN_NAME',COLUMN_NAME, 'TYPE',TYPE, 'NULLABLE', NULLABLE, 'EXPRESSION',EXPRESSION))
+													FROM TABLE(
+														INFER_SCHEMA(
+															LOCATION=>'@ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}/${TABLE_NAME}/',
+															FILE_FORMAT=>'ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.FF_PARQUET'
+														)
 													)
 												)
-											)
-											WITH LOCATION = @ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}/${TABLE_NAME}/
-											FILE_FORMAT = ( TYPE = PARQUET )
-											AUTO_REFRESH = FALSE
-											REFRESH_ON_CREATE = FALSE
-											COMMENT = '${JSON.stringify(std_tag)}'
-										;`});
+												WITH LOCATION = @ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.STAGE_${EXTERNAL_VOLUME}/${TABLE_NAME}/
+												FILE_FORMAT = ( TYPE = PARQUET )
+												AUTO_REFRESH = FALSE
+												REFRESH_ON_CREATE = FALSE
+												COMMENT = '${JSON.stringify(std_tag)}'
+											;`});
 
-			snowflake.execute({sqlText: `ALTER EXTERNAL TABLE ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.${TABLE_NAME} REFRESH;`});
+				snowflake.execute({sqlText: `ALTER EXTERNAL TABLE ICEBERG_MIGRATOR_DB.ICEBERG_STAGING.${TABLE_NAME} REFRESH;`});
 
-			table_catalog = 'ICEBERG_MIGRATOR_DB';
-			table_schema = 'ICEBERG_STAGING';
+				table_catalog = 'ICEBERG_MIGRATOR_DB';
+				table_schema = 'ICEBERG_STAGING';
 
-		}
+			}
 
+			
+			// -- Validates the table is good to go and gets other table properties
+			chk = checkValid(table_catalog, table_schema)
 		
-		// -- Validates the table is good to go and gets other table properties
-		chk = checkValid(table_catalog, table_schema)
-	
-		if ( !chk.result ) {
-			throw new Error(chk.message);
-		}
+			if ( !chk.result ) {
+				throw new Error(chk.message);
+			}
 
-		//set table name
-		var v_tablename = `"${table_catalog}"."${table_schema}"."${TABLE_NAME}"`
-		var v_oldname = `"${table_catalog}"."${table_schema}"."${TABLE_NAME}_${RUN_ID}_old"`
+			//set table name
+			var v_tablename = `"${table_catalog}"."${table_schema}"."${TABLE_NAME}"`
+			var v_oldname = `"${table_catalog}"."${table_schema}"."${TABLE_NAME}_${RUN_ID}_old"`
 
-		if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
-			v_tablename = v_tablename.replace(/"/g, '');
-			v_oldname = v_oldname.replace(/"/g, '');
-		}
+			if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
+				v_tablename = v_tablename.replace(/"/g, '');
+				v_oldname = v_oldname.replace(/"/g, '');
+			}
 
-		// -- Build location 
-		v_location = LOCATION_PATTERN
-		if (v_replace) {
-			v_location = v_location.replaceAll("${TABLE_CATALOG}",TABLE_CATALOG.replaceAll(" ", "-"))
-			v_location = v_location.replaceAll("${TABLE_SCHEMA}",TABLE_SCHEMA.replaceAll(" ", "-"))
-		}
-		else {
-			v_location = v_location.replaceAll("${TABLE_CATALOG}",TARGET_TABLE_CATALOG.replaceAll(" ", "-"))
-			v_location = v_location.replaceAll("${TABLE_SCHEMA}",TARGET_TABLE_SCHEMA.replaceAll(" ", "-"))
-		}
-		v_location = v_location.replaceAll("${TABLE_NAME}",TABLE_NAME.replaceAll(" ", "-"))
+			// -- Build location 
+			v_location = LOCATION_PATTERN
+			if (v_replace) {
+				v_location = v_location.replaceAll("${TABLE_CATALOG}",TABLE_CATALOG.replaceAll(" ", "-"))
+				v_location = v_location.replaceAll("${TABLE_SCHEMA}",TABLE_SCHEMA.replaceAll(" ", "-"))
+			}
+			else {
+				v_location = v_location.replaceAll("${TABLE_CATALOG}",TARGET_TABLE_CATALOG.replaceAll(" ", "-"))
+				v_location = v_location.replaceAll("${TABLE_SCHEMA}",TARGET_TABLE_SCHEMA.replaceAll(" ", "-"))
+			}
+			v_location = v_location.replaceAll("${TABLE_NAME}",TABLE_NAME.replaceAll(" ", "-"))
 
-		// -- Create iceberg table
-		sql_txt = createIcebergDDL(TABLE_TYPE, TABLE_LOCATION, v_tablename, v_icename, EXTERNAL_VOLUME, CATALOG_INTEGRATION, v_location, TABLE_CONFIGURATION, TRUNCATE_TIME, TIMEZONE_CONVERSION)
-		ret['debugSql'] = sql_txt
-		snowflake.execute({sqlText: sql_txt});
-
-        // -- Change the grants on external table
-		if ( !cloneTablePermissions(v_tablename, v_icename) ){
-			throw(new Error('Failed to set permissions'))
-		}
-
-		// -- Get list of columns in table 
-		tblCols = getColumnList(v_tablename, TRUNCATE_TIME, TIMEZONE_CONVERSION)
-		//ret['tblCols'] = tblCols;
-
-		// ---- If provided cluster then add order by 
-		order_by = '' 
-		if ( TABLE_CONFIGURATION !== null) {
-			if ( TABLE_CONFIGURATION.cluster_key !== null) {
-				order_by = `ORDER BY ${TABLE_CONFIGURATION.cluster_key}`	
-			} 
-		}
-
-		if (TABLE_TYPE.toLocaleLowerCase() == 'snowflake') {
-			// -- Insert data into iceberg table  
-			sql_txt = `INSERT INTO ${v_icename} (${tblCols.insertList}) SELECT ${tblCols.selectList} FROM ${v_tablename} ${order_by}`
+			// -- Create iceberg table
+			sql_txt = createIcebergDDL(TABLE_TYPE, TABLE_LOCATION, v_tablename, v_icename, EXTERNAL_VOLUME, CATALOG_INTEGRATION, v_location, TABLE_CONFIGURATION, TRUNCATE_TIME, TIMEZONE_CONVERSION)
 			ret['debugSql'] = sql_txt
 			snowflake.execute({sqlText: sql_txt});
 
-			// -- Validate the data in the table(s) match
-			if ( COUNT_ONLY ){
+			// -- Change the grants on external table
+			if ( !cloneTablePermissions(v_tablename, v_icename) ){
+				throw(new Error('Failed to set permissions'))
+			}
+
+			// -- Get list of columns in table 
+			tblCols = getColumnList(v_tablename, TRUNCATE_TIME, TIMEZONE_CONVERSION)
+			//ret['tblCols'] = tblCols;
+
+			// ---- If provided cluster then add order by 
+			order_by = '' 
+			if ( TABLE_CONFIGURATION !== null) {
+				if ( TABLE_CONFIGURATION.cluster_key !== null) {
+					order_by = `ORDER BY ${TABLE_CONFIGURATION.cluster_key}`	
+				} 
+			}
+
+			if (TABLE_TYPE.toLocaleLowerCase() == 'snowflake_fdn') {
+				// -- Insert data into iceberg table  
+				sql_txt = `INSERT INTO ${v_icename} (${tblCols.insertList}) SELECT ${tblCols.selectList} FROM ${v_tablename} ${order_by}`
+				ret['debugSql'] = sql_txt
+				snowflake.execute({sqlText: sql_txt});
+
+				// -- Validate the data in the table(s) match
+				if ( COUNT_ONLY ){
+					sql_txt = `
+					WITH a AS 
+					(
+						SELECT COUNT(*) AS hag FROM ${v_icename}
+						MINUS 
+						SELECT COUNT(*) AS hag FROM ${v_tablename}
+					)
+					SELECT COUNT(*) AS cnt 
+					FROM a`
+				}
+				else {
 				sql_txt = `
-				WITH a AS 
-				(
-					SELECT COUNT(*) AS hag FROM ${v_icename}
-					MINUS 
-					SELECT COUNT(*) AS hag FROM ${v_tablename}
-				)
-				SELECT COUNT(*) AS cnt 
-				FROM a`
-			}
-			else {
-			sql_txt = `
-				WITH a AS 
-				(
-					SELECT HASH_AGG(${tblCols.iceSelectList}) AS hag FROM ${v_icename}
-					MINUS 
-					SELECT HASH_AGG(${tblCols.selectList}) AS hag FROM ${v_tablename}
-				)
-				SELECT COUNT(*) AS cnt 
-				FROM a`
-			}
-			ret['debugSql'] = sql_txt
-			let v_cnt_rs = snowflake.execute({sqlText: sql_txt})
-			v_cnt_rs.next()
+					WITH a AS 
+					(
+						SELECT HASH_AGG(${tblCols.iceSelectList}) AS hag FROM ${v_icename}
+						MINUS 
+						SELECT HASH_AGG(${tblCols.selectList}) AS hag FROM ${v_tablename}
+					)
+					SELECT COUNT(*) AS cnt 
+					FROM a`
+				}
+				ret['debugSql'] = sql_txt
+				let v_cnt_rs = snowflake.execute({sqlText: sql_txt})
+				v_cnt_rs.next()
 
-			// -- If validation OK do the swap.  
-			if (v_cnt_rs.CNT == 0) {
-				if ( v_replace ) {
-					// -- Rename normal table to some backup name 
-					sql_txt = `ALTER TABLE ${v_tablename} RENAME TO ${v_oldname}`
-					snowflake.execute({sqlText: sql_txt});
+				// -- If validation OK do the swap.  
+				if (v_cnt_rs.CNT == 0) {
+					if ( v_replace ) {
+						// -- Rename normal table to some backup name 
+						sql_txt = `ALTER TABLE ${v_tablename} RENAME TO ${v_oldname}`
+						snowflake.execute({sqlText: sql_txt});
 
-					// -- Rename new iceberg table to old table name 
-					sql_txt = `ALTER ICEBERG TABLE ${v_icename} RENAME TO ${v_tablename}`
-					snowflake.execute({sqlText: sql_txt});
+						// -- Rename new iceberg table to old table name 
+						sql_txt = `ALTER ICEBERG TABLE ${v_icename} RENAME TO ${v_tablename}`
+						snowflake.execute({sqlText: sql_txt});
 
-					// -- Drop normal table
-					sql_txt = `DROP TABLE ${v_oldname}`
-					snowflake.execute({sqlText: sql_txt});
+						// -- Drop normal table
+						sql_txt = `DROP TABLE ${v_oldname}`
+						snowflake.execute({sqlText: sql_txt});
+					}
+				}
+				else {
+					throw(new Error(`Migration validation failed.  Total mismatched rows (${v_cnt_rs.CNT})`))
 				}
 			}
-			else {
-				throw(new Error(`Migration validation failed.  Total mismatched rows (${v_cnt_rs.CNT})`))
+			
+			//if TABLE_TYPE is 'delta', drop external table
+			if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
+				snowflake.execute({sqlText: `DROP EXTERNAL TABLE ${v_tablename};`});
+			}
+		} else if (TARGET_TYPE.toLocaleLowerCase() == 'aws_glue') {
+			//just in case, but do not see any other table type being synced to an external catalog
+			if (TABLE_TYPE.toLocaleLowerCase() == 'snowflake_iceberg'){ 
+				//insert records into ICEBERG_METADATA_SYNC table
+				snowflake.execute({sqlText: `INSERT INTO 
+												ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.ICEBERG_METADATA_SYNC(
+													TABLE_INSTANCE_ID
+													,TABLE_RUN_ID
+													,SOURCE_DATABASE
+													,SOURCE_SCHEMA
+													,SOURCE_TABLE
+													,DESTINATION
+													,TARGET_DATABASE
+													,TARGET_TABLE
+													,UPDATE_FREQUENCY_MINS
+													,WAREHOUSE
+													,EXTERNAL_ACCESS_INTEGRATION
+													,SYNC_STARTED
+												)
+												VALUES(
+													${TABLE_INSTANCE_ID}
+													,${RUN_ID}
+													,'${TABLE_CATALOG}'
+													,'${TABLE_SCHEMA}'
+													,'${TABLE_NAME}'
+													,'${TARGET_TYPE}'
+													,'${TARGET_TABLE_CATALOG}'
+													,'${TARGET_TABLE_NAME}'
+													,${UPDATE_FREQUENCY_MINS}
+													,'${WAREHOUSE}'
+													,'${EXTERNAL_ACCESS_INTEGRATION}'
+													,'N'
+												)`});
+				
+				//call GLUE_SYNC_TASK_MANAGER
+				snowflake.execute({sqlText: `CALL ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.GLUE_SYNC_TASK_MANAGER();`});
 			}
 		}
-        
-		//if TABLE_TYPE is 'delta', drop external table
-		if (TABLE_TYPE.toLocaleLowerCase() == 'delta') {
-			snowflake.execute({sqlText: `DROP EXTERNAL TABLE ${v_tablename};`});
-		}
+		
     }
     catch(err)
     {
@@ -338,7 +382,10 @@ $$
 
 	// -- Cleanup if failed
 	if (is_err) {
-		snowflake.execute({sqlText: `DROP ICEBERG TABLE IF EXISTS ${v_icename}`});
+		if (TARGET_TYPE.toLocaleLowerCase() == 'snowflake'){
+			snowflake.execute({sqlText: `DROP ICEBERG TABLE IF EXISTS ${v_icename}`});
+		}
+		
 	}
 
 	ret['finishTimeStamp'] = getCurrentTimestamp()
@@ -504,7 +551,7 @@ $$
 		// --- Get permissions from source table 
     	var valRet = '' 
 		
-		if (table_type.toLocaleLowerCase() == 'snowflake') {
+		if (table_type.toLocaleLowerCase() == 'snowflake_fdn') {
 			// ---- Get DDL for source table 
 			let table_rs = snowflake.execute({sqlText: `SELECT GET_DDL('TABLE',  '${source_table}', true) AS ddl`})
 			table_rs.next()

@@ -10,7 +10,7 @@ USE SCHEMA IDENTIFIER($T2I_SCH);
 CREATE or REPLACE PROCEDURE iceberg_insert_delta_tables(external_volume VARCHAR, target_catalog VARCHAR, target_schema VARCHAR, table_list ARRAY)
 RETURNS VARIANT 
 LANGUAGE JAVASCRIPT
-COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 2}}' 
+COMMENT = '{"origin": "sf_sit", "name": "table_to_iceberg", "version":{"major": 1, "minor": 3}}' 
 EXECUTE AS CALLER 
 AS
 $$
@@ -36,7 +36,7 @@ $$
     // ---------------------------------------------------------------------------------------------
 
     // ----- Standard tag 
-    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 2}}
+    var std_tag = {origin: 'sf_sit', name: 'table_to_iceberg', version:{major: 1, minor: 3}}
 
     // ----- Define return value
     var ret = {}
@@ -109,7 +109,7 @@ $$
         }
 
         //build insert statement
-        let insert_stmt = `INSERT INTO ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATION_TABLE(table_type, table_location, table_name, target_table_catalog, target_table_schema) VALUES\n`;
+        let insert_stmt = `INSERT INTO ICEBERG_MIGRATOR_DB.ICEBERG_MIGRATOR.MIGRATION_TABLE(table_type, table_location, table_name, target_type, target_table_catalog, target_table_schema, target_table_name) VALUES\n`;
 
         //if table_list only contains '*', get list of all tables
         if (TABLE_LIST.length == 1 && TABLE_LIST[0] == '*') {
@@ -128,9 +128,9 @@ $$
         for (let i = 0; i < TABLE_LIST.length; i++) {
             let tbl = TABLE_LIST[i];
             if (i==0) {
-                insert_stmt += `('delta', '${location}', '${tbl}', '${TARGET_CATALOG}', '${TARGET_SCHEMA}')\n`
+                insert_stmt += `('delta', '${location}', '${tbl}', 'snowflake', '${TARGET_CATALOG}', '${TARGET_SCHEMA}', '${tbl}')\n`
             } else {
-                insert_stmt += `,('delta', '${location}', '${tbl}', '${TARGET_CATALOG}', '${TARGET_SCHEMA}')\n`
+                insert_stmt += `,('delta', '${location}', '${tbl}', 'snowflake', '${TARGET_CATALOG}', '${TARGET_SCHEMA}', '${tbl}')\n`
             }
         }
 

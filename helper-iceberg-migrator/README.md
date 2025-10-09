@@ -63,6 +63,30 @@ Copyright (c) [Current Year] Snowflake Inc. All Rights Reserved.
     - Ability to create and drop objects in the databases and schemas that contain table to be modified 
     - Ability to create Iceberg Tables in the target databases and schemas 
 
+### - Syncing Snowflake-managed Iceberg Tables to AWS Glue:
+
+- External:
+    - An existing AWS Glue Data Catalog  
+- Snowflake:
+    - At least ```SELECT``` privileges on existing Snowflake Iceberg tables
+    - At least ```USAGE``` privileges on an existing Snowflake ```EXTERNAL ACCESS INTEGRATION``` registered to the required AWS Glue region(s)
+        - This tool can be used to create the ```EXTERNAL ACCESS INTEGRATION```, which requires either the ```ACCOUNTADMIN``` role or a role with the ```CREATE INTEGRATION``` and ```CREATE EXTERNAL ACCESS INTEGRATION``` privileges.
+            - If creating an ```EXTERNAL ACCESS INTEGRATION```, at least ```USAGE``` privileges on an existing Snowflake ```NETWORK RULE``` is required. This tool can also be used to create one, which requires either the ```ACCOUNTADMIN```, ```SECURITYADMIN``` roles, ownership of the schema, or a role granted the ```CREATE NETWORK RULE``` privilege.
+        - Visit https://docs.snowflake.com/en/developer-guide/external-network-access/creating-using-external-network-access for instructions for more details. 
+    - At least ```USAGE``` privileges on an existing Snowflake ```SECURITY INTEGRATION``` (if preferred to manage access to AWS Glue).
+    - At least ```USAGE``` privileges on an existing warehouse that will be used for tasks that will sync iceberg metadata to AWS Glue. 
+- Role Permissions:
+    - Ability to query and update all the objects in the tool schema 
+    - Ability to query all the views in the tool schema 
+    - Ability to create and execute procedures in the tool schema
+    - Ability to use the warehouse for processing
+    - Ability to create, execute, monitor and drop tasks in the tool schema 
+    - Usage of the external volume
+    - Ability to create and drop objects in the databases and schemas that contain table to be modified 
+    - Ability to create objects in the target databases and schemas (if not replacing existing Snowflake tables)
+    - Ability to set permissions and change ownership of the newly created iceberg tables
+
+
 ## Installation
 
 This repo includes the `im_install` notebook, located in the `installer/` directory, that installs the Iceberg Migrator solution and SiS app. The notebook should be imported in the appicable Snowflake account and executed, using a role with the specified permissions. Refer to the notebook for more details.
@@ -71,22 +95,41 @@ This repo includes the `im_install` notebook, located in the `installer/` direct
 
 ## Running and monitoring (Streamlit)
 
-- Follow the instructions in the included Streamlit app to migrate Snowflake or Delta tables, monitor the migration logs, create External Volumes and Catalog Integrations, or update settings.
+- Follow the instructions in the included Streamlit app to migrate Snowflake or Delta tables, synce Snowflake-managed Iceberg tables to AWS Glue, monitor the migration logs, create External Volumes, Catalog Integrations, External Access Integrations, or update settings.
 
 ## Running and monitoring (non-Streamlit)
 
 - Insert list of tables into the **_migration_table_** table.
     ```
-    insert into iceberg_migrator.migration_table
+    --Migrating Snowflake FDN tables
+    insert into iceberg_migrator_db.iceberg_migrator.migration_table
     (
-        table_catalog, 
-        table_schema, 
-        table_name 
+        table_type ,table_catalog ,table_schema ,table_name ,target_type ,target_table_catalog ,target_table_schema ,target_table_name
     )
     values 
-        ('TEST_DB','TEST_SCHEMA','TEST_TABLE_1'), 
-        ('TEST_DB','TEST_SCHEMA','TEST_TABLE_2'), 
-        ('TEST_DB','TEST_SCHEMA','TEST_TABLE_2'); 
+        ('snowflake_fdn','TEST_DB','TEST_SCHEMA','TEST_TABLE_1','snowflake','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_1'), 
+        ('snowflake_fdn','TEST_DB','TEST_SCHEMA','TEST_TABLE_2','snowflake','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_2'), 
+        ('snowflake_fdn','TEST_DB','TEST_SCHEMA','TEST_TABLE_3','snowflake','TEST_DB','TEST_SCHEMA','TEST_TABLE_3'); --replaces the existing fdn table
+
+    --Migrating Delta tables
+    insert into iceberg_migrator_db.iceberg_migrator.migration_table
+    (
+        table_type, table_location ,table_name ,target_type ,target_table_catalog ,target_table_schema ,target_table_name
+    )
+    values 
+        ('delta','azure://mhenderson.blob.core.windows.net/dbfscontainer/mnt/','TEST_TABLE_1','snowflake','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_1'), 
+        ('delta','azure://mhenderson.blob.core.windows.net/dbfscontainer/mnt/','TEST_TABLE_2','snowflake','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_2'), 
+        ('delta','azure://mhenderson.blob.core.windows.net/dbfscontainer/mnt/','TEST_TABLE_3','snowflake','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_3');
+
+    --Syncing Iceberg metadata to AWS Glue
+    insert into iceberg_migrator_db.iceberg_migrator.migration_table
+    (
+        table_type, table_catalog, table_schema, table_name, target_type, target_table_catalog, target_table_name, update_frequency_mins, warehouse
+    )
+    values 
+        ('snowflake_iceberg','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_1','aws_glue','my_athena_db','TEST_TABLE_1',120, 'MY_WH_XS'), 
+        ('snowflake_iceberg','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_2','aws_glue','my_athena_db','TEST_TABLE_1',120, 'MY_WH_XS'), 
+        ('snowflake_iceberg','TARGET_DB','TARGET_SCHEMA','TEST_TABLE_3','aws_glue','my_athena_db','TEST_TABLE_1',120, 'MY_WH_XS');
     ```
 
 - Once the table is populated then execute **_iceberg_migration_dispatcher_** procedure.
@@ -101,13 +144,17 @@ This repo includes the `im_install` notebook, located in the `installer/` direct
             "result": true,
             "runID": 502,
             "settings": {
-                "external_volume": "iceberg_external_volume",
+                "aws_glue_external_access_integration": "my_aws_glue_external_access_integration",
+                "count_only_validation": "FALSE",
+                "delta_catalog_integration": "my_delta_catalog_integration",
+                "external_volume": "my_iceberg_external_volume",
                 "location_pattern": "${TABLE_CATALOG}/${TABLE_SCHEMA}/${TABLE_NAME}",
                 "max_parallel_tasks": "3",
                 "max_tables_run": "50",
                 "procName": "ICEBERG_MIGRATION_DISPATCHER",
+                "timezone_conversion": null,
                 "truncate_time": "TRUE",
-                "version": "1.0",
+                "version": "1.3",
                 "warehouse_name": "sramsey_wh"
             }
         }
@@ -116,22 +163,30 @@ This repo includes the `im_install` notebook, located in the `installer/` direct
 
 - Monitor process
 
-    The first thing to check would be the tasks.  You will either see tasks, meaning that tasks are running, or nothing will be returned meaning all the migrations have completed. 
+    The Iceberg Migrator SiS app has includes a Migration Log page that tracks the status of Snowflake FDN and Delta tables. In addition, there is also a Catalog Sync Log page that tracks syncing Snowflake-managed Iceberg tables to AWS Glue.
+    
+    Alternatively, the tasks can be checked.  You will either see tasks, meaning that tasks are running, or nothing will be returned meaning all the migrations/syncs have completed. 
     ```
     show tasks like 'IM%';
     ```
 
-    You can also query log tables to see the status of the current/last executed iceberg migration.
+    For migrations, you can also query log tables to see the status of the current/last executed iceberg migration.
     ```
     select mt.*, mtl.* exclude (table_instance_id) 
-    from migration_table_log mtl
-    inner join migration_table mt
+    from iceberg_migrator_db.iceberg_migrator.migration_table_log mtl
+    inner join iceberg_migrator_db.iceberg_migrator.migration_table mt
        on mt.table_instance_id = mtl.table_instance_id
     where log_time >= (select max(start_time) from migration_run_log)
     order by log_time desc;
     ```
+
+    For syncs to AWS Glue, you can query the iceberg_metadata_sync table:
+    ```
+    select * from iceberg_migrator_db.iceberg_migrator.iceberg_metadata_sync;
+    ```
+
 - Table migration error message types 
     - Table does not exist 
     - Table is already converted to iceberg 
     - Source table contains data types that are not supported by iceberg
-    - Other Snowflake errors that were not handled by the migrator code.  These will be returned with all the details from the Snowflake error message.  
+    - Other Snowflake errors that were not handled by the migrator code.  These will be returned with all the details from the Snowflake error message.
