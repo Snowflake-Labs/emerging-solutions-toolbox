@@ -63,13 +63,13 @@ def execute_cmd(session):
         curr_db = pd.DataFrame(session.sql(f"""SELECT CURRENT_DATABASE();""").collect()).iloc[0,0]
             
         #create temp table from stream
-        session.sql("CREATE OR REPLACE TEMPORARY TABLE CMD_MGR.COMMANDS_TEMP(run_id NUMBER(38,0), app_name VARCHAR, cmd VARCHAR, cmd_hash VARCHAR, generate_results_table BOOLEAN)").collect()
+        session.sql(f"CREATE OR REPLACE TEMPORARY TABLE {curr_db}.CMD_MGR.COMMANDS_TEMP(run_id NUMBER(38,0), app_name VARCHAR, cmd VARCHAR, cmd_hash VARCHAR, generate_results_table BOOLEAN)").collect()
         
         #advance the stream by inserting into temp table from stream
-        session.sql("INSERT INTO CMD_MGR.COMMANDS_TEMP SELECT run_id, app_name, cmd, cmd_hash, generate_results_table FROM CMD_MGR.COMMANDS_STREAM WHERE METADATA$ACTION = 'INSERT' ORDER BY start_timestamp ASC").collect()
+        session.sql(f"INSERT INTO {curr_db}.CMD_MGR.COMMANDS_TEMP SELECT run_id, app_name, cmd, cmd_hash, generate_results_table FROM CMD_MGR.COMMANDS_STREAM WHERE METADATA$ACTION = 'INSERT' ORDER BY start_timestamp ASC").collect()
 
         #select commands from temp table
-        df_cmds = pd.DataFrame(session.sql(f"""SELECT run_id, app_name, cmd, cmd_hash, generate_results_table FROM CMD_MGR.COMMANDS_TEMP""").collect())
+        df_cmds = pd.DataFrame(session.sql(f"""SELECT run_id, app_name, cmd, cmd_hash, generate_results_table FROM {curr_db}.CMD_MGR.COMMANDS_TEMP""").collect())
 
         for row in df_cmds.itertuples():
             run_id = row.RUN_ID
@@ -101,7 +101,7 @@ def execute_cmd(session):
                     results_table = f"CMD_RESULTS_{cmd_hash}"
 
                 #update COMMANDS table, set status to COMPLETE
-                session.sql(f"""UPDATE CMD_MGR.COMMANDS SET 
+                session.sql(f"""UPDATE {curr_db}.CMD_MGR.COMMANDS SET 
                                     status = 'COMPLETE'
                                     ,completed_timestamp = SYSDATE()
                                     ,results_table = '{results_table}'
@@ -112,7 +112,7 @@ def execute_cmd(session):
                                     AND cmd_hash = '{cmd_hash}'""").collect()
 
                 #add cmd to LOGS table
-                session.sql(f"""INSERT INTO LOGGING.LOGS SELECT 
+                session.sql(f"""INSERT INTO {curr_db}.LOGGING.LOGS SELECT 
                                     SYSDATE()
                                     ,'SUCCESS'
                                     ,PARSE_JSON('{{"run_id":"{run_id}", "app_name":"{app_name}", "message":"Command executed successfully"}}')""").collect()
@@ -127,7 +127,7 @@ def execute_cmd(session):
                 msg_return = f"Failed: {error_eraw}"
 
                 #update COMMANDS table with ERROR
-                session.sql(f"""UPDATE CMD_MGR.COMMANDS SET 
+                session.sql(f"""UPDATE {curr_db}.CMD_MGR.COMMANDS SET 
                                     status = 'ERROR'
                                     ,completed_timestamp = SYSDATE()
                                     ,notes = '{msg_return}'
@@ -146,7 +146,7 @@ def execute_cmd(session):
         msg_return = f"Failed: {error_eraw}"
 
         #add ERROR to LOGS table
-        session.sql(f"""INSERT INTO LOGGING.LOGS SELECT 
+        session.sql(f"""INSERT INTO {curr_db}.LOGGING.LOGS SELECT 
                             SYSDATE()
                             ,'ERROR'
                             ,PARSE_JSON('{{"run_id":"{run_id}", "app_name":"{app_name}", "message":"{msg_return}"}}')""").collect()
