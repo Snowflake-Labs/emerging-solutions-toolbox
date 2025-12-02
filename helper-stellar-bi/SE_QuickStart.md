@@ -112,7 +112,7 @@ Review each partition and look for:
 ## Key Resources
 - **Stellar BI**: 
   Can be run in either:
-  - [Stellar BI in Snowhouse](https://app.snowflake.com/sfcogsops/snowhouse_aws_us_west_2/#/streamlit-apps/APPLIED_FIELD_ENGINEERING.UI.STELLAR_BI)
+  - Stellar BI in Snowhouse
   - Stellar BI installation in your demo account: see [Installation Instructions](README.md#method-b-install-stellar-bi-in-your-snowflake-account).  
 - [**Walkthrough Video**](https://drive.google.com/file/d/14JZU3TSpNSpJH4KaSLqFDfmgThJIkEBW/view)
 - **Docs**: 
