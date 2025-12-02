@@ -33,12 +33,7 @@ If you have a `.pbix` file, convert it to `.pbit`:
 Alternatively, you can use the test pbit file [test1.pbit](tests/data/test1.pbit).
 
 ### 2. Run Stellar BI Streamlit App
-There are two methods to run Stellar BI:
-#### Method A: Run Stellar BI in Snowhouse
-You can run Stellar BI in Snowhouse [here](https://app.snowflake.com/sfcogsops/snowhouse_aws_us_west_2/#/streamlit-apps/APPLIED_FIELD_ENGINEERING.UI.STELLAR_BI).
-
-#### Method B: Install Stellar BI in your Snowflake Account
-The following notebook installers are available to end users:
+Install Stellar BI in your Snowflake Account using the following notebook installers:
 
 - **`bi.ipynb`**: For users with SYSADMIN role (creates new database and objects)
 - **`bi_no_sysadmin.ipynb`**: For users without SYSADMIN role (uses existing database, user must have CREATE SCHEMA / STAGE / TABLE / STREAMLIT privilege)
