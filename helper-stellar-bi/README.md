@@ -36,7 +36,12 @@ Alternatively, you can use the test pbit file [test1.pbit](tests/data/test1.pbit
 Install Stellar BI in your Snowflake Account using the following notebook installers:
 
 - **`bi.ipynb`**: For users with SYSADMIN role (creates new database and objects)
+
+- **`bi_no_signin.ipynb`**: same as bi.ipynb but without Salesforce account dialog.
+
 - **`bi_no_sysadmin.ipynb`**: For users without SYSADMIN role (uses existing database, user must have CREATE SCHEMA / STAGE / TABLE / STREAMLIT privilege)
+
+- **`bi_no_sysadmin_no_signin.ipynb`**: same as bi_no_sysadmin.ipynb but without Salesforce account dialog.
 
 ##### Steps
 1. Download the notebook installers from the repo.
