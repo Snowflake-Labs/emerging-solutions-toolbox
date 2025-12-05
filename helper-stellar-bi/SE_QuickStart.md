@@ -114,7 +114,7 @@ Review each partition and look for:
   Can be run in either:
   - Stellar BI in Snowhouse
   - Stellar BI installation in your demo account: see [Installation Instructions](README.md#method-b-install-stellar-bi-in-your-snowflake-account).  
-- [**Walkthrough Video**](https://drive.google.com/file/d/14JZU3TSpNSpJH4KaSLqFDfmgThJIkEBW/view)
+- [**Walkthrough Video**](https://drive.google.com/file/d/1BdPUxx-I46ZvcjmKt4UlvNG0_xNASK55/view?usp=drive_link)
 - **Docs**: 
   - [readme.md](README.md)
   - [limitations.md](limitations.md)

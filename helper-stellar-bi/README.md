@@ -63,7 +63,7 @@ The installer will also create database, schemas, stages, roles, and warehouses 
 See [limitations.md](limitations.md) for detailed information on supported functions and current limitations.
 
 ## Walkthrough Video
-[Stellar BI Walkthrough Video](https://drive.google.com/file/d/14JZU3TSpNSpJH4KaSLqFDfmgThJIkEBW/view)
+[Stellar BI Walkthrough Video](https://drive.google.com/file/d/1BdPUxx-I46ZvcjmKt4UlvNG0_xNASK55/view?usp=drive_link)
 
 ## For Developers
 **[README_dev.md](README_dev.md)** - Please refer to this Readme for development and debugging purposes.
