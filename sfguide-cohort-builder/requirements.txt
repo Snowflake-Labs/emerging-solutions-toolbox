@@ -24,7 +24,7 @@ defusedxml==0.7.1
 exceptiongroup==1.2.1
 executing==2.0.1
 fastjsonschema==2.20.0
-filelock==3.15.4
+filelock==3.20.1
 fqdn==1.5.1
 gitdb==4.0.11
 GitPython==3.1.43
