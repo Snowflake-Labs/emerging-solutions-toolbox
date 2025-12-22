@@ -14,11 +14,9 @@ from textwrap import dedent
 import snowflake.snowpark
 from snowflake.cortex import Complete
 from snowflake.ml.registry import registry
-from snowflake.ml.feature_store import FeatureView
-from snowflake.ml.model import ModelVersion
+from snowflake.ml.feature_store import FeatureView, FeatureStore
 from snowflake.snowpark import Session, exceptions, DataFrame
 from snowflake.snowpark import functions as F
-from snowflake.snowpark import types as T
 from snowflake.snowpark.context import get_active_session
 
 
@@ -289,18 +287,71 @@ def get_next_model_version(
     }
     return output_dict
 
-def version_featureview(feature_view:FeatureView) -> str:
+def version_featureview(feature_store: FeatureStore, feature_view: FeatureView) -> str:
+    """
+    Determine the appropriate version for a feature view based on its definition.
 
-    """Computes an md5 hash of a feature view's query and the key/value of metadata fields.
-    This hash can be used as the version when registering the feature view."""
+    Implements a smart versioning strategy that:
+      - Creates a new version (increments) when breaking changes are detected
+        (changes to entities, query, timestamp column, or clustering)
+      - Updates the existing version in-place for non-breaking metadata changes
+        (refresh frequency, warehouse, or description)
+      - Returns version "1" for brand new feature views
 
-    keys = [
-        'query', 'name','entities','timestamp_col','desc','feature_desc',
-        'refresh_freq','database','schema','initialize','warehouse',
-        'refresh_mode','refresh_mode_reason','owner','cluster_by'
-    ]
-    data = {k:str(getattr(feature_view, "_"+k)) for k in keys}
-    return hashlib.md5(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest().upper()
+    This approach minimizes unnecessary version proliferation while ensuring
+    that downstream consumers are protected from breaking schema changes.
+
+    Args:
+        feature_store (FeatureStore): The initialized Snowflake Feature Store instance
+        feature_view (FeatureView): The new feature view to version
+
+    Returns:
+        str: The version string to use when registering the feature view.
+             Either a new incremented version or the existing version number.
+
+    Examples:
+        >>> version = _version_featureview(fs, my_feature_view)
+        >>> fs.register_feature_view(my_feature_view, version=version)
+
+    """
+    name = str(feature_view.name)
+
+    # Check if any versions of this feature view already exist
+    existing = feature_store.list_feature_views().filter(F.col("NAME") == name).collect()
+
+    if existing:
+        # Find the highest (most recent) version number
+        last_version = max([int(row.VERSION) for row in existing])
+        last_feature_view = feature_store.get_feature_view(name=name, version=str(last_version))
+
+        # Compare entities - a change in entities is a breaking change
+        last_ent = [e.name for e in last_feature_view.entities]
+        new_ent = [e.name for e in feature_view.entities]
+        if last_ent != new_ent:
+            return str(last_version+1)
+
+        # Check for breaking changes in core feature view attributes
+        # These attributes affect the data schema or query logic
+        breaking_change_keys = ['_query', '_name','_timestamp_col','_cluster_by']
+        for k in breaking_change_keys:
+            if getattr(last_feature_view, k) != getattr(feature_view, k):
+                return str(last_version+1)
+
+        # For non-breaking metadata changes, update the existing version in-place
+        # These changes don't affect the data schema, so no new version is needed
+        metadata_keys = ["refresh_freq", "warehouse", "desc"]
+        updates = {
+            k: getattr(feature_view, k)
+            for k in metadata_keys
+            if getattr(feature_view, k) != getattr(last_feature_view, k)
+        }
+        if updates:
+            feature_store.update_feature_view(name=name, version=str(last_version), **updates)
+
+        return str(last_version)
+
+    # No existing versions found - this is a new feature view
+    return str(1)
 
 def version_data(df:DataFrame) -> str:
 
