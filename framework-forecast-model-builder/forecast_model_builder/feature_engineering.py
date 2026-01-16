@@ -126,29 +126,38 @@ def verify_current_frequency(
     # print(f"Distinct time step values: {distinct_time_step_values_count} \n")
 
     # Most common time step value
-    most_common_time_diff = sdf_freq_verification.agg(
-        F.mode("TIME_DIFF").alias("MODE_TIME_DIFF")
-    ).collect()[0]["MODE_TIME_DIFF"]
+    time_diff_stats = sdf_freq_verification.agg(
+        F.min("TIME_DIFF").alias("MIN_TIME_DIFF"),
+        F.mode("TIME_DIFF").alias("MODE_TIME_DIFF"),
+        F.max("TIME_DIFF").alias("MAX_TIME_DIFF"),
+    ).collect()[0].as_dict()
 
-    # Most common time step value in different units
-    time_step_values = {
-        "millisecond": most_common_time_diff,
-        "second": most_common_time_diff / 1000,
-        "minute": most_common_time_diff / 1000 / 60,
-        "hour": most_common_time_diff / 1000 / 60 / 60,
-        "day": most_common_time_diff / 1000 / 60 / 60 / 24,
-        "week": most_common_time_diff / 1000 / 60 / 60 / 24 / 7,
-        "month": most_common_time_diff / 1000 / 60 / 60 / 24 / 30,
+    # Time step value in different units
+    time_step_funcs = {
+        "millisecond": lambda x: x,
+        "second": lambda x: x / 1000,
+        "minute": lambda x: x / 1000 / 60,
+        "hour": lambda x: x / 1000 / 60 / 60,
+        "day": lambda x: x / 1000 / 60 / 60 / 24,
+        "week": lambda x: x / 1000 / 60 / 60 / 24 / 7,
+        "month": lambda x: x / 1000 / 60 / 60 / 24 / 30,
     }
+
+    time_step_values = {k:v(time_diff_stats['MODE_TIME_DIFF']) for k,v in time_step_funcs.items()}
 
     # The unit that converts the most common time step value closest to 1 is probably the granularity of the dataset
     closest_unit_to_1 = min(
         time_step_values, key=lambda k: abs(time_step_values[k] - 1)
     )
+    conversion_func = time_step_funcs[closest_unit_to_1]
+
+    min_diff = conversion_func(time_diff_stats['MIN_TIME_DIFF'])
+    max_diff = conversion_func(time_diff_stats['MAX_TIME_DIFF'])
 
     print(
         f"""Most common time between consecutive records (frequency): {time_step_values[closest_unit_to_1]} {closest_unit_to_1}(s)
     The current frequency appears to be in {closest_unit_to_1.upper()} granularity.
+    The range of values is {min_diff} - {max_diff} {closest_unit_to_1}(s)
     """
     )
 
