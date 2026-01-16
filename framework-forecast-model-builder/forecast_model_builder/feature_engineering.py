@@ -157,7 +157,7 @@ def verify_current_frequency(
     print(
         f"""Most common time between consecutive records (frequency): {time_step_values[closest_unit_to_1]} {closest_unit_to_1}(s)
     The current frequency appears to be in {closest_unit_to_1.upper()} granularity.
-    The range of values is {min_diff} - {max_diff} {closest_unit_to_1} (s)
+    The range of values is {min_diff} - {max_diff} {closest_unit_to_1}(s)
     """
     )
 
